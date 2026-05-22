@@ -1,0 +1,1049 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#0f1117">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Вендинг Мениджър</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --bg: #0f1117;
+    --bg2: #171b26;
+    --bg3: #1e2433;
+    --border: #2a3147;
+    --accent: #4f8ef7;
+    --accent2: #7c3aed;
+    --green: #22c55e;
+    --amber: #f59e0b;
+    --red: #ef4444;
+    --text: #e8eaf0;
+    --text2: #8b92a8;
+    --text3: #4a5068;
+    --radius: 14px;
+    --font: 'Manrope', sans-serif;
+    --mono: 'JetBrains Mono', monospace;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    max-width: 480px;
+    margin: 0 auto;
+    padding-bottom: 80px;
+  }
+
+  /* HEADER */
+  .header {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(15,17,23,0.92);
+    backdrop-filter: blur(16px);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 20px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .header-title { font-size: 17px; font-weight: 700; letter-spacing: -0.3px; }
+  .header-sub { font-size: 12px; color: var(--text2); font-family: var(--mono); }
+  .header-avatar {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; font-weight: 700; cursor: pointer;
+  }
+
+  /* TABS */
+  .tabs {
+    display: flex; gap: 4px;
+    padding: 12px 16px 0;
+    overflow-x: auto; scrollbar-width: none;
+  }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab {
+    flex-shrink: 0;
+    padding: 8px 16px; border-radius: 8px;
+    font-size: 13px; font-weight: 600;
+    border: 1px solid var(--border);
+    background: var(--bg2);
+    color: var(--text2);
+    cursor: pointer; transition: all 0.2s;
+  }
+  .tab.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+
+  /* PAGES */
+  .page { display: none; padding: 16px; }
+  .page.active { display: block; }
+
+  /* SECTION LABEL */
+  .section-label {
+    font-size: 11px; font-weight: 700; letter-spacing: 1.2px;
+    color: var(--text3); text-transform: uppercase;
+    margin: 20px 0 10px;
+  }
+
+  /* CARD */
+  .card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-bottom: 12px;
+  }
+
+  /* FIELD */
+  .field { margin-bottom: 14px; }
+  .field label {
+    display: block; font-size: 12px; font-weight: 600;
+    color: var(--text2); margin-bottom: 6px; letter-spacing: 0.3px;
+  }
+  .field input, .field select, .field textarea {
+    width: 100%;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    color: var(--text);
+    font-family: var(--font);
+    font-size: 15px;
+    outline: none;
+    transition: border-color 0.2s;
+    appearance: none;
+  }
+  .field input:focus, .field select:focus {
+    border-color: var(--accent);
+  }
+  .field select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238b92a8' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+    padding-right: 36px;
+  }
+
+  /* QTY CONTROL */
+  .qty-control {
+    display: flex; align-items: center; gap: 12px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 8px 14px;
+  }
+  .qty-btn {
+    width: 36px; height: 36px;
+    border-radius: 8px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-size: 20px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; transition: all 0.15s;
+    flex-shrink: 0;
+  }
+  .qty-btn:active { background: var(--accent); border-color: var(--accent); transform: scale(0.92); }
+  .qty-input {
+    flex: 1; text-align: center;
+    background: transparent !important;
+    border: none !important;
+    font-size: 22px !important;
+    font-weight: 700 !important;
+    font-family: var(--mono) !important;
+    padding: 0 !important;
+  }
+
+  /* PRODUCT GRID */
+  .product-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+  .product-btn {
+    background: var(--bg3);
+    border: 2px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 8px;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.15s;
+  }
+  .product-btn:active { transform: scale(0.94); }
+  .product-btn.selected {
+    border-color: var(--accent);
+    background: rgba(79,142,247,0.12);
+  }
+  .product-btn .icon { font-size: 24px; margin-bottom: 4px; }
+  .product-btn .pname { font-size: 11px; font-weight: 600; color: var(--text2); }
+  .product-btn.selected .pname { color: var(--accent); }
+
+  /* GPS ROW */
+  .gps-row {
+    display: flex; gap: 8px; align-items: stretch;
+  }
+  .gps-row .field { flex: 1; margin-bottom: 0; }
+  .gps-btn {
+    flex-shrink: 0;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0 14px;
+    color: var(--text2);
+    cursor: pointer;
+    font-size: 20px;
+    display: flex; align-items: center;
+    transition: all 0.2s;
+  }
+  .gps-btn:active { border-color: var(--accent); color: var(--accent); }
+  .gps-status { font-size: 11px; color: var(--text3); margin-top: 5px; font-family: var(--mono); }
+
+  /* TIMER */
+  .timer-row {
+    display: flex; align-items: center; gap: 12px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+  }
+  .timer-display {
+    font-family: var(--mono);
+    font-size: 22px;
+    font-weight: 500;
+    color: var(--accent);
+    flex: 1;
+  }
+  .timer-btn {
+    padding: 8px 16px;
+    border-radius: 8px;
+    border: none;
+    font-size: 12px; font-weight: 700;
+    cursor: pointer; transition: all 0.15s;
+  }
+  .timer-btn.start { background: var(--green); color: #fff; }
+  .timer-btn.stop { background: var(--red); color: #fff; }
+  .timer-btn.reset { background: var(--bg2); border: 1px solid var(--border); color: var(--text2); }
+
+  /* COUNTER ROW */
+  .counter-row {
+    display: flex; gap: 8px; align-items: flex-end;
+  }
+  .counter-row .field { flex: 1; margin-bottom: 0; }
+  .camera-btn {
+    flex-shrink: 0;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0 14px;
+    color: var(--text2);
+    cursor: pointer;
+    font-size: 20px;
+    height: 48px;
+    display: flex; align-items: center;
+    transition: all 0.2s;
+  }
+
+  /* SUBMIT BTN */
+  .submit-btn {
+    width: 100%;
+    padding: 16px;
+    border-radius: 12px;
+    border: none;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    color: #fff;
+    font-size: 16px; font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-top: 8px;
+  }
+  .submit-btn:active { transform: scale(0.97); opacity: 0.9; }
+  .submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* BOTTOM NAV */
+  .bottom-nav {
+    position: fixed; bottom: 0; left: 50%;
+    transform: translateX(-50%);
+    width: 100%; max-width: 480px;
+    background: rgba(15,17,23,0.95);
+    backdrop-filter: blur(16px);
+    border-top: 1px solid var(--border);
+    display: flex;
+    padding: 8px 16px 16px;
+    z-index: 100;
+  }
+  .nav-btn {
+    flex: 1;
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    padding: 8px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: none; background: transparent;
+  }
+  .nav-btn.active { background: rgba(79,142,247,0.12); }
+  .nav-icon { font-size: 22px; }
+  .nav-label { font-size: 10px; font-weight: 600; color: var(--text3); }
+  .nav-btn.active .nav-label { color: var(--accent); }
+
+  /* TOAST */
+  .toast {
+    position: fixed; top: 80px; left: 50%;
+    transform: translateX(-50%) translateY(-20px);
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 20px;
+    font-size: 14px; font-weight: 600;
+    opacity: 0; transition: all 0.3s;
+    z-index: 999; white-space: nowrap;
+    pointer-events: none;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .toast.success { border-color: var(--green); color: var(--green); }
+  .toast.error { border-color: var(--red); color: var(--red); }
+
+  /* STATS GRID */
+  .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .stat-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+  }
+  .stat-label { font-size: 11px; color: var(--text3); font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 6px; }
+  .stat-value { font-size: 22px; font-weight: 800; font-family: var(--mono); }
+  .stat-value.green { color: var(--green); }
+  .stat-value.amber { color: var(--amber); }
+  .stat-value.blue { color: var(--accent); }
+
+  /* OPERATIONS LIST */
+  .op-item {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px;
+    margin-bottom: 8px;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .op-icon { font-size: 26px; flex-shrink: 0; }
+  .op-info { flex: 1; min-width: 0; }
+  .op-title { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .op-sub { font-size: 12px; color: var(--text2); margin-top: 2px; }
+  .op-cash { font-family: var(--mono); font-size: 15px; font-weight: 700; color: var(--green); }
+
+  /* LOADING */
+  .loading {
+    display: flex; align-items: center; justify-content: center;
+    padding: 40px; color: var(--text3); font-size: 14px; gap: 10px;
+  }
+  .spinner {
+    width: 18px; height: 18px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* BADGE */
+  .badge {
+    display: inline-block;
+    padding: 3px 8px; border-radius: 5px;
+    font-size: 11px; font-weight: 700;
+    background: rgba(79,142,247,0.15);
+    color: var(--accent);
+  }
+  .badge.green { background: rgba(34,197,94,0.15); color: var(--green); }
+  .badge.amber { background: rgba(245,158,11,0.15); color: var(--amber); }
+
+  /* INFO ROW */
+  .info-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+  }
+  .info-row:last-child { border-bottom: none; }
+  .info-row .key { color: var(--text2); }
+  .info-row .val { font-weight: 600; font-family: var(--mono); }
+
+  /* EMPTY STATE */
+  .empty { text-align: center; padding: 40px 20px; color: var(--text3); }
+  .empty .empty-icon { font-size: 48px; margin-bottom: 12px; }
+  .empty p { font-size: 14px; }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div>
+    <div class="header-title">☕ Вендинг</div>
+    <div class="header-sub" id="headerDate">зарежда...</div>
+  </div>
+  <div class="header-avatar" id="avatarBtn">?</div>
+</div>
+
+<!-- TABS -->
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('restock')">⬆ Зареждане</div>
+  <div class="tab" onclick="switchTab('history')">📋 История</div>
+  <div class="tab" onclick="switchTab('stats')">📊 Статистика</div>
+  <div class="tab" onclick="switchTab('settings')">⚙️ Настройки</div>
+</div>
+
+<!-- PAGE: ЗАРЕЖДАНЕ -->
+<div class="page active" id="page-restock">
+
+  <!-- Техник -->
+  <div class="section-label">Техник</div>
+  <div class="card">
+    <div class="field">
+      <label>КОЙ ЗАРЕЖДА</label>
+      <select id="techSelect">
+        <option value="">— избери техник —</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Дата -->
+  <div class="section-label">Дата</div>
+  <div class="card">
+    <div class="field">
+      <label>ДАТА</label>
+      <input type="date" id="dateInput">
+    </div>
+  </div>
+
+  <!-- Обект -->
+  <div class="section-label">Обект</div>
+  <div class="card">
+    <div class="gps-row">
+      <div class="field">
+        <label>ОБЕКТ</label>
+        <select id="objectSelect">
+          <option value="">— избери обект —</option>
+        </select>
+      </div>
+      <button class="gps-btn" onclick="getGPS()" title="GPS">📍</button>
+    </div>
+    <div class="gps-status" id="gpsStatus"></div>
+    <div id="objectInfo"></div>
+  </div>
+
+  <!-- Продукт -->
+  <div class="section-label">Продукт</div>
+  <div class="card">
+    <div class="product-grid" id="productGrid">
+      <div class="loading"><div class="spinner"></div></div>
+    </div>
+    <div class="field">
+      <label>КОЛИЧЕСТВО</label>
+      <div class="qty-control">
+        <div class="qty-btn" onclick="changeQty(-1)">−</div>
+        <input class="qty-input" type="number" id="qtyInput" value="1.00" step="0.5" min="0">
+        <div class="qty-btn" onclick="changeQty(1)">+</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Брояч и Cash -->
+  <div class="section-label">Брояч и Cash</div>
+  <div class="card">
+    <div class="counter-row">
+      <div class="field">
+        <label>БРОЯЧ (незадължително)</label>
+        <input type="number" id="counterInput" placeholder="напр. 12450">
+      </div>
+      <button class="camera-btn" onclick="openCamera()" title="Снимка">📷</button>
+    </div>
+    <div class="field" style="margin-top:14px">
+      <label>CASH (лв)</label>
+      <input type="number" id="cashInput" placeholder="0.00" step="0.01" min="0">
+    </div>
+  </div>
+
+  <!-- Таймер -->
+  <div class="section-label">Престой</div>
+  <div class="card">
+    <div class="timer-row">
+      <div class="timer-display" id="timerDisplay">00:00:00</div>
+      <button class="timer-btn start" id="timerStartBtn" onclick="timerStart()">▶ Старт</button>
+      <button class="timer-btn stop" id="timerStopBtn" onclick="timerStop()" style="display:none">⏹ Стоп</button>
+      <button class="timer-btn reset" onclick="timerReset()">↺</button>
+    </div>
+  </div>
+
+  <!-- Коментар -->
+  <div class="section-label">Бележка</div>
+  <div class="card">
+    <div class="field" style="margin-bottom:0">
+      <label>КОМЕНТАР (незадължително)</label>
+      <textarea id="commentInput" rows="2" style="resize:none; background:var(--bg3); border:1px solid var(--border); border-radius:10px; padding:12px 14px; color:var(--text); font-family:var(--font); font-size:14px; width:100%; outline:none;" placeholder="напр. почистена филтър лента..."></textarea>
+    </div>
+  </div>
+
+  <!-- Изчислено -->
+  <div id="calcPreview"></div>
+
+  <button class="submit-btn" onclick="submitRestock()">💾 Запиши зареждането</button>
+</div>
+
+<!-- PAGE: ИСТОРИЯ -->
+<div class="page" id="page-history">
+  <div class="section-label">Последни операции</div>
+  <div id="historyList"><div class="loading"><div class="spinner"></div> зарежда...</div></div>
+</div>
+
+<!-- PAGE: СТАТИСТИКА -->
+<div class="page" id="page-stats">
+  <div class="section-label">Тази седмица</div>
+  <div class="stats-grid" id="statsGrid">
+    <div class="loading" style="grid-column:1/-1"><div class="spinner"></div> зарежда...</div>
+  </div>
+  <div class="section-label" style="margin-top:24px">По обект</div>
+  <div id="objectStats"></div>
+</div>
+
+<!-- PAGE: НАСТРОЙКИ -->
+<div class="page" id="page-settings">
+  <div class="section-label">Връзка</div>
+  <div class="card">
+    <div class="info-row">
+      <span class="key">Supabase</span>
+      <span class="badge green" id="connStatus">свързан</span>
+    </div>
+    <div class="info-row">
+      <span class="key">Обекти</span>
+      <span class="val" id="objCount">—</span>
+    </div>
+    <div class="info-row">
+      <span class="key">Продукти</span>
+      <span class="val" id="prodCount">—</span>
+    </div>
+    <div class="info-row">
+      <span class="key">Техници</span>
+      <span class="val" id="techCount">—</span>
+    </div>
+  </div>
+
+  <div class="section-label">Избор на техник</div>
+  <div class="card">
+    <div class="field" style="margin-bottom:0">
+      <label>ТЕКУЩ ТЕХНИК (запомня се)</label>
+      <select id="defaultTechSelect" onchange="saveDefaultTech()">
+        <option value="">— избери —</option>
+      </select>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<!-- BOTTOM NAV -->
+<div class="bottom-nav">
+  <button class="nav-btn active" onclick="switchTab('restock')" id="nav-restock">
+    <span class="nav-icon">⬆️</span>
+    <span class="nav-label">Зареждане</span>
+  </button>
+  <button class="nav-btn" onclick="switchTab('history')" id="nav-history">
+    <span class="nav-icon">📋</span>
+    <span class="nav-label">История</span>
+  </button>
+  <button class="nav-btn" onclick="switchTab('stats')" id="nav-stats">
+    <span class="nav-icon">📊</span>
+    <span class="nav-label">Статистика</span>
+  </button>
+  <button class="nav-btn" onclick="switchTab('settings')" id="nav-settings">
+    <span class="nav-icon">⚙️</span>
+    <span class="nav-label">Настройки</span>
+  </button>
+</div>
+
+<script>
+// =============================================
+// SUPABASE CONFIG
+// =============================================
+const SUPABASE_URL = 'https://yqbfrncncserfpcdikxy.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_n4UfSazXU9vhI9fs2paVNQ_3kz_SD9L';
+const { createClient } = supabase;
+const db = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// =============================================
+// STATE
+// =============================================
+let objects = [], products = [], technicians = [];
+let selectedProduct = null;
+let timerInterval = null, timerSeconds = 0, timerRunning = false;
+let currentLat = null, currentLng = null;
+
+// =============================================
+// INIT
+// =============================================
+document.addEventListener('DOMContentLoaded', async () => {
+  // Date
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('dateInput').value = today;
+  document.getElementById('headerDate').textContent = formatDateBG(new Date());
+
+  // Load data
+  await Promise.all([loadObjects(), loadProducts(), loadTechnicians()]);
+  loadDefaultTech();
+  updateSettingsInfo();
+});
+
+// =============================================
+// DATA LOADING
+// =============================================
+async function loadObjects() {
+  const { data, error } = await db.from('objects').select('*').eq('active', true).order('name');
+  if (error) { showToast('Грешка: обекти', 'error'); return; }
+  objects = data;
+  const sel = document.getElementById('objectSelect');
+  data.forEach(o => {
+    const opt = document.createElement('option');
+    opt.value = o.id;
+    opt.textContent = o.name;
+    opt.dataset.lat = o.lat || '';
+    opt.dataset.lng = o.lng || '';
+    opt.dataset.target = o.target_weekly || 0;
+    opt.dataset.rent = o.rent || 0;
+    sel.appendChild(opt);
+  });
+  document.getElementById('objCount').textContent = data.length;
+}
+
+async function loadProducts() {
+  const { data, error } = await db.from('products').select('*').eq('active', true).order('name');
+  if (error) return;
+  products = data;
+  renderProductGrid(data);
+  document.getElementById('prodCount').textContent = data.length;
+}
+
+async function loadTechnicians() {
+  const { data, error } = await db.from('technicians').select('*').eq('active', true).order('name');
+  if (error) return;
+  technicians = data;
+  [document.getElementById('techSelect'), document.getElementById('defaultTechSelect')].forEach(sel => {
+    data.forEach(t => {
+      const opt = document.createElement('option');
+      opt.value = t.id;
+      opt.textContent = t.name;
+      sel.appendChild(opt);
+    });
+  });
+  document.getElementById('techCount').textContent = data.length;
+}
+
+// =============================================
+// PRODUCT GRID
+// =============================================
+function renderProductGrid(prods) {
+  const grid = document.getElementById('productGrid');
+  const mainProds = prods.filter(p => !p.auto_add);
+  grid.innerHTML = mainProds.map(p => `
+    <div class="product-btn" onclick="selectProduct(${p.id})" id="prod-${p.id}">
+      <div class="icon">${p.icon || '📦'}</div>
+      <div class="pname">${p.name}</div>
+    </div>
+  `).join('');
+}
+
+function selectProduct(id) {
+  selectedProduct = products.find(p => p.id === id);
+  document.querySelectorAll('.product-btn').forEach(b => b.classList.remove('selected'));
+  const el = document.getElementById(`prod-${id}`);
+  if (el) el.classList.add('selected');
+  updateCalcPreview();
+}
+
+// =============================================
+// QTY
+// =============================================
+function changeQty(delta) {
+  const inp = document.getElementById('qtyInput');
+  let val = parseFloat(inp.value) || 0;
+  val = Math.max(0, val + delta * 0.5);
+  inp.value = val.toFixed(2);
+  updateCalcPreview();
+}
+
+// =============================================
+// GPS
+// =============================================
+function getGPS() {
+  const status = document.getElementById('gpsStatus');
+  status.textContent = '⏳ търсим GPS...';
+  if (!navigator.geolocation) { status.textContent = '❌ GPS не се поддържа'; return; }
+  navigator.geolocation.getCurrentPosition(pos => {
+    currentLat = pos.coords.latitude;
+    currentLng = pos.coords.longitude;
+    status.textContent = `📍 ${currentLat.toFixed(5)}, ${currentLng.toFixed(5)}`;
+    findNearestObject(currentLat, currentLng);
+  }, err => {
+    status.textContent = '❌ Не можем да получим GPS';
+  }, { enableHighAccuracy: true, timeout: 8000 });
+}
+
+function findNearestObject(lat, lng) {
+  if (!objects.length) return;
+  let nearest = null, minDist = Infinity;
+  objects.forEach(o => {
+    if (!o.lat || !o.lng) return;
+    const d = Math.sqrt(Math.pow(o.lat - lat, 2) + Math.pow(o.lng - lng, 2));
+    if (d < minDist) { minDist = d; nearest = o; }
+  });
+  if (nearest && minDist < 0.02) {
+    document.getElementById('objectSelect').value = nearest.id;
+    document.getElementById('gpsStatus').textContent += ` → ${nearest.name}`;
+    showObjectInfo(nearest);
+  }
+}
+
+document.getElementById('objectSelect').addEventListener('change', function() {
+  const obj = objects.find(o => o.id == this.value);
+  if (obj) showObjectInfo(obj);
+  else document.getElementById('objectInfo').innerHTML = '';
+  updateCalcPreview();
+});
+
+function showObjectInfo(obj) {
+  document.getElementById('objectInfo').innerHTML = `
+    <div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap;">
+      <span class="badge">🎯 ${obj.target_weekly} лв/седм.</span>
+      <span class="badge amber">🏠 ${obj.rent} лв наем</span>
+      ${obj.serial_number ? `<span class="badge">${obj.serial_number}</span>` : ''}
+    </div>
+  `;
+}
+
+// =============================================
+// TIMER
+// =============================================
+function timerStart() {
+  if (timerRunning) return;
+  timerRunning = true;
+  document.getElementById('timerStartBtn').style.display = 'none';
+  document.getElementById('timerStopBtn').style.display = 'inline-flex';
+  timerInterval = setInterval(() => {
+    timerSeconds++;
+    updateTimerDisplay();
+  }, 1000);
+}
+
+function timerStop() {
+  timerRunning = false;
+  clearInterval(timerInterval);
+  document.getElementById('timerStartBtn').style.display = 'inline-flex';
+  document.getElementById('timerStopBtn').style.display = 'none';
+}
+
+function timerReset() {
+  timerStop();
+  timerSeconds = 0;
+  updateTimerDisplay();
+}
+
+function updateTimerDisplay() {
+  const h = Math.floor(timerSeconds / 3600).toString().padStart(2,'0');
+  const m = Math.floor((timerSeconds % 3600) / 60).toString().padStart(2,'0');
+  const s = (timerSeconds % 60).toString().padStart(2,'0');
+  document.getElementById('timerDisplay').textContent = `${h}:${m}:${s}`;
+}
+
+// =============================================
+// CALC PREVIEW
+// =============================================
+function updateCalcPreview() {
+  const preview = document.getElementById('calcPreview');
+  if (!selectedProduct) { preview.innerHTML = ''; return; }
+  const qty = parseFloat(document.getElementById('qtyInput').value) || 0;
+  const costTotal = (selectedProduct.price_with_vat * qty).toFixed(2);
+  preview.innerHTML = `
+    <div class="section-label">Изчислено</div>
+    <div class="card">
+      <div class="info-row">
+        <span class="key">Продукт</span>
+        <span class="val">${selectedProduct.icon} ${selectedProduct.name}</span>
+      </div>
+      <div class="info-row">
+        <span class="key">Количество</span>
+        <span class="val">${qty} ${selectedProduct.unit}</span>
+      </div>
+      <div class="info-row">
+        <span class="key">Цена (с ДДС)</span>
+        <span class="val">${selectedProduct.price_with_vat} лв/${selectedProduct.unit}</span>
+      </div>
+      <div class="info-row">
+        <span class="key">Стойност на зареждане</span>
+        <span class="val" style="color:var(--amber)">${costTotal} лв</span>
+      </div>
+    </div>
+  `;
+}
+
+// =============================================
+// CAMERA
+// =============================================
+function openCamera() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*';
+  input.capture = 'environment';
+  input.onchange = (e) => {
+    const file = e.target.files[0];
+    if (file) showToast('📷 Снимката е качена — OCR идва скоро!', 'success');
+  };
+  input.click();
+}
+
+// =============================================
+// SUBMIT
+// =============================================
+async function submitRestock() {
+  const techId = document.getElementById('techSelect').value;
+  const objectId = document.getElementById('objectSelect').value;
+  const date = document.getElementById('dateInput').value;
+  const cash = parseFloat(document.getElementById('cashInput').value) || 0;
+  const counter = parseInt(document.getElementById('counterInput').value) || null;
+  const comment = document.getElementById('commentInput').value;
+  const qty = parseFloat(document.getElementById('qtyInput').value) || 0;
+
+  if (!techId) { showToast('Избери техник!', 'error'); return; }
+  if (!objectId) { showToast('Избери обект!', 'error'); return; }
+  if (!selectedProduct) { showToast('Избери продукт!', 'error'); return; }
+  if (qty <= 0) { showToast('Въведи количество!', 'error'); return; }
+
+  const obj = objects.find(o => o.id == objectId);
+  const tech = technicians.find(t => t.id == techId);
+
+  const dateObj = new Date(date);
+  const weekNum = getWeekNumber(dateObj);
+  const period = `${dateObj.getFullYear()}.${String(dateObj.getMonth()+1).padStart(2,'0')}`;
+  const durationMin = Math.round(timerSeconds / 60);
+  const costVal = selectedProduct.price_with_vat * qty;
+
+  const btn = document.querySelector('.submit-btn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Записва...';
+
+  const { error } = await db.from('operations').insert({
+    date,
+    object_id: parseInt(objectId),
+    object_name: obj?.name,
+    product_id: selectedProduct.id,
+    product_name: selectedProduct.name,
+    quantity: qty,
+    counter,
+    cash,
+    duration_minutes: durationMin,
+    technician_id: parseInt(techId),
+    technician_name: tech?.name,
+    cost_value: costVal,
+    week_number: weekNum,
+    period,
+    target: obj?.target_weekly || 0,
+    rent: obj?.rent || 0,
+    comment,
+    op_type: 'restock'
+  });
+
+  btn.disabled = false;
+  btn.textContent = '💾 Запиши зареждането';
+
+  if (error) {
+    showToast('❌ Грешка при запис: ' + error.message, 'error');
+    return;
+  }
+
+  showToast('✅ Зареждането е записано!', 'success');
+  timerReset();
+  document.getElementById('cashInput').value = '';
+  document.getElementById('counterInput').value = '';
+  document.getElementById('commentInput').value = '';
+  selectedProduct = null;
+  document.querySelectorAll('.product-btn').forEach(b => b.classList.remove('selected'));
+  document.getElementById('calcPreview').innerHTML = '';
+}
+
+// =============================================
+// HISTORY
+// =============================================
+async function loadHistory() {
+  const list = document.getElementById('historyList');
+  list.innerHTML = '<div class="loading"><div class="spinner"></div> зарежда...</div>';
+  const { data, error } = await db.from('operations')
+    .select('*').order('created_at', { ascending: false }).limit(30);
+  if (error || !data.length) {
+    list.innerHTML = '<div class="empty"><div class="empty-icon">📭</div><p>Няма записи</p></div>';
+    return;
+  }
+  list.innerHTML = data.map(op => `
+    <div class="op-item">
+      <div class="op-icon">${getProductIcon(op.product_name)}</div>
+      <div class="op-info">
+        <div class="op-title">${op.object_name || '—'} · ${op.product_name || '—'}</div>
+        <div class="op-sub">${formatDateBG(new Date(op.date))} · ${op.technician_name || '—'} · ${op.quantity} ${getProductUnit(op.product_name)}</div>
+      </div>
+      ${op.cash ? `<div class="op-cash">${op.cash.toFixed(2)} лв</div>` : ''}
+    </div>
+  `).join('');
+}
+
+// =============================================
+// STATS
+// =============================================
+async function loadStats() {
+  const grid = document.getElementById('statsGrid');
+  grid.innerHTML = '<div class="loading" style="grid-column:1/-1"><div class="spinner"></div> зарежда...</div>';
+
+  const weekStart = getWeekStart();
+  const { data } = await db.from('operations')
+    .select('*').gte('date', weekStart).eq('op_type', 'restock');
+
+  if (!data) return;
+
+  const totalCash = data.reduce((s, r) => s + (r.cash || 0), 0);
+  const totalCost = data.reduce((s, r) => s + (r.cost_value || 0), 0);
+  const totalOps = data.length;
+  const uniqueObjects = new Set(data.map(r => r.object_id)).size;
+
+  grid.innerHTML = `
+    <div class="stat-card">
+      <div class="stat-label">Cash тази седм.</div>
+      <div class="stat-value green">${totalCash.toFixed(0)} лв</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Стойност заредено</div>
+      <div class="stat-value amber">${totalCost.toFixed(0)} лв</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Зареждания</div>
+      <div class="stat-value blue">${totalOps}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Обекти</div>
+      <div class="stat-value">${uniqueObjects}</div>
+    </div>
+  `;
+
+  // By object
+  const byObj = {};
+  data.forEach(r => {
+    if (!byObj[r.object_name]) byObj[r.object_name] = { cash: 0, cost: 0, ops: 0 };
+    byObj[r.object_name].cash += r.cash || 0;
+    byObj[r.object_name].cost += r.cost_value || 0;
+    byObj[r.object_name].ops++;
+  });
+
+  const objStats = document.getElementById('objectStats');
+  const sorted = Object.entries(byObj).sort((a, b) => b[1].cash - a[1].cash);
+  objStats.innerHTML = sorted.map(([name, s]) => `
+    <div class="card">
+      <div class="info-row" style="padding-top:0">
+        <span style="font-weight:700">${name}</span>
+        <span class="badge green">${s.cash.toFixed(0)} лв</span>
+      </div>
+      <div class="info-row">
+        <span class="key">Заредено</span>
+        <span class="val amber" style="color:var(--amber)">${s.cost.toFixed(0)} лв</span>
+      </div>
+      <div class="info-row" style="padding-bottom:0">
+        <span class="key">Зареждания</span>
+        <span class="val">${s.ops}</span>
+      </div>
+    </div>
+  `).join('') || '<div class="empty"><div class="empty-icon">📊</div><p>Няма данни за тази седмица</p></div>';
+}
+
+// =============================================
+// TECH DEFAULT
+// =============================================
+function saveDefaultTech() {
+  const val = document.getElementById('defaultTechSelect').value;
+  if (val) localStorage.setItem('defaultTech', val);
+}
+
+function loadDefaultTech() {
+  const saved = localStorage.getItem('defaultTech');
+  if (saved) {
+    document.getElementById('techSelect').value = saved;
+    document.getElementById('defaultTechSelect').value = saved;
+  }
+}
+
+// =============================================
+// NAVIGATION
+// =============================================
+function switchTab(tab) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+
+  document.getElementById(`page-${tab}`).classList.add('active');
+  document.getElementById(`nav-${tab}`).classList.add('active');
+
+  const tabs = document.querySelectorAll('.tab');
+  const tabMap = ['restock','history','stats','settings'];
+  tabs[tabMap.indexOf(tab)]?.classList.add('active');
+
+  if (tab === 'history') loadHistory();
+  if (tab === 'stats') loadStats();
+}
+
+// =============================================
+// SETTINGS INFO
+// =============================================
+function updateSettingsInfo() {
+  document.getElementById('objCount').textContent = objects.length;
+  document.getElementById('prodCount').textContent = products.length;
+  document.getElementById('techCount').textContent = technicians.length;
+}
+
+// =============================================
+// HELPERS
+// =============================================
+function showToast(msg, type = 'success') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `toast ${type} show`;
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+function formatDateBG(d) {
+  return d.toLocaleDateString('bg-BG', { weekday:'long', day:'numeric', month:'long' });
+}
+
+function getWeekNumber(d) {
+  const onejan = new Date(d.getFullYear(), 0, 1);
+  return Math.ceil((((d - onejan) / 86400000) + onejan.getDay() + 1) / 7);
+}
+
+function getWeekStart() {
+  const now = new Date();
+  const day = now.getDay() || 7;
+  const mon = new Date(now);
+  mon.setDate(now.getDate() - day + 1);
+  return mon.toISOString().split('T')[0];
+}
+
+function getProductIcon(name) {
+  const p = products.find(x => x.name === name);
+  return p ? p.icon : '📦';
+}
+
+function getProductUnit(name) {
+  const p = products.find(x => x.name === name);
+  return p ? p.unit : '';
+}
+</script>
+</body>
+</html>
