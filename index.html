@@ -56,6 +56,14 @@
   .gps-btn:active { border-color:var(--accent); color:var(--accent); }
   .gps-status { font-size:11px; color:var(--text3); margin-top:5px; font-family:var(--mono); }
 
+  /* OCR */
+  .ocr-btn { flex-shrink:0; width:48px; height:48px; background:var(--bg3); border:1px solid var(--border); border-radius:10px; font-size:20px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all 0.2s; }
+  .ocr-btn:active { border-color:var(--accent); transform:scale(0.92); }
+  .ocr-status { font-size:13px; font-weight:600; padding:8px 12px; border-radius:8px; text-align:center; }
+  .ocr-status.loading { background:rgba(14,165,160,0.1); color:var(--accent); }
+  .ocr-status.success { background:rgba(22,163,74,0.1); color:var(--green); }
+  .ocr-status.error { background:rgba(220,38,38,0.1); color:var(--red); }
+
   /* TIMER */
   .timer-row { display:flex; align-items:center; gap:10px; background:var(--bg3); border:1px solid var(--border); border-radius:10px; padding:12px 14px; }
   .timer-display { font-family:var(--mono); font-size:22px; font-weight:500; color:var(--accent); flex:1; }
@@ -222,14 +230,25 @@
   <!-- 3. БРОЯЧ -->
   <div class="section-label">Брояч и Cash</div>
   <div class="card">
-    <div style="display:flex; gap:8px; align-items:flex-end;">
-      <div class="field" style="flex:1; margin-bottom:0">
-        <label>БРОЯЧ (незадължително)</label>
-        <input type="number" id="counterInput" placeholder="напр. 12450">
+    <div class="field">
+      <label>БРОЯЧ (незадължително)</label>
+      <div style="display:flex; gap:8px;">
+        <input type="number" id="counterInput" placeholder="напр. 12450" style="flex:1">
+        <button class="ocr-btn" onclick="triggerCamera()" title="Снимай брояча">📷</button>
+        <button class="ocr-btn" onclick="triggerGallery()" title="От галерия">🖼️</button>
       </div>
-      <button style="flex-shrink:0; background:var(--bg3); border:1px solid var(--border); border-radius:10px; padding:0 14px; color:var(--text2); cursor:pointer; font-size:20px; height:48px; display:flex; align-items:center;" onclick="openCamera()">📷</button>
     </div>
-    <div class="field" style="margin-top:14px; margin-bottom:0">
+    <!-- OCR Preview -->
+    <div id="ocrPreview" style="display:none; margin-bottom:14px;">
+      <div style="border-radius:10px; overflow:hidden; margin-bottom:8px; max-height:180px; display:flex; align-items:center; justify-content:center; background:var(--bg3);">
+        <img id="ocrImg" style="max-width:100%; max-height:180px; object-fit:contain; border-radius:10px;">
+      </div>
+      <div id="ocrStatus" class="ocr-status"></div>
+    </div>
+    <!-- Hidden inputs -->
+    <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none" onchange="processOCR(this)">
+    <input type="file" id="galleryInput" accept="image/*" style="display:none" onchange="processOCR(this)">
+    <div class="field" style="margin-bottom:0">
       <label>CASH (лв)</label>
       <input type="number" id="cashInput" placeholder="0.00" step="0.01" min="0">
     </div>
@@ -526,12 +545,73 @@ function updateTimerDisplay() {
   document.getElementById('timerDisplay').textContent = `${h}:${m}:${s}`;
 }
 
-// ── CAMERA ──
-function openCamera() {
-  const input = document.createElement('input');
-  input.type = 'file'; input.accept = 'image/*'; input.capture = 'environment';
-  input.onchange = () => showToast('📷 OCR скоро!', 'success');
-  input.click();
+// ── OCR БРОЯЧ ──
+function triggerCamera() { document.getElementById('cameraInput').click(); }
+function triggerGallery() { document.getElementById('galleryInput').click(); }
+
+async function processOCR(input) {
+  const file = input.files[0];
+  if (!file) return;
+
+  // Show preview
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    const base64 = e.target.result;
+    const preview = document.getElementById('ocrPreview');
+    const img = document.getElementById('ocrImg');
+    const status = document.getElementById('ocrStatus');
+
+    img.src = base64;
+    preview.style.display = 'block';
+    status.className = 'ocr-status loading';
+    status.textContent = '⏳ Разпознавам числото...';
+
+    try {
+      const base64Data = base64.split(',')[1];
+      const mediaType = file.type || 'image/jpeg';
+
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 100,
+          messages: [{
+            role: 'user',
+            content: [
+              {
+                type: 'image',
+                source: { type: 'base64', media_type: mediaType, data: base64Data }
+              },
+              {
+                type: 'text',
+                text: 'Тази снимка показва механичен брояч на вендинг машина с барабани. Прочети само числото което показва брояча. Върни САМО цифрите, нищо друго. Ако не можеш да разпознаеш числото, върни само "ГРЕШКА".'
+              }
+            ]
+          }]
+        })
+      });
+
+      const data = await response.json();
+      const result = data.content?.[0]?.text?.trim();
+
+      if (!result || result === 'ГРЕШКА' || !/^\d+$/.test(result)) {
+        status.className = 'ocr-status error';
+        status.textContent = '❌ Не успях да разпозная числото — въведи ръчно';
+      } else {
+        document.getElementById('counterInput').value = result;
+        status.className = 'ocr-status success';
+        status.textContent = `✅ Разпознато: ${result} — провери и коригирай ако трябва`;
+      }
+    } catch (err) {
+      status.className = 'ocr-status error';
+      status.textContent = '❌ Грешка при свързване — въведи ръчно';
+    }
+
+    // Reset input за следваща употреба
+    input.value = '';
+  };
+  reader.readAsDataURL(file);
 }
 
 // ── SUBMIT ──
