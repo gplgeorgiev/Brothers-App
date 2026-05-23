@@ -11,17 +11,17 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root {
-    --bg: #0f1117; --bg2: #171b26; --bg3: #1e2433;
-    --border: #2a3147; --accent: #4f8ef7; --accent2: #7c3aed;
-    --green: #22c55e; --amber: #f59e0b; --red: #ef4444;
-    --text: #e8eaf0; --text2: #8b92a8; --text3: #4a5068;
+    --bg: #f0f2f5; --bg2: #ffffff; --bg3: #e8ecf0;
+    --border: #d0d7e2; --accent: #0ea5a0; --accent2: #e8622a;
+    --green: #16a34a; --amber: #d97706; --red: #dc2626;
+    --text: #1a2236; --text2: #5a6580; --text3: #9aa3b8;
     --radius: 14px; --font: 'Manrope', sans-serif; --mono: 'JetBrains Mono', monospace;
   }
   * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
   body { font-family:var(--font); background:var(--bg); color:var(--text); min-height:100vh; max-width:480px; margin:0 auto; padding-bottom:90px; }
 
   /* HEADER */
-  .header { position:sticky; top:0; z-index:100; background:rgba(15,17,23,0.92); backdrop-filter:blur(16px); border-bottom:1px solid var(--border); padding:14px 20px; display:flex; align-items:center; justify-content:space-between; }
+  .header { position:sticky; top:0; z-index:100; background:rgba(240,242,245,0.92); backdrop-filter:blur(16px); border-bottom:1px solid var(--border); padding:14px 20px; display:flex; align-items:center; justify-content:space-between; }
   .header-title { font-size:17px; font-weight:700; letter-spacing:-0.3px; }
   .header-sub { font-size:12px; color:var(--text2); font-family:var(--mono); }
   .header-avatar { width:36px; height:36px; border-radius:50%; background:linear-gradient(135deg,var(--accent),var(--accent2)); display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:700; cursor:pointer; }
@@ -74,16 +74,20 @@
   .prod-card .pc-name { font-size:11px; font-weight:700; color:var(--text2); line-height:1.2; }
   .prod-card.selected .pc-name { color:var(--accent); }
 
-  .qty-popup { display:none; background:var(--bg2); border:1px solid var(--accent); border-radius:12px; padding:12px 14px; margin-bottom:10px; }
-  .qty-popup.visible { display:flex; align-items:center; gap:10px; animation:popIn 0.18s ease; }
+  .qty-popup { display:none; background:var(--bg2); border:1px solid var(--accent); border-radius:12px; padding:12px; margin-bottom:10px; }
+  .qty-popup.visible { display:flex; flex-wrap:wrap; align-items:center; gap:8px; animation:popIn 0.18s ease; }
   @keyframes popIn { from { opacity:0; transform:scale(0.95) translateY(-4px); } to { opacity:1; transform:scale(1) translateY(0); } }
-  .qty-popup .prod-label { flex:1; font-size:14px; font-weight:700; display:flex; align-items:center; gap:6px; }
-  .qty-popup .prod-label span { font-size:20px; }
-  .qty-big-btn { width:40px; height:40px; border-radius:10px; background:var(--bg3); border:1px solid var(--border); color:var(--text); font-size:22px; font-weight:700; display:flex; align-items:center; justify-content:center; cursor:pointer; transition:all 0.15s; flex-shrink:0; user-select:none; }
+  .qty-popup .prod-label { flex:1; min-width:0; font-size:13px; font-weight:700; display:flex; align-items:center; gap:6px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+  .qty-popup .prod-label span { font-size:18px; flex-shrink:0; }
+  .qty-popup .qty-controls { display:flex; align-items:center; gap:8px; flex-shrink:0; }
+  .qty-big-btn { width:38px; height:38px; border-radius:10px; background:var(--bg3); border:1px solid var(--border); color:var(--text); font-size:20px; font-weight:700; display:flex; align-items:center; justify-content:center; cursor:pointer; transition:all 0.15s; flex-shrink:0; user-select:none; }
   .qty-big-btn:active { background:var(--accent); border-color:var(--accent); transform:scale(0.88); }
-  .qty-big-val { min-width:44px; text-align:center; font-family:var(--mono); font-size:20px; font-weight:800; color:var(--text); }
-  .qty-add-btn { padding:10px 18px; border-radius:10px; border:none; background:var(--accent); color:#fff; font-size:13px; font-weight:700; font-family:var(--font); cursor:pointer; transition:all 0.15s; white-space:nowrap; }
-  .qty-add-btn:active { transform:scale(0.94); opacity:0.85; }
+  .qty-big-val { min-width:36px; text-align:center; font-family:var(--mono); font-size:18px; font-weight:800; color:var(--text); }
+  .qty-big-input { width:52px; text-align:center; background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:6px 4px; color:var(--text); font-family:var(--mono); font-size:18px; font-weight:800; outline:none; -moz-appearance:textfield; }
+  .qty-big-input::-webkit-inner-spin-button, .qty-big-input::-webkit-outer-spin-button { -webkit-appearance:none; }
+  .qty-big-input:focus { border-color:var(--accent); }
+  .qty-add-btn { width:100%; padding:11px; border-radius:10px; border:none; background:var(--accent); color:#fff; font-size:14px; font-weight:700; font-family:var(--font); cursor:pointer; transition:all 0.15s; }
+  .qty-add-btn:active { transform:scale(0.97); opacity:0.85; }
 
   .added-lines { display:flex; flex-direction:column; gap:8px; margin-bottom:4px; }
   .added-line { display:flex; align-items:center; gap:10px; background:var(--bg3); border:1px solid var(--border); border-radius:10px; padding:10px 12px; animation:slideIn 0.18s ease; }
@@ -113,7 +117,7 @@
   .submit-btn:disabled { opacity:0.5; cursor:not-allowed; }
 
   /* BOTTOM NAV */
-  .bottom-nav { position:fixed; bottom:0; left:50%; transform:translateX(-50%); width:100%; max-width:480px; background:rgba(15,17,23,0.95); backdrop-filter:blur(16px); border-top:1px solid var(--border); display:flex; padding:8px 16px 16px; z-index:100; }
+  .bottom-nav { position:fixed; bottom:0; left:50%; transform:translateX(-50%); width:100%; max-width:480px; background:rgba(240,242,245,0.95); backdrop-filter:blur(16px); border-top:1px solid var(--border); display:flex; padding:8px 16px 16px; z-index:100; }
   .nav-btn { flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; padding:8px; border-radius:10px; cursor:pointer; transition:all 0.2s; border:none; background:transparent; }
   .nav-btn.active { background:rgba(79,142,247,0.12); }
   .nav-icon { font-size:22px; }
@@ -121,7 +125,7 @@
   .nav-btn.active .nav-label { color:var(--accent); }
 
   /* TOAST */
-  .toast { position:fixed; top:80px; left:50%; transform:translateX(-50%) translateY(-20px); background:var(--bg3); border:1px solid var(--border); border-radius:10px; padding:12px 20px; font-size:14px; font-weight:600; opacity:0; transition:all 0.3s; z-index:999; white-space:nowrap; pointer-events:none; }
+  .toast { position:fixed; top:80px; left:50%; transform:translateX(-50%) translateY(-20px); background:var(--bg2); border:1px solid var(--border); box-shadow:0 4px 20px rgba(0,0,0,0.12); border-radius:10px; padding:12px 20px; font-size:14px; font-weight:600; opacity:0; transition:all 0.3s; z-index:999; white-space:nowrap; pointer-events:none; }
   .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
   .toast.success { border-color:var(--green); color:var(--green); }
   .toast.error { border-color:var(--red); color:var(--red); }
@@ -180,22 +184,7 @@
 <!-- PAGE: ЗАРЕЖДАНЕ -->
 <div class="page active" id="page-restock">
 
-  <div class="section-label">Техник</div>
-  <div class="card">
-    <div class="field" style="margin-bottom:0">
-      <label>КОЙ ЗАРЕЖДА</label>
-      <select id="techSelect"><option value="">— избери техник —</option></select>
-    </div>
-  </div>
-
-  <div class="section-label">Дата</div>
-  <div class="card">
-    <div class="field" style="margin-bottom:0">
-      <label>ДАТА</label>
-      <input type="date" id="dateInput">
-    </div>
-  </div>
-
+  <!-- 1. ОБЕКТ -->
   <div class="section-label">Обект</div>
   <div class="card">
     <div class="gps-row">
@@ -209,7 +198,7 @@
     <div id="objectInfo"></div>
   </div>
 
-  <!-- ПРОДУКТИ — хоризонтален скрол + qty popup -->
+  <!-- 2. ПРОДУКТИ -->
   <div class="section-label">Продукти</div>
   <div class="card">
     <div class="product-scroll-wrap" id="productScrollWrap">
@@ -217,18 +206,20 @@
     </div>
     <div class="qty-popup" id="qtyPopup">
       <div class="prod-label"><span id="popupIcon">☕</span><span id="popupName">Продукт</span></div>
-      <div class="qty-big-btn" onclick="changePopupQty(-0.5)">−</div>
-      <div class="qty-big-val" id="popupQty">1</div>
-      <div class="qty-big-btn" onclick="changePopupQty(0.5)">＋</div>
-      <button class="qty-add-btn" onclick="addToBasket()">Добави</button>
+      <div class="qty-controls">
+        <div class="qty-big-btn" onclick="changePopupQty(-1)">−</div>
+        <input class="qty-big-input" id="popupQtyInput" type="number" value="1" min="1" step="1" oninput="popupQty=parseFloat(this.value)||1">
+        <div class="qty-big-btn" onclick="changePopupQty(1)">＋</div>
+      </div>
+      <button class="qty-add-btn" onclick="addToBasket()">✓ Добави</button>
     </div>
     <div class="added-lines" id="addedLines"></div>
   </div>
 
-  <!-- РЕЗЮМЕ на зареждането -->
+  <!-- РЕЗЮМЕ -->
   <div id="summarySection"></div>
 
-  <!-- Брояч и Cash -->
+  <!-- 3. БРОЯЧ -->
   <div class="section-label">Брояч и Cash</div>
   <div class="card">
     <div style="display:flex; gap:8px; align-items:flex-end;">
@@ -244,7 +235,34 @@
     </div>
   </div>
 
-  <!-- Таймер -->
+  <!-- 4. ТЕХНИК -->
+  <div class="section-label">Техник</div>
+  <div class="card">
+    <div class="field" style="margin-bottom:0">
+      <label>КОЙ ЗАРЕЖДА</label>
+      <select id="techSelect"><option value="">— избери техник —</option></select>
+    </div>
+  </div>
+
+  <!-- 5. ДАТА -->
+  <div class="section-label">Дата</div>
+  <div class="card">
+    <div class="field" style="margin-bottom:0">
+      <label>ДАТА</label>
+      <input type="date" id="dateInput">
+    </div>
+  </div>
+
+  <!-- 6. БЕЛЕЖКА -->
+  <div class="section-label">Бележка</div>
+  <div class="card">
+    <div class="field" style="margin-bottom:0">
+      <label>КОМЕНТАР (незадължително)</label>
+      <textarea id="commentInput" rows="2" style="resize:none; background:var(--bg3); border:1px solid var(--border); border-radius:10px; padding:12px 14px; color:var(--text); font-family:var(--font); font-size:14px; width:100%; outline:none;" placeholder="напр. почистена филтър лента..."></textarea>
+    </div>
+  </div>
+
+  <!-- 7. ПРЕСТОЙ -->
   <div class="section-label">Престой</div>
   <div class="card">
     <div class="timer-row">
@@ -255,15 +273,7 @@
     </div>
   </div>
 
-  <!-- Коментар -->
-  <div class="section-label">Бележка</div>
-  <div class="card">
-    <div class="field" style="margin-bottom:0">
-      <label>КОМЕНТАР (незадължително)</label>
-      <textarea id="commentInput" rows="2" style="resize:none; background:var(--bg3); border:1px solid var(--border); border-radius:10px; padding:12px 14px; color:var(--text); font-family:var(--font); font-size:14px; width:100%; outline:none;" placeholder="напр. почистена филтър лента..."></textarea>
-    </div>
-  </div>
-
+  <!-- 8. ЗАПИШИ -->
   <button class="submit-btn" id="submitBtn" onclick="submitRestock()">💾 Запиши зареждането</button>
 </div>
 
@@ -341,7 +351,7 @@ async function loadObjects() {
 }
 
 async function loadProducts() {
-  const { data } = await db.from('products').select('*').eq('active', true).order('name');
+  const { data } = await db.from('products').select('*').eq('active', true).order('sort_order', {ascending:true, nullsFirst:false}).order('name');
   if (!data) return;
   products = data.filter(p => !p.auto_add);
   document.getElementById('prodCount').textContent = data.length;
@@ -385,23 +395,24 @@ function selectProdCard(id) {
   if (!prod) return;
   document.getElementById('popupIcon').textContent = prod.icon || '📦';
   document.getElementById('popupName').textContent = prod.name;
-  document.getElementById('popupQty').textContent = popupQty;
+  const qinp = document.getElementById('popupQtyInput'); if(qinp) qinp.value = popupQty;
   document.getElementById('qtyPopup').classList.add('visible');
   // scroll картата в изглед
   document.getElementById(`pc-${id}`)?.scrollIntoView({ behavior:'smooth', block:'nearest', inline:'center' });
 }
 
 function changePopupQty(delta) {
-  popupQty = Math.max(0.5, popupQty + delta);
+  popupQty = Math.max(1, popupQty + delta);
   // показваме като цяло число ако е цяло
-  document.getElementById('popupQty').textContent = popupQty % 1 === 0 ? popupQty : popupQty.toFixed(1);
+  const inp = document.getElementById('popupQtyInput'); if(inp) inp.value = popupQty;
 }
 
 function addToBasket() {
   if (!selectedProdId) return;
   const prod = products.find(p => p.id === selectedProdId);
   if (!prod) return;
-  // ако вече е добавен — обнови qty
+  const inp = document.getElementById('popupQtyInput');
+  if (inp) popupQty = parseFloat(inp.value) || 1;
   const existing = basket.find(b => b.product.id === selectedProdId);
   if (existing) { existing.qty += popupQty; } 
   else { basket.push({ product: prod, qty: popupQty }); }
@@ -426,7 +437,7 @@ function renderBasket() {
     <div class="added-line">
       <div class="al-icon">${b.product.icon || '📦'}</div>
       <div class="al-name">${b.product.name}</div>
-      <div class="al-qty">${b.qty % 1 === 0 ? b.qty : b.qty.toFixed(1)} ${b.product.unit}</div>
+      <div class="al-qty">${Number.isInteger(b.qty) ? b.qty : b.qty.toFixed(1)} ${b.product.unit}</div>
       <div class="al-remove" onclick="removeFromBasket(${i})">✕</div>
     </div>
   `).join('');
