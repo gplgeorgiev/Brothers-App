@@ -11,377 +11,157 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root {
-    --bg: #0f1117;
-    --bg2: #171b26;
-    --bg3: #1e2433;
-    --border: #2a3147;
-    --accent: #4f8ef7;
-    --accent2: #7c3aed;
-    --green: #22c55e;
-    --amber: #f59e0b;
-    --red: #ef4444;
-    --text: #e8eaf0;
-    --text2: #8b92a8;
-    --text3: #4a5068;
-    --radius: 14px;
-    --font: 'Manrope', sans-serif;
-    --mono: 'JetBrains Mono', monospace;
+    --bg: #0f1117; --bg2: #171b26; --bg3: #1e2433;
+    --border: #2a3147; --accent: #4f8ef7; --accent2: #7c3aed;
+    --green: #22c55e; --amber: #f59e0b; --red: #ef4444;
+    --text: #e8eaf0; --text2: #8b92a8; --text3: #4a5068;
+    --radius: 14px; --font: 'Manrope', sans-serif; --mono: 'JetBrains Mono', monospace;
   }
-
-  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-
-  body {
-    font-family: var(--font);
-    background: var(--bg);
-    color: var(--text);
-    min-height: 100vh;
-    max-width: 480px;
-    margin: 0 auto;
-    padding-bottom: 80px;
-  }
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { font-family:var(--font); background:var(--bg); color:var(--text); min-height:100vh; max-width:480px; margin:0 auto; padding-bottom:90px; }
 
   /* HEADER */
-  .header {
-    position: sticky; top: 0; z-index: 100;
-    background: rgba(15,17,23,0.92);
-    backdrop-filter: blur(16px);
-    border-bottom: 1px solid var(--border);
-    padding: 14px 20px;
-    display: flex; align-items: center; justify-content: space-between;
-  }
-  .header-title { font-size: 17px; font-weight: 700; letter-spacing: -0.3px; }
-  .header-sub { font-size: 12px; color: var(--text2); font-family: var(--mono); }
-  .header-avatar {
-    width: 36px; height: 36px; border-radius: 50%;
-    background: linear-gradient(135deg, var(--accent), var(--accent2));
-    display: flex; align-items: center; justify-content: center;
-    font-size: 14px; font-weight: 700; cursor: pointer;
-  }
+  .header { position:sticky; top:0; z-index:100; background:rgba(15,17,23,0.92); backdrop-filter:blur(16px); border-bottom:1px solid var(--border); padding:14px 20px; display:flex; align-items:center; justify-content:space-between; }
+  .header-title { font-size:17px; font-weight:700; letter-spacing:-0.3px; }
+  .header-sub { font-size:12px; color:var(--text2); font-family:var(--mono); }
+  .header-avatar { width:36px; height:36px; border-radius:50%; background:linear-gradient(135deg,var(--accent),var(--accent2)); display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:700; cursor:pointer; }
 
   /* TABS */
-  .tabs {
-    display: flex; gap: 4px;
-    padding: 12px 16px 0;
-    overflow-x: auto; scrollbar-width: none;
-  }
-  .tabs::-webkit-scrollbar { display: none; }
-  .tab {
-    flex-shrink: 0;
-    padding: 8px 16px; border-radius: 8px;
-    font-size: 13px; font-weight: 600;
-    border: 1px solid var(--border);
-    background: var(--bg2);
-    color: var(--text2);
-    cursor: pointer; transition: all 0.2s;
-  }
-  .tab.active {
-    background: var(--accent);
-    border-color: var(--accent);
-    color: #fff;
-  }
+  .tabs { display:flex; gap:4px; padding:12px 16px 0; overflow-x:auto; scrollbar-width:none; }
+  .tabs::-webkit-scrollbar { display:none; }
+  .tab { flex-shrink:0; padding:8px 16px; border-radius:8px; font-size:13px; font-weight:600; border:1px solid var(--border); background:var(--bg2); color:var(--text2); cursor:pointer; transition:all 0.2s; }
+  .tab.active { background:var(--accent); border-color:var(--accent); color:#fff; }
 
   /* PAGES */
-  .page { display: none; padding: 16px; }
-  .page.active { display: block; }
+  .page { display:none; padding:16px; }
+  .page.active { display:block; }
 
   /* SECTION LABEL */
-  .section-label {
-    font-size: 11px; font-weight: 700; letter-spacing: 1.2px;
-    color: var(--text3); text-transform: uppercase;
-    margin: 20px 0 10px;
-  }
+  .section-label { font-size:11px; font-weight:700; letter-spacing:1.2px; color:var(--text3); text-transform:uppercase; margin:20px 0 10px; }
 
   /* CARD */
-  .card {
-    background: var(--bg2);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 16px;
-    margin-bottom: 12px;
-  }
+  .card { background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius); padding:16px; margin-bottom:12px; }
 
   /* FIELD */
-  .field { margin-bottom: 14px; }
-  .field label {
-    display: block; font-size: 12px; font-weight: 600;
-    color: var(--text2); margin-bottom: 6px; letter-spacing: 0.3px;
-  }
-  .field input, .field select, .field textarea {
-    width: 100%;
-    background: var(--bg3);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 12px 14px;
-    color: var(--text);
-    font-family: var(--font);
-    font-size: 15px;
-    outline: none;
-    transition: border-color 0.2s;
-    appearance: none;
-  }
-  .field input:focus, .field select:focus {
-    border-color: var(--accent);
-  }
-  .field select {
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238b92a8' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: right 14px center;
-    padding-right: 36px;
-  }
-
-  /* QTY CONTROL */
-  .qty-control {
-    display: flex; align-items: center; gap: 12px;
-    background: var(--bg3);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 8px 14px;
-  }
-  .qty-btn {
-    width: 36px; height: 36px;
-    border-radius: 8px;
-    background: var(--bg2);
-    border: 1px solid var(--border);
-    color: var(--text);
-    font-size: 20px;
-    display: flex; align-items: center; justify-content: center;
-    cursor: pointer; transition: all 0.15s;
-    flex-shrink: 0;
-  }
-  .qty-btn:active { background: var(--accent); border-color: var(--accent); transform: scale(0.92); }
-  .qty-input {
-    flex: 1; text-align: center;
-    background: transparent !important;
-    border: none !important;
-    font-size: 22px !important;
-    font-weight: 700 !important;
-    font-family: var(--mono) !important;
-    padding: 0 !important;
-  }
-
-  /* PRODUCT GRID */
-  .product-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 8px;
-    margin-bottom: 14px;
-  }
-  .product-btn {
-    background: var(--bg3);
-    border: 2px solid var(--border);
-    border-radius: 12px;
-    padding: 12px 8px;
-    cursor: pointer;
-    text-align: center;
-    transition: all 0.15s;
-  }
-  .product-btn:active { transform: scale(0.94); }
-  .product-btn.selected {
-    border-color: var(--accent);
-    background: rgba(79,142,247,0.12);
-  }
-  .product-btn .icon { font-size: 24px; margin-bottom: 4px; }
-  .product-btn .pname { font-size: 11px; font-weight: 600; color: var(--text2); }
-  .product-btn.selected .pname { color: var(--accent); }
+  .field { margin-bottom:14px; }
+  .field label { display:block; font-size:12px; font-weight:600; color:var(--text2); margin-bottom:6px; letter-spacing:0.3px; }
+  .field input, .field select, .field textarea { width:100%; background:var(--bg3); border:1px solid var(--border); border-radius:10px; padding:12px 14px; color:var(--text); font-family:var(--font); font-size:15px; outline:none; transition:border-color 0.2s; appearance:none; }
+  .field input:focus, .field select:focus { border-color:var(--accent); }
+  .field select { background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238b92a8' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 14px center; padding-right:36px; }
 
   /* GPS ROW */
-  .gps-row {
-    display: flex; gap: 8px; align-items: stretch;
-  }
-  .gps-row .field { flex: 1; margin-bottom: 0; }
-  .gps-btn {
-    flex-shrink: 0;
-    background: var(--bg3);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 0 14px;
-    color: var(--text2);
-    cursor: pointer;
-    font-size: 20px;
-    display: flex; align-items: center;
-    transition: all 0.2s;
-  }
-  .gps-btn:active { border-color: var(--accent); color: var(--accent); }
-  .gps-status { font-size: 11px; color: var(--text3); margin-top: 5px; font-family: var(--mono); }
+  .gps-row { display:flex; gap:8px; align-items:stretch; }
+  .gps-row .field { flex:1; margin-bottom:0; }
+  .gps-btn { flex-shrink:0; background:var(--bg3); border:1px solid var(--border); border-radius:10px; padding:0 14px; color:var(--text2); cursor:pointer; font-size:20px; display:flex; align-items:center; transition:all 0.2s; }
+  .gps-btn:active { border-color:var(--accent); color:var(--accent); }
+  .gps-status { font-size:11px; color:var(--text3); margin-top:5px; font-family:var(--mono); }
 
   /* TIMER */
-  .timer-row {
-    display: flex; align-items: center; gap: 12px;
-    background: var(--bg3);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 12px 14px;
-  }
-  .timer-display {
-    font-family: var(--mono);
-    font-size: 22px;
-    font-weight: 500;
-    color: var(--accent);
-    flex: 1;
-  }
-  .timer-btn {
-    padding: 8px 16px;
-    border-radius: 8px;
-    border: none;
-    font-size: 12px; font-weight: 700;
-    cursor: pointer; transition: all 0.15s;
-  }
-  .timer-btn.start { background: var(--green); color: #fff; }
-  .timer-btn.stop { background: var(--red); color: #fff; }
-  .timer-btn.reset { background: var(--bg2); border: 1px solid var(--border); color: var(--text2); }
+  .timer-row { display:flex; align-items:center; gap:10px; background:var(--bg3); border:1px solid var(--border); border-radius:10px; padding:12px 14px; }
+  .timer-display { font-family:var(--mono); font-size:22px; font-weight:500; color:var(--accent); flex:1; }
+  .timer-btn { padding:8px 14px; border-radius:8px; border:none; font-size:12px; font-weight:700; cursor:pointer; transition:all 0.15s; }
+  .timer-btn.start { background:var(--green); color:#fff; }
+  .timer-btn.stop { background:var(--red); color:#fff; }
+  .timer-btn.reset { background:var(--bg2); border:1px solid var(--border); color:var(--text2); }
 
-  /* COUNTER ROW */
-  .counter-row {
-    display: flex; gap: 8px; align-items: flex-end;
-  }
-  .counter-row .field { flex: 1; margin-bottom: 0; }
-  .camera-btn {
-    flex-shrink: 0;
-    background: var(--bg3);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 0 14px;
-    color: var(--text2);
-    cursor: pointer;
-    font-size: 20px;
-    height: 48px;
-    display: flex; align-items: center;
-    transition: all 0.2s;
-  }
+  /* ====== PRODUCT PICKER ====== */
+  .product-scroll-wrap { margin:0 -16px; padding:0 16px 6px; overflow-x:auto; scrollbar-width:none; display:flex; gap:10px; margin-bottom:14px; }
+  .product-scroll-wrap::-webkit-scrollbar { display:none; }
+  .prod-card { flex-shrink:0; width:86px; background:var(--bg3); border:2px solid var(--border); border-radius:14px; padding:12px 8px 10px; text-align:center; cursor:pointer; transition:all 0.15s; user-select:none; }
+  .prod-card:active { transform:scale(0.93); }
+  .prod-card.selected { border-color:var(--accent); background:rgba(79,142,247,0.1); }
+  .prod-card .pc-icon { font-size:28px; margin-bottom:5px; line-height:1; }
+  .prod-card .pc-name { font-size:11px; font-weight:700; color:var(--text2); line-height:1.2; }
+  .prod-card.selected .pc-name { color:var(--accent); }
 
-  /* SUBMIT BTN */
-  .submit-btn {
-    width: 100%;
-    padding: 16px;
-    border-radius: 12px;
-    border: none;
-    background: linear-gradient(135deg, var(--accent), var(--accent2));
-    color: #fff;
-    font-size: 16px; font-weight: 700;
-    cursor: pointer;
-    transition: all 0.2s;
-    margin-top: 8px;
+  .qty-popup { display:none; background:var(--bg2); border:1px solid var(--accent); border-radius:12px; padding:12px 14px; margin-bottom:10px; }
+  .qty-popup.visible { display:flex; align-items:center; gap:10px; animation:popIn 0.18s ease; }
+  @keyframes popIn { from { opacity:0; transform:scale(0.95) translateY(-4px); } to { opacity:1; transform:scale(1) translateY(0); } }
+  .qty-popup .prod-label { flex:1; font-size:14px; font-weight:700; display:flex; align-items:center; gap:6px; }
+  .qty-popup .prod-label span { font-size:20px; }
+  .qty-big-btn { width:40px; height:40px; border-radius:10px; background:var(--bg3); border:1px solid var(--border); color:var(--text); font-size:22px; font-weight:700; display:flex; align-items:center; justify-content:center; cursor:pointer; transition:all 0.15s; flex-shrink:0; user-select:none; }
+  .qty-big-btn:active { background:var(--accent); border-color:var(--accent); transform:scale(0.88); }
+  .qty-big-val { min-width:44px; text-align:center; font-family:var(--mono); font-size:20px; font-weight:800; color:var(--text); }
+  .qty-add-btn { padding:10px 18px; border-radius:10px; border:none; background:var(--accent); color:#fff; font-size:13px; font-weight:700; font-family:var(--font); cursor:pointer; transition:all 0.15s; white-space:nowrap; }
+  .qty-add-btn:active { transform:scale(0.94); opacity:0.85; }
+
+  .added-lines { display:flex; flex-direction:column; gap:8px; margin-bottom:4px; }
+  .added-line { display:flex; align-items:center; gap:10px; background:var(--bg3); border:1px solid var(--border); border-radius:10px; padding:10px 12px; animation:slideIn 0.18s ease; }
+  @keyframes slideIn { from { opacity:0; transform:translateY(-5px); } to { opacity:1; transform:translateY(0); } }
+  .added-line .al-icon { font-size:22px; flex-shrink:0; }
+  .added-line .al-name { flex:1; font-size:13px; font-weight:700; }
+  .added-line .al-qty { font-family:var(--mono); font-size:13px; color:var(--text2); }
+  .added-line .al-remove { width:26px; height:26px; border-radius:6px; background:transparent; border:1px solid var(--border); color:var(--text3); font-size:14px; display:flex; align-items:center; justify-content:center; cursor:pointer; transition:all 0.15s; flex-shrink:0; }
+  .added-line .al-remove:active { background:rgba(239,68,68,0.15); border-color:var(--red); color:var(--red); }
+
+  /* SUMMARY */
+  .summary-card {
+    background:linear-gradient(135deg, rgba(79,142,247,0.08), rgba(124,58,237,0.08));
+    border:1px solid rgba(79,142,247,0.25);
+    border-radius:var(--radius); padding:16px; margin-bottom:12px;
   }
-  .submit-btn:active { transform: scale(0.97); opacity: 0.9; }
-  .submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .summary-row { display:flex; justify-content:space-between; align-items:center; padding:5px 0; font-size:13px; }
+  .summary-row .key { color:var(--text2); }
+  .summary-row .val { font-weight:700; font-family:var(--mono); }
+  .summary-total { display:flex; justify-content:space-between; align-items:center; padding-top:10px; margin-top:6px; border-top:1px solid rgba(79,142,247,0.2); }
+  .summary-total .key { font-size:13px; font-weight:700; }
+  .summary-total .val { font-size:18px; font-weight:800; color:var(--amber); font-family:var(--mono); }
+
+  /* SUBMIT */
+  .submit-btn { width:100%; padding:16px; border-radius:12px; border:none; background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff; font-size:16px; font-weight:700; cursor:pointer; transition:all 0.2s; margin-top:8px; font-family:var(--font); }
+  .submit-btn:active { transform:scale(0.97); opacity:0.9; }
+  .submit-btn:disabled { opacity:0.5; cursor:not-allowed; }
 
   /* BOTTOM NAV */
-  .bottom-nav {
-    position: fixed; bottom: 0; left: 50%;
-    transform: translateX(-50%);
-    width: 100%; max-width: 480px;
-    background: rgba(15,17,23,0.95);
-    backdrop-filter: blur(16px);
-    border-top: 1px solid var(--border);
-    display: flex;
-    padding: 8px 16px 16px;
-    z-index: 100;
-  }
-  .nav-btn {
-    flex: 1;
-    display: flex; flex-direction: column; align-items: center; gap: 4px;
-    padding: 8px;
-    border-radius: 10px;
-    cursor: pointer;
-    transition: all 0.2s;
-    border: none; background: transparent;
-  }
-  .nav-btn.active { background: rgba(79,142,247,0.12); }
-  .nav-icon { font-size: 22px; }
-  .nav-label { font-size: 10px; font-weight: 600; color: var(--text3); }
-  .nav-btn.active .nav-label { color: var(--accent); }
+  .bottom-nav { position:fixed; bottom:0; left:50%; transform:translateX(-50%); width:100%; max-width:480px; background:rgba(15,17,23,0.95); backdrop-filter:blur(16px); border-top:1px solid var(--border); display:flex; padding:8px 16px 16px; z-index:100; }
+  .nav-btn { flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; padding:8px; border-radius:10px; cursor:pointer; transition:all 0.2s; border:none; background:transparent; }
+  .nav-btn.active { background:rgba(79,142,247,0.12); }
+  .nav-icon { font-size:22px; }
+  .nav-label { font-size:10px; font-weight:600; color:var(--text3); }
+  .nav-btn.active .nav-label { color:var(--accent); }
 
   /* TOAST */
-  .toast {
-    position: fixed; top: 80px; left: 50%;
-    transform: translateX(-50%) translateY(-20px);
-    background: var(--bg3);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 12px 20px;
-    font-size: 14px; font-weight: 600;
-    opacity: 0; transition: all 0.3s;
-    z-index: 999; white-space: nowrap;
-    pointer-events: none;
-  }
-  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-  .toast.success { border-color: var(--green); color: var(--green); }
-  .toast.error { border-color: var(--red); color: var(--red); }
-
-  /* STATS GRID */
-  .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  .stat-card {
-    background: var(--bg2);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 16px;
-  }
-  .stat-label { font-size: 11px; color: var(--text3); font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 6px; }
-  .stat-value { font-size: 22px; font-weight: 800; font-family: var(--mono); }
-  .stat-value.green { color: var(--green); }
-  .stat-value.amber { color: var(--amber); }
-  .stat-value.blue { color: var(--accent); }
-
-  /* OPERATIONS LIST */
-  .op-item {
-    background: var(--bg2);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 14px;
-    margin-bottom: 8px;
-    display: flex; align-items: center; gap: 12px;
-  }
-  .op-icon { font-size: 26px; flex-shrink: 0; }
-  .op-info { flex: 1; min-width: 0; }
-  .op-title { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .op-sub { font-size: 12px; color: var(--text2); margin-top: 2px; }
-  .op-cash { font-family: var(--mono); font-size: 15px; font-weight: 700; color: var(--green); }
-
-  /* LOADING */
-  .loading {
-    display: flex; align-items: center; justify-content: center;
-    padding: 40px; color: var(--text3); font-size: 14px; gap: 10px;
-  }
-  .spinner {
-    width: 18px; height: 18px;
-    border: 2px solid var(--border);
-    border-top-color: var(--accent);
-    border-radius: 50%;
-    animation: spin 0.7s linear infinite;
-  }
-  @keyframes spin { to { transform: rotate(360deg); } }
-
-  /* BADGE */
-  .badge {
-    display: inline-block;
-    padding: 3px 8px; border-radius: 5px;
-    font-size: 11px; font-weight: 700;
-    background: rgba(79,142,247,0.15);
-    color: var(--accent);
-  }
-  .badge.green { background: rgba(34,197,94,0.15); color: var(--green); }
-  .badge.amber { background: rgba(245,158,11,0.15); color: var(--amber); }
+  .toast { position:fixed; top:80px; left:50%; transform:translateX(-50%) translateY(-20px); background:var(--bg3); border:1px solid var(--border); border-radius:10px; padding:12px 20px; font-size:14px; font-weight:600; opacity:0; transition:all 0.3s; z-index:999; white-space:nowrap; pointer-events:none; }
+  .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+  .toast.success { border-color:var(--green); color:var(--green); }
+  .toast.error { border-color:var(--red); color:var(--red); }
 
   /* INFO ROW */
-  .info-row {
-    display: flex; justify-content: space-between; align-items: center;
-    padding: 10px 0;
-    border-bottom: 1px solid var(--border);
-    font-size: 13px;
-  }
-  .info-row:last-child { border-bottom: none; }
-  .info-row .key { color: var(--text2); }
-  .info-row .val { font-weight: 600; font-family: var(--mono); }
+  .info-row { display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid var(--border); font-size:13px; }
+  .info-row:last-child { border-bottom:none; }
+  .info-row .key { color:var(--text2); }
+  .info-row .val { font-weight:600; font-family:var(--mono); }
 
-  /* EMPTY STATE */
-  .empty { text-align: center; padding: 40px 20px; color: var(--text3); }
-  .empty .empty-icon { font-size: 48px; margin-bottom: 12px; }
-  .empty p { font-size: 14px; }
+  /* STATS */
+  .stats-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .stat-card { background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius); padding:16px; }
+  .stat-label { font-size:11px; color:var(--text3); font-weight:600; text-transform:uppercase; letter-spacing:0.8px; margin-bottom:6px; }
+  .stat-value { font-size:22px; font-weight:800; font-family:var(--mono); }
+  .stat-value.green { color:var(--green); }
+  .stat-value.amber { color:var(--amber); }
+  .stat-value.blue { color:var(--accent); }
+
+  /* HISTORY */
+  .op-item { background:var(--bg2); border:1px solid var(--border); border-radius:12px; padding:14px; margin-bottom:8px; display:flex; align-items:center; gap:12px; }
+  .op-icon { font-size:26px; flex-shrink:0; }
+  .op-info { flex:1; min-width:0; }
+  .op-title { font-size:14px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .op-sub { font-size:12px; color:var(--text2); margin-top:2px; }
+  .op-cash { font-family:var(--mono); font-size:15px; font-weight:700; color:var(--green); }
+
+  .badge { display:inline-block; padding:3px 8px; border-radius:5px; font-size:11px; font-weight:700; background:rgba(79,142,247,0.15); color:var(--accent); }
+  .badge.green { background:rgba(34,197,94,0.15); color:var(--green); }
+  .badge.amber { background:rgba(245,158,11,0.15); color:var(--amber); }
+
+  .loading { display:flex; align-items:center; justify-content:center; padding:40px; color:var(--text3); font-size:14px; gap:10px; }
+  .spinner { width:18px; height:18px; border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 0.7s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .empty { text-align:center; padding:40px 20px; color:var(--text3); }
+  .empty .empty-icon { font-size:48px; margin-bottom:12px; }
 </style>
 </head>
 <body>
 
-<!-- HEADER -->
 <div class="header">
   <div>
     <div class="header-title">☕ Вендинг</div>
@@ -390,7 +170,6 @@
   <div class="header-avatar" id="avatarBtn">?</div>
 </div>
 
-<!-- TABS -->
 <div class="tabs">
   <div class="tab active" onclick="switchTab('restock')">⬆ Зареждане</div>
   <div class="tab" onclick="switchTab('history')">📋 История</div>
@@ -401,69 +180,65 @@
 <!-- PAGE: ЗАРЕЖДАНЕ -->
 <div class="page active" id="page-restock">
 
-  <!-- Техник -->
   <div class="section-label">Техник</div>
   <div class="card">
-    <div class="field">
+    <div class="field" style="margin-bottom:0">
       <label>КОЙ ЗАРЕЖДА</label>
-      <select id="techSelect">
-        <option value="">— избери техник —</option>
-      </select>
+      <select id="techSelect"><option value="">— избери техник —</option></select>
     </div>
   </div>
 
-  <!-- Дата -->
   <div class="section-label">Дата</div>
   <div class="card">
-    <div class="field">
+    <div class="field" style="margin-bottom:0">
       <label>ДАТА</label>
       <input type="date" id="dateInput">
     </div>
   </div>
 
-  <!-- Обект -->
   <div class="section-label">Обект</div>
   <div class="card">
     <div class="gps-row">
       <div class="field">
         <label>ОБЕКТ</label>
-        <select id="objectSelect">
-          <option value="">— избери обект —</option>
-        </select>
+        <select id="objectSelect"><option value="">— избери обект —</option></select>
       </div>
-      <button class="gps-btn" onclick="getGPS()" title="GPS">📍</button>
+      <button class="gps-btn" onclick="getGPS()">📍</button>
     </div>
     <div class="gps-status" id="gpsStatus"></div>
     <div id="objectInfo"></div>
   </div>
 
-  <!-- Продукт -->
-  <div class="section-label">Продукт</div>
+  <!-- ПРОДУКТИ — хоризонтален скрол + qty popup -->
+  <div class="section-label">Продукти</div>
   <div class="card">
-    <div class="product-grid" id="productGrid">
-      <div class="loading"><div class="spinner"></div></div>
+    <div class="product-scroll-wrap" id="productScrollWrap">
+      <div class="loading" style="padding:20px 0"><div class="spinner"></div></div>
     </div>
-    <div class="field">
-      <label>КОЛИЧЕСТВО</label>
-      <div class="qty-control">
-        <div class="qty-btn" onclick="changeQty(-1)">−</div>
-        <input class="qty-input" type="number" id="qtyInput" value="1.00" step="0.5" min="0">
-        <div class="qty-btn" onclick="changeQty(1)">+</div>
-      </div>
+    <div class="qty-popup" id="qtyPopup">
+      <div class="prod-label"><span id="popupIcon">☕</span><span id="popupName">Продукт</span></div>
+      <div class="qty-big-btn" onclick="changePopupQty(-0.5)">−</div>
+      <div class="qty-big-val" id="popupQty">1</div>
+      <div class="qty-big-btn" onclick="changePopupQty(0.5)">＋</div>
+      <button class="qty-add-btn" onclick="addToBasket()">Добави</button>
     </div>
+    <div class="added-lines" id="addedLines"></div>
   </div>
+
+  <!-- РЕЗЮМЕ на зареждането -->
+  <div id="summarySection"></div>
 
   <!-- Брояч и Cash -->
   <div class="section-label">Брояч и Cash</div>
   <div class="card">
-    <div class="counter-row">
-      <div class="field">
+    <div style="display:flex; gap:8px; align-items:flex-end;">
+      <div class="field" style="flex:1; margin-bottom:0">
         <label>БРОЯЧ (незадължително)</label>
         <input type="number" id="counterInput" placeholder="напр. 12450">
       </div>
-      <button class="camera-btn" onclick="openCamera()" title="Снимка">📷</button>
+      <button style="flex-shrink:0; background:var(--bg3); border:1px solid var(--border); border-radius:10px; padding:0 14px; color:var(--text2); cursor:pointer; font-size:20px; height:48px; display:flex; align-items:center;" onclick="openCamera()">📷</button>
     </div>
-    <div class="field" style="margin-top:14px">
+    <div class="field" style="margin-top:14px; margin-bottom:0">
       <label>CASH (лв)</label>
       <input type="number" id="cashInput" placeholder="0.00" step="0.01" min="0">
     </div>
@@ -489,10 +264,7 @@
     </div>
   </div>
 
-  <!-- Изчислено -->
-  <div id="calcPreview"></div>
-
-  <button class="submit-btn" onclick="submitRestock()">💾 Запиши зареждането</button>
+  <button class="submit-btn" id="submitBtn" onclick="submitRestock()">💾 Запиши зареждането</button>
 </div>
 
 <!-- PAGE: ИСТОРИЯ -->
@@ -504,9 +276,7 @@
 <!-- PAGE: СТАТИСТИКА -->
 <div class="page" id="page-stats">
   <div class="section-label">Тази седмица</div>
-  <div class="stats-grid" id="statsGrid">
-    <div class="loading" style="grid-column:1/-1"><div class="spinner"></div> зарежда...</div>
-  </div>
+  <div class="stats-grid" id="statsGrid"><div class="loading" style="grid-column:1/-1"><div class="spinner"></div></div></div>
   <div class="section-label" style="margin-top:24px">По обект</div>
   <div id="objectStats"></div>
 </div>
@@ -515,377 +285,318 @@
 <div class="page" id="page-settings">
   <div class="section-label">Връзка</div>
   <div class="card">
-    <div class="info-row">
-      <span class="key">Supabase</span>
-      <span class="badge green" id="connStatus">свързан</span>
-    </div>
-    <div class="info-row">
-      <span class="key">Обекти</span>
-      <span class="val" id="objCount">—</span>
-    </div>
-    <div class="info-row">
-      <span class="key">Продукти</span>
-      <span class="val" id="prodCount">—</span>
-    </div>
-    <div class="info-row">
-      <span class="key">Техници</span>
-      <span class="val" id="techCount">—</span>
-    </div>
+    <div class="info-row"><span class="key">Supabase</span><span class="badge green">свързан</span></div>
+    <div class="info-row"><span class="key">Обекти</span><span class="val" id="objCount">—</span></div>
+    <div class="info-row"><span class="key">Продукти</span><span class="val" id="prodCount">—</span></div>
+    <div class="info-row"><span class="key">Техници</span><span class="val" id="techCount">—</span></div>
   </div>
-
-  <div class="section-label">Избор на техник</div>
+  <div class="section-label">По подразбиране</div>
   <div class="card">
     <div class="field" style="margin-bottom:0">
-      <label>ТЕКУЩ ТЕХНИК (запомня се)</label>
-      <select id="defaultTechSelect" onchange="saveDefaultTech()">
-        <option value="">— избери —</option>
-      </select>
+      <label>ТЕХНИК (запомня се)</label>
+      <select id="defaultTechSelect" onchange="saveDefaultTech()"><option value="">— избери —</option></select>
     </div>
   </div>
 </div>
 
-<!-- TOAST -->
 <div class="toast" id="toast"></div>
 
-<!-- BOTTOM NAV -->
 <div class="bottom-nav">
-  <button class="nav-btn active" onclick="switchTab('restock')" id="nav-restock">
-    <span class="nav-icon">⬆️</span>
-    <span class="nav-label">Зареждане</span>
-  </button>
-  <button class="nav-btn" onclick="switchTab('history')" id="nav-history">
-    <span class="nav-icon">📋</span>
-    <span class="nav-label">История</span>
-  </button>
-  <button class="nav-btn" onclick="switchTab('stats')" id="nav-stats">
-    <span class="nav-icon">📊</span>
-    <span class="nav-label">Статистика</span>
-  </button>
-  <button class="nav-btn" onclick="switchTab('settings')" id="nav-settings">
-    <span class="nav-icon">⚙️</span>
-    <span class="nav-label">Настройки</span>
-  </button>
+  <button class="nav-btn active" onclick="switchTab('restock')" id="nav-restock"><span class="nav-icon">⬆️</span><span class="nav-label">Зареждане</span></button>
+  <button class="nav-btn" onclick="switchTab('history')" id="nav-history"><span class="nav-icon">📋</span><span class="nav-label">История</span></button>
+  <button class="nav-btn" onclick="switchTab('stats')" id="nav-stats"><span class="nav-icon">📊</span><span class="nav-label">Статистика</span></button>
+  <button class="nav-btn" onclick="switchTab('settings')" id="nav-settings"><span class="nav-icon">⚙️</span><span class="nav-label">Настройки</span></button>
 </div>
 
 <script>
-// =============================================
-// SUPABASE CONFIG
-// =============================================
 const SUPABASE_URL = 'https://yqbfrncncserfpcdikxy.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_n4UfSazXU9vhI9fs2paVNQ_3kz_SD9L';
 const { createClient } = supabase;
 const db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// =============================================
-// STATE
-// =============================================
 let objects = [], products = [], technicians = [];
-let selectedProduct = null;
 let timerInterval = null, timerSeconds = 0, timerRunning = false;
-let currentLat = null, currentLng = null;
+let lineCounter = 0;
 
-// =============================================
-// INIT
-// =============================================
+// ── INIT ──
 document.addEventListener('DOMContentLoaded', async () => {
-  // Date
-  const today = new Date().toISOString().split('T')[0];
-  document.getElementById('dateInput').value = today;
+  document.getElementById('dateInput').value = new Date().toISOString().split('T')[0];
   document.getElementById('headerDate').textContent = formatDateBG(new Date());
-
-  // Load data
   await Promise.all([loadObjects(), loadProducts(), loadTechnicians()]);
   loadDefaultTech();
-  updateSettingsInfo();
+  renderProductCards();
 });
 
-// =============================================
-// DATA LOADING
-// =============================================
+// ── LOAD DATA ──
 async function loadObjects() {
-  const { data, error } = await db.from('objects').select('*').eq('active', true).order('name');
-  if (error) { showToast('Грешка: обекти', 'error'); return; }
+  const { data } = await db.from('objects').select('*').eq('active', true).order('name');
+  if (!data) return;
   objects = data;
   const sel = document.getElementById('objectSelect');
   data.forEach(o => {
     const opt = document.createElement('option');
-    opt.value = o.id;
-    opt.textContent = o.name;
-    opt.dataset.lat = o.lat || '';
-    opt.dataset.lng = o.lng || '';
-    opt.dataset.target = o.target_weekly || 0;
-    opt.dataset.rent = o.rent || 0;
-    sel.appendChild(opt);
+    opt.value = o.id; opt.textContent = o.name; sel.appendChild(opt);
   });
   document.getElementById('objCount').textContent = data.length;
 }
 
 async function loadProducts() {
-  const { data, error } = await db.from('products').select('*').eq('active', true).order('name');
-  if (error) return;
-  products = data;
-  renderProductGrid(data);
+  const { data } = await db.from('products').select('*').eq('active', true).order('name');
+  if (!data) return;
+  products = data.filter(p => !p.auto_add);
   document.getElementById('prodCount').textContent = data.length;
+  renderProductCards();
 }
 
 async function loadTechnicians() {
-  const { data, error } = await db.from('technicians').select('*').eq('active', true).order('name');
-  if (error) return;
+  const { data } = await db.from('technicians').select('*').eq('active', true).order('name');
+  if (!data) return;
   technicians = data;
   [document.getElementById('techSelect'), document.getElementById('defaultTechSelect')].forEach(sel => {
     data.forEach(t => {
       const opt = document.createElement('option');
-      opt.value = t.id;
-      opt.textContent = t.name;
-      sel.appendChild(opt);
+      opt.value = t.id; opt.textContent = t.name; sel.appendChild(opt);
     });
   });
   document.getElementById('techCount').textContent = data.length;
 }
 
-// =============================================
-// PRODUCT GRID
-// =============================================
-function renderProductGrid(prods) {
-  const grid = document.getElementById('productGrid');
-  const mainProds = prods.filter(p => !p.auto_add);
-  grid.innerHTML = mainProds.map(p => `
-    <div class="product-btn" onclick="selectProduct(${p.id})" id="prod-${p.id}">
-      <div class="icon">${p.icon || '📦'}</div>
-      <div class="pname">${p.name}</div>
+// ── PRODUCT PICKER ──
+let selectedProdId = null;
+let popupQty = 1;
+let basket = []; // [{product, qty}]
+
+function renderProductCards() {
+  const wrap = document.getElementById('productScrollWrap');
+  wrap.innerHTML = products.map(p => `
+    <div class="prod-card" id="pc-${p.id}" onclick="selectProdCard(${p.id})">
+      <div class="pc-icon">${p.icon || '📦'}</div>
+      <div class="pc-name">${p.name}</div>
     </div>
   `).join('');
 }
 
-function selectProduct(id) {
-  selectedProduct = products.find(p => p.id === id);
-  document.querySelectorAll('.product-btn').forEach(b => b.classList.remove('selected'));
-  const el = document.getElementById(`prod-${id}`);
-  if (el) el.classList.add('selected');
-  updateCalcPreview();
+function selectProdCard(id) {
+  selectedProdId = id;
+  popupQty = 1;
+  document.querySelectorAll('.prod-card').forEach(c => c.classList.remove('selected'));
+  document.getElementById(`pc-${id}`)?.classList.add('selected');
+  const prod = products.find(p => p.id === id);
+  if (!prod) return;
+  document.getElementById('popupIcon').textContent = prod.icon || '📦';
+  document.getElementById('popupName').textContent = prod.name;
+  document.getElementById('popupQty').textContent = popupQty;
+  document.getElementById('qtyPopup').classList.add('visible');
+  // scroll картата в изглед
+  document.getElementById(`pc-${id}`)?.scrollIntoView({ behavior:'smooth', block:'nearest', inline:'center' });
 }
 
-// =============================================
-// QTY
-// =============================================
-function changeQty(delta) {
-  const inp = document.getElementById('qtyInput');
-  let val = parseFloat(inp.value) || 0;
-  val = Math.max(0, val + delta * 0.5);
-  inp.value = val.toFixed(2);
-  updateCalcPreview();
+function changePopupQty(delta) {
+  popupQty = Math.max(0.5, popupQty + delta);
+  // показваме като цяло число ако е цяло
+  document.getElementById('popupQty').textContent = popupQty % 1 === 0 ? popupQty : popupQty.toFixed(1);
 }
 
-// =============================================
-// GPS
-// =============================================
+function addToBasket() {
+  if (!selectedProdId) return;
+  const prod = products.find(p => p.id === selectedProdId);
+  if (!prod) return;
+  // ако вече е добавен — обнови qty
+  const existing = basket.find(b => b.product.id === selectedProdId);
+  if (existing) { existing.qty += popupQty; } 
+  else { basket.push({ product: prod, qty: popupQty }); }
+  // скрий popup, де-селектирай
+  document.getElementById('qtyPopup').classList.remove('visible');
+  document.querySelectorAll('.prod-card').forEach(c => c.classList.remove('selected'));
+  selectedProdId = null;
+  renderBasket();
+  updateSummary();
+}
+
+function removeFromBasket(idx) {
+  basket.splice(idx, 1);
+  renderBasket();
+  updateSummary();
+}
+
+function renderBasket() {
+  const el = document.getElementById('addedLines');
+  if (!basket.length) { el.innerHTML = ''; return; }
+  el.innerHTML = basket.map((b, i) => `
+    <div class="added-line">
+      <div class="al-icon">${b.product.icon || '📦'}</div>
+      <div class="al-name">${b.product.name}</div>
+      <div class="al-qty">${b.qty % 1 === 0 ? b.qty : b.qty.toFixed(1)} ${b.product.unit}</div>
+      <div class="al-remove" onclick="removeFromBasket(${i})">✕</div>
+    </div>
+  `).join('');
+}
+
+function getLines() { return basket; }
+
+// ── SUMMARY ──
+function updateSummary() {
+  const lines = getLines();
+  const sec = document.getElementById('summarySection');
+  if (!lines.length) { sec.innerHTML = ''; return; }
+
+  const totalCost = lines.reduce((s, l) => s + l.product.price_with_vat * l.qty, 0);
+
+  sec.innerHTML = `
+    <div class="section-label">Резюме</div>
+    <div class="summary-card">
+      ${lines.map(l => `
+        <div class="summary-row">
+          <span class="key">${l.product.icon || '📦'} ${l.product.name} × ${l.qty} ${l.product.unit}</span>
+          <span class="val">${(l.product.price_with_vat * l.qty).toFixed(2)} лв</span>
+        </div>
+      `).join('')}
+      <div class="summary-total">
+        <span class="key">Общо заредено</span>
+        <span class="val">${totalCost.toFixed(2)} лв</span>
+      </div>
+    </div>
+  `;
+}
+
+// ── OBJECT INFO ──
+document.getElementById('objectSelect').addEventListener('change', function() {
+  const obj = objects.find(o => o.id == this.value);
+  if (obj) {
+    document.getElementById('objectInfo').innerHTML = `
+      <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap;">
+        <span class="badge">🎯 ${obj.target_weekly} лв/седм.</span>
+        <span class="badge amber">🏠 ${obj.rent} лв наем</span>
+        ${obj.serial_number ? `<span class="badge">${obj.serial_number}</span>` : ''}
+      </div>`;
+  } else { document.getElementById('objectInfo').innerHTML = ''; }
+});
+
+// ── GPS ──
 function getGPS() {
   const status = document.getElementById('gpsStatus');
   status.textContent = '⏳ търсим GPS...';
   if (!navigator.geolocation) { status.textContent = '❌ GPS не се поддържа'; return; }
   navigator.geolocation.getCurrentPosition(pos => {
-    currentLat = pos.coords.latitude;
-    currentLng = pos.coords.longitude;
-    status.textContent = `📍 ${currentLat.toFixed(5)}, ${currentLng.toFixed(5)}`;
-    findNearestObject(currentLat, currentLng);
-  }, err => {
-    status.textContent = '❌ Не можем да получим GPS';
-  }, { enableHighAccuracy: true, timeout: 8000 });
+    const lat = pos.coords.latitude, lng = pos.coords.longitude;
+    status.textContent = `📍 ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+    let nearest = null, minD = Infinity;
+    objects.forEach(o => {
+      if (!o.lat || !o.lng) return;
+      const d = Math.hypot(o.lat - lat, o.lng - lng);
+      if (d < minD) { minD = d; nearest = o; }
+    });
+    if (nearest && minD < 0.02) {
+      document.getElementById('objectSelect').value = nearest.id;
+      document.getElementById('objectSelect').dispatchEvent(new Event('change'));
+      status.textContent += ` → ${nearest.name}`;
+    }
+  }, () => { status.textContent = '❌ Грешка при GPS'; }, { enableHighAccuracy: true, timeout: 8000 });
 }
 
-function findNearestObject(lat, lng) {
-  if (!objects.length) return;
-  let nearest = null, minDist = Infinity;
-  objects.forEach(o => {
-    if (!o.lat || !o.lng) return;
-    const d = Math.sqrt(Math.pow(o.lat - lat, 2) + Math.pow(o.lng - lng, 2));
-    if (d < minDist) { minDist = d; nearest = o; }
-  });
-  if (nearest && minDist < 0.02) {
-    document.getElementById('objectSelect').value = nearest.id;
-    document.getElementById('gpsStatus').textContent += ` → ${nearest.name}`;
-    showObjectInfo(nearest);
-  }
-}
-
-document.getElementById('objectSelect').addEventListener('change', function() {
-  const obj = objects.find(o => o.id == this.value);
-  if (obj) showObjectInfo(obj);
-  else document.getElementById('objectInfo').innerHTML = '';
-  updateCalcPreview();
-});
-
-function showObjectInfo(obj) {
-  document.getElementById('objectInfo').innerHTML = `
-    <div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap;">
-      <span class="badge">🎯 ${obj.target_weekly} лв/седм.</span>
-      <span class="badge amber">🏠 ${obj.rent} лв наем</span>
-      ${obj.serial_number ? `<span class="badge">${obj.serial_number}</span>` : ''}
-    </div>
-  `;
-}
-
-// =============================================
-// TIMER
-// =============================================
+// ── TIMER ──
 function timerStart() {
   if (timerRunning) return;
   timerRunning = true;
   document.getElementById('timerStartBtn').style.display = 'none';
   document.getElementById('timerStopBtn').style.display = 'inline-flex';
-  timerInterval = setInterval(() => {
-    timerSeconds++;
-    updateTimerDisplay();
-  }, 1000);
+  timerInterval = setInterval(() => { timerSeconds++; updateTimerDisplay(); }, 1000);
 }
-
 function timerStop() {
-  timerRunning = false;
-  clearInterval(timerInterval);
+  timerRunning = false; clearInterval(timerInterval);
   document.getElementById('timerStartBtn').style.display = 'inline-flex';
   document.getElementById('timerStopBtn').style.display = 'none';
 }
-
-function timerReset() {
-  timerStop();
-  timerSeconds = 0;
-  updateTimerDisplay();
-}
-
+function timerReset() { timerStop(); timerSeconds = 0; updateTimerDisplay(); }
 function updateTimerDisplay() {
-  const h = Math.floor(timerSeconds / 3600).toString().padStart(2,'0');
-  const m = Math.floor((timerSeconds % 3600) / 60).toString().padStart(2,'0');
-  const s = (timerSeconds % 60).toString().padStart(2,'0');
+  const h = String(Math.floor(timerSeconds/3600)).padStart(2,'0');
+  const m = String(Math.floor((timerSeconds%3600)/60)).padStart(2,'0');
+  const s = String(timerSeconds%60).padStart(2,'0');
   document.getElementById('timerDisplay').textContent = `${h}:${m}:${s}`;
 }
 
-// =============================================
-// CALC PREVIEW
-// =============================================
-function updateCalcPreview() {
-  const preview = document.getElementById('calcPreview');
-  if (!selectedProduct) { preview.innerHTML = ''; return; }
-  const qty = parseFloat(document.getElementById('qtyInput').value) || 0;
-  const costTotal = (selectedProduct.price_with_vat * qty).toFixed(2);
-  preview.innerHTML = `
-    <div class="section-label">Изчислено</div>
-    <div class="card">
-      <div class="info-row">
-        <span class="key">Продукт</span>
-        <span class="val">${selectedProduct.icon} ${selectedProduct.name}</span>
-      </div>
-      <div class="info-row">
-        <span class="key">Количество</span>
-        <span class="val">${qty} ${selectedProduct.unit}</span>
-      </div>
-      <div class="info-row">
-        <span class="key">Цена (с ДДС)</span>
-        <span class="val">${selectedProduct.price_with_vat} лв/${selectedProduct.unit}</span>
-      </div>
-      <div class="info-row">
-        <span class="key">Стойност на зареждане</span>
-        <span class="val" style="color:var(--amber)">${costTotal} лв</span>
-      </div>
-    </div>
-  `;
-}
-
-// =============================================
-// CAMERA
-// =============================================
+// ── CAMERA ──
 function openCamera() {
   const input = document.createElement('input');
-  input.type = 'file';
-  input.accept = 'image/*';
-  input.capture = 'environment';
-  input.onchange = (e) => {
-    const file = e.target.files[0];
-    if (file) showToast('📷 Снимката е качена — OCR идва скоро!', 'success');
-  };
+  input.type = 'file'; input.accept = 'image/*'; input.capture = 'environment';
+  input.onchange = () => showToast('📷 OCR скоро!', 'success');
   input.click();
 }
 
-// =============================================
-// SUBMIT
-// =============================================
+// ── SUBMIT ──
 async function submitRestock() {
   const techId = document.getElementById('techSelect').value;
   const objectId = document.getElementById('objectSelect').value;
   const date = document.getElementById('dateInput').value;
-  const cash = parseFloat(document.getElementById('cashInput').value) || 0;
-  const counter = parseInt(document.getElementById('counterInput').value) || null;
-  const comment = document.getElementById('commentInput').value;
-  const qty = parseFloat(document.getElementById('qtyInput').value) || 0;
+  const lines = getLines();
 
   if (!techId) { showToast('Избери техник!', 'error'); return; }
   if (!objectId) { showToast('Избери обект!', 'error'); return; }
-  if (!selectedProduct) { showToast('Избери продукт!', 'error'); return; }
-  if (qty <= 0) { showToast('Въведи количество!', 'error'); return; }
+  if (!lines.length) { showToast('Добави поне един продукт!', 'error'); return; }
 
   const obj = objects.find(o => o.id == objectId);
   const tech = technicians.find(t => t.id == techId);
+  const cash = parseFloat(document.getElementById('cashInput').value) || 0;
+  const counter = parseInt(document.getElementById('counterInput').value) || null;
+  const comment = document.getElementById('commentInput').value;
+  const durationMin = Math.round(timerSeconds / 60);
 
   const dateObj = new Date(date);
   const weekNum = getWeekNumber(dateObj);
   const period = `${dateObj.getFullYear()}.${String(dateObj.getMonth()+1).padStart(2,'0')}`;
-  const durationMin = Math.round(timerSeconds / 60);
-  const costVal = selectedProduct.price_with_vat * qty;
 
-  const btn = document.querySelector('.submit-btn');
-  btn.disabled = true;
-  btn.textContent = '⏳ Записва...';
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true; btn.textContent = '⏳ Записва...';
 
-  const { error } = await db.from('operations').insert({
+  // Записваме по един ред за всеки продукт
+  const rows = lines.map((l, i) => ({
     date,
     object_id: parseInt(objectId),
     object_name: obj?.name,
-    product_id: selectedProduct.id,
-    product_name: selectedProduct.name,
-    quantity: qty,
-    counter,
-    cash,
-    duration_minutes: durationMin,
+    product_id: l.product.id,
+    product_name: l.product.name,
+    quantity: l.qty,
+    counter: i === 0 ? counter : null,      // брояч само на първия ред
+    cash: i === 0 ? cash : 0,               // cash само на първия ред
+    duration_minutes: i === 0 ? durationMin : 0,
     technician_id: parseInt(techId),
     technician_name: tech?.name,
-    cost_value: costVal,
+    cost_value: l.product.price_with_vat * l.qty,
     week_number: weekNum,
     period,
     target: obj?.target_weekly || 0,
-    rent: obj?.rent || 0,
-    comment,
+    rent: i === 0 ? (obj?.rent || 0) : 0,  // наем само на първия ред
+    comment: i === 0 ? comment : null,
     op_type: 'restock'
-  });
+  }));
 
-  btn.disabled = false;
-  btn.textContent = '💾 Запиши зареждането';
+  const { error } = await db.from('operations').insert(rows);
 
-  if (error) {
-    showToast('❌ Грешка при запис: ' + error.message, 'error');
-    return;
-  }
+  btn.disabled = false; btn.textContent = '💾 Запиши зареждането';
 
-  showToast('✅ Зареждането е записано!', 'success');
+  if (error) { showToast('❌ ' + error.message, 'error'); return; }
+
+  showToast(`✅ Записани ${lines.length} продукта!`, 'success');
+
+  // Изчисти формата
   timerReset();
   document.getElementById('cashInput').value = '';
   document.getElementById('counterInput').value = '';
   document.getElementById('commentInput').value = '';
-  selectedProduct = null;
-  document.querySelectorAll('.product-btn').forEach(b => b.classList.remove('selected'));
-  document.getElementById('calcPreview').innerHTML = '';
+  basket = [];
+  selectedProdId = null;
+  renderBasket();
+  renderProductCards();
+  document.getElementById('qtyPopup').classList.remove('visible');
+  document.getElementById('summarySection').innerHTML = '';
 }
 
-// =============================================
-// HISTORY
-// =============================================
+// ── HISTORY ──
 async function loadHistory() {
   const list = document.getElementById('historyList');
   list.innerHTML = '<div class="loading"><div class="spinner"></div> зарежда...</div>';
-  const { data, error } = await db.from('operations')
-    .select('*').order('created_at', { ascending: false }).limit(30);
-  if (error || !data.length) {
-    list.innerHTML = '<div class="empty"><div class="empty-icon">📭</div><p>Няма записи</p></div>';
-    return;
-  }
+  const { data } = await db.from('operations').select('*').order('created_at', { ascending: false }).limit(40);
+  if (!data?.length) { list.innerHTML = '<div class="empty"><div class="empty-icon">📭</div><p>Няма записи</p></div>'; return; }
   list.innerHTML = data.map(op => `
     <div class="op-item">
       <div class="op-icon">${getProductIcon(op.product_name)}</div>
@@ -894,156 +605,61 @@ async function loadHistory() {
         <div class="op-sub">${formatDateBG(new Date(op.date))} · ${op.technician_name || '—'} · ${op.quantity} ${getProductUnit(op.product_name)}</div>
       </div>
       ${op.cash ? `<div class="op-cash">${op.cash.toFixed(2)} лв</div>` : ''}
-    </div>
-  `).join('');
+    </div>`).join('');
 }
 
-// =============================================
-// STATS
-// =============================================
+// ── STATS ──
 async function loadStats() {
   const grid = document.getElementById('statsGrid');
-  grid.innerHTML = '<div class="loading" style="grid-column:1/-1"><div class="spinner"></div> зарежда...</div>';
-
-  const weekStart = getWeekStart();
-  const { data } = await db.from('operations')
-    .select('*').gte('date', weekStart).eq('op_type', 'restock');
-
+  grid.innerHTML = '<div class="loading" style="grid-column:1/-1"><div class="spinner"></div></div>';
+  const { data } = await db.from('operations').select('*').gte('date', getWeekStart());
   if (!data) return;
-
-  const totalCash = data.reduce((s, r) => s + (r.cash || 0), 0);
-  const totalCost = data.reduce((s, r) => s + (r.cost_value || 0), 0);
-  const totalOps = data.length;
-  const uniqueObjects = new Set(data.map(r => r.object_id)).size;
-
+  const totalCash = data.reduce((s,r) => s+(r.cash||0), 0);
+  const totalCost = data.reduce((s,r) => s+(r.cost_value||0), 0);
+  const uniqueObjs = new Set(data.map(r=>r.object_id)).size;
   grid.innerHTML = `
-    <div class="stat-card">
-      <div class="stat-label">Cash тази седм.</div>
-      <div class="stat-value green">${totalCash.toFixed(0)} лв</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label">Стойност заредено</div>
-      <div class="stat-value amber">${totalCost.toFixed(0)} лв</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label">Зареждания</div>
-      <div class="stat-value blue">${totalOps}</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label">Обекти</div>
-      <div class="stat-value">${uniqueObjects}</div>
-    </div>
-  `;
-
-  // By object
+    <div class="stat-card"><div class="stat-label">Cash тази седм.</div><div class="stat-value green">${totalCash.toFixed(0)} лв</div></div>
+    <div class="stat-card"><div class="stat-label">Стойност заредено</div><div class="stat-value amber">${totalCost.toFixed(0)} лв</div></div>
+    <div class="stat-card"><div class="stat-label">Записа</div><div class="stat-value blue">${data.length}</div></div>
+    <div class="stat-card"><div class="stat-label">Обекти</div><div class="stat-value">${uniqueObjs}</div></div>`;
   const byObj = {};
-  data.forEach(r => {
-    if (!byObj[r.object_name]) byObj[r.object_name] = { cash: 0, cost: 0, ops: 0 };
-    byObj[r.object_name].cash += r.cash || 0;
-    byObj[r.object_name].cost += r.cost_value || 0;
-    byObj[r.object_name].ops++;
-  });
-
-  const objStats = document.getElementById('objectStats');
-  const sorted = Object.entries(byObj).sort((a, b) => b[1].cash - a[1].cash);
-  objStats.innerHTML = sorted.map(([name, s]) => `
+  data.forEach(r => { if(!byObj[r.object_name]) byObj[r.object_name]={cash:0,cost:0,ops:0}; byObj[r.object_name].cash+=r.cash||0; byObj[r.object_name].cost+=r.cost_value||0; byObj[r.object_name].ops++; });
+  document.getElementById('objectStats').innerHTML = Object.entries(byObj).sort((a,b)=>b[1].cash-a[1].cash).map(([name,s])=>`
     <div class="card">
-      <div class="info-row" style="padding-top:0">
-        <span style="font-weight:700">${name}</span>
-        <span class="badge green">${s.cash.toFixed(0)} лв</span>
-      </div>
-      <div class="info-row">
-        <span class="key">Заредено</span>
-        <span class="val amber" style="color:var(--amber)">${s.cost.toFixed(0)} лв</span>
-      </div>
-      <div class="info-row" style="padding-bottom:0">
-        <span class="key">Зареждания</span>
-        <span class="val">${s.ops}</span>
-      </div>
-    </div>
-  `).join('') || '<div class="empty"><div class="empty-icon">📊</div><p>Няма данни за тази седмица</p></div>';
+      <div class="info-row" style="padding-top:0"><span style="font-weight:700">${name}</span><span class="badge green">${s.cash.toFixed(0)} лв</span></div>
+      <div class="info-row"><span class="key">Заредено</span><span class="val" style="color:var(--amber)">${s.cost.toFixed(0)} лв</span></div>
+      <div class="info-row" style="padding-bottom:0"><span class="key">Записа</span><span class="val">${s.ops}</span></div>
+    </div>`).join('') || '<div class="empty"><div class="empty-icon">📊</div><p>Няма данни</p></div>';
 }
 
-// =============================================
-// TECH DEFAULT
-// =============================================
-function saveDefaultTech() {
-  const val = document.getElementById('defaultTechSelect').value;
-  if (val) localStorage.setItem('defaultTech', val);
-}
+// ── TECH DEFAULT ──
+function saveDefaultTech() { const v = document.getElementById('defaultTechSelect').value; if(v) localStorage.setItem('defaultTech',v); }
+function loadDefaultTech() { const v = localStorage.getItem('defaultTech'); if(v) { document.getElementById('techSelect').value=v; document.getElementById('defaultTechSelect').value=v; } }
 
-function loadDefaultTech() {
-  const saved = localStorage.getItem('defaultTech');
-  if (saved) {
-    document.getElementById('techSelect').value = saved;
-    document.getElementById('defaultTechSelect').value = saved;
-  }
-}
-
-// =============================================
-// NAVIGATION
-// =============================================
+// ── NAV ──
 function switchTab(tab) {
-  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById(`page-${tab}`).classList.add('active');
   document.getElementById(`nav-${tab}`).classList.add('active');
-
-  const tabs = document.querySelectorAll('.tab');
   const tabMap = ['restock','history','stats','settings'];
-  tabs[tabMap.indexOf(tab)]?.classList.add('active');
-
-  if (tab === 'history') loadHistory();
-  if (tab === 'stats') loadStats();
+  document.querySelectorAll('.tab')[tabMap.indexOf(tab)]?.classList.add('active');
+  if(tab==='history') loadHistory();
+  if(tab==='stats') loadStats();
 }
 
-// =============================================
-// SETTINGS INFO
-// =============================================
-function updateSettingsInfo() {
-  document.getElementById('objCount').textContent = objects.length;
-  document.getElementById('prodCount').textContent = products.length;
-  document.getElementById('techCount').textContent = technicians.length;
-}
-
-// =============================================
-// HELPERS
-// =============================================
-function showToast(msg, type = 'success') {
+// ── HELPERS ──
+function showToast(msg, type='success') {
   const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.className = `toast ${type} show`;
-  setTimeout(() => t.classList.remove('show'), 3000);
+  t.textContent = msg; t.className = `toast ${type} show`;
+  setTimeout(()=>t.classList.remove('show'), 3000);
 }
-
-function formatDateBG(d) {
-  return d.toLocaleDateString('bg-BG', { weekday:'long', day:'numeric', month:'long' });
-}
-
-function getWeekNumber(d) {
-  const onejan = new Date(d.getFullYear(), 0, 1);
-  return Math.ceil((((d - onejan) / 86400000) + onejan.getDay() + 1) / 7);
-}
-
-function getWeekStart() {
-  const now = new Date();
-  const day = now.getDay() || 7;
-  const mon = new Date(now);
-  mon.setDate(now.getDate() - day + 1);
-  return mon.toISOString().split('T')[0];
-}
-
-function getProductIcon(name) {
-  const p = products.find(x => x.name === name);
-  return p ? p.icon : '📦';
-}
-
-function getProductUnit(name) {
-  const p = products.find(x => x.name === name);
-  return p ? p.unit : '';
-}
+function formatDateBG(d) { return d.toLocaleDateString('bg-BG',{weekday:'long',day:'numeric',month:'long'}); }
+function getWeekNumber(d) { const j=new Date(d.getFullYear(),0,1); return Math.ceil((((d-j)/86400000)+j.getDay()+1)/7); }
+function getWeekStart() { const n=new Date(); const day=n.getDay()||7; const m=new Date(n); m.setDate(n.getDate()-day+1); return m.toISOString().split('T')[0]; }
+function getProductIcon(name) { const p=products.find(x=>x.name===name); return p?p.icon:'📦'; }
+function getProductUnit(name) { const p=products.find(x=>x.name===name); return p?p.unit:''; }
 </script>
 </body>
 </html>
