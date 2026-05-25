@@ -586,11 +586,27 @@ async function processOCR(input) {
       });
 
       const data = await response.json();
-      const result = data.result?.trim();
+      console.log('OCR Debug:', JSON.stringify(data));
 
-      if (!result || result === 'ГРЕШКА' || !/^\d+$/.test(result)) {
+      if (data.error) {
         status.className = 'ocr-status error';
-        status.textContent = '❌ Не успях да разпозная числото — въведи ръчно';
+        status.textContent = '❌ Грешка: ' + data.error;
+        return;
+      }
+      if (data.vision_error) {
+        status.className = 'ocr-status error';
+        status.textContent = '❌ Vision API: ' + data.vision_error.message;
+        return;
+      }
+
+      const result = data.result?.trim();
+      const rawText = data.raw_text || data.first_annotation || '';
+
+      if (!result || result === 'ГРЕШКА') {
+        status.className = 'ocr-status error';
+        status.textContent = rawText
+          ? `⚠️ Текст: "${rawText}" — не са намерени само цифри`
+          : '❌ Не е разпознат текст — опитай по-ясна снимка';
       } else {
         document.getElementById('counterInput').value = result;
         status.className = 'ocr-status success';
