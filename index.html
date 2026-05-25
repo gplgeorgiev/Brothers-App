@@ -573,26 +573,45 @@ function resizeImage(base64, maxSize) {
   });
 }
 
+function resizeImage(base64, maxSize) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      let w = img.width, h = img.height;
+      if (w > maxSize || h > maxSize) {
+        if (w > h) { h = Math.round(h * maxSize / w); w = maxSize; }
+        else { w = Math.round(w * maxSize / h); h = maxSize; }
+      }
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL('image/jpeg', 0.85));
+    };
+    img.src = base64;
+  });
+}
+
 async function processOCR(input) {
   const file = input.files[0];
   if (!file) return;
 
-  // Show preview
   const reader = new FileReader();
   reader.onload = async (e) => {
-    const base64 = e.target.result;
+    const originalBase64 = e.target.result;
     const preview = document.getElementById('ocrPreview');
     const img = document.getElementById('ocrImg');
     const status = document.getElementById('ocrStatus');
 
-    img.src = base64;
+    img.src = originalBase64;
     preview.style.display = 'block';
     status.className = 'ocr-status loading';
-    status.textContent = '⏳ Разпознавам числото...';
+    status.textContent = '⏳ Обработвам снимката...';
 
     try {
-      const base64Data = base64.split(',')[1];
-      const mediaType = file.type || 'image/jpeg';
+      const resizedBase64 = await resizeImage(originalBase64, 1024);
+      const base64Data = resizedBase64.split(',')[1];
+      const mediaType = 'image/jpeg';
+      status.textContent = '⏳ Разпознавам числото...';
 
       // Викаме Supabase Edge Function (избягва CORS)
       const response = await fetch(`${SUPABASE_URL}/functions/v1/ocr-counter`, {
