@@ -554,6 +554,25 @@ function updateTimerDisplay() {
 function triggerCamera() { document.getElementById('cameraInput').click(); }
 function triggerGallery() { document.getElementById('galleryInput').click(); }
 
+function resizeImage(base64, maxSize) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      let w = img.width, h = img.height;
+      if (w > maxSize || h > maxSize) {
+        if (w > h) { h = Math.round(h * maxSize / w); w = maxSize; }
+        else { w = Math.round(w * maxSize / h); h = maxSize; }
+      }
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL('image/jpeg', 0.85));
+    };
+    img.src = base64;
+  });
+}
+
 async function processOCR(input) {
   const file = input.files[0];
   if (!file) return;
