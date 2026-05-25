@@ -14,6 +14,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <style>
   :root {
     --bg: #f0f2f5; --bg2: #ffffff; --bg3: #e8ecf0;
@@ -565,27 +566,8 @@ function resizeImage(base64, maxSize) {
         else { w = Math.round(w * maxSize / h); h = maxSize; }
       }
       canvas.width = w; canvas.height = h;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0, w, h);
-      resolve(canvas.toDataURL('image/jpeg', 0.85));
-    };
-    img.src = base64;
-  });
-}
-
-function resizeImage(base64, maxSize) {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      let w = img.width, h = img.height;
-      if (w > maxSize || h > maxSize) {
-        if (w > h) { h = Math.round(h * maxSize / w); w = maxSize; }
-        else { w = Math.round(w * maxSize / h); h = maxSize; }
-      }
-      canvas.width = w; canvas.height = h;
       canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-      resolve(canvas.toDataURL('image/jpeg', 0.85));
+      resolve(canvas);
     };
     img.src = base64;
   });
@@ -608,54 +590,31 @@ async function processOCR(input) {
     status.textContent = '⏳ Обработвам снимката...';
 
     try {
-      const resizedBase64 = await resizeImage(originalBase64, 1024);
-      const base64Data = resizedBase64.split(',')[1];
-      const mediaType = 'image/jpeg';
+      // Намали снимката
+      const canvas = await resizeImage(originalBase64, 1200);
       status.textContent = '⏳ Разпознавам числото...';
 
-      // Викаме Supabase Edge Function (избягва CORS)
-      const response = await fetch(`${SUPABASE_URL}/functions/v1/ocr-counter`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${SUPABASE_KEY}`
-        },
-        body: JSON.stringify({ image_base64: base64Data, media_type: mediaType })
+      // Tesseract OCR — само цифри
+      const result = await Tesseract.recognize(canvas, 'eng', {
+        tessedit_char_whitelist: '0123456789',
       });
 
-      const data = await response.json();
-      console.log('OCR Debug:', JSON.stringify(data));
+      const digits = result.data.text.replace(/[^0-9]/g, '').trim();
+      console.log('Tesseract raw:', result.data.text, 'digits:', digits);
 
-      if (data.error) {
+      if (!digits) {
         status.className = 'ocr-status error';
-        status.textContent = '❌ Грешка: ' + data.error;
-        return;
-      }
-      if (data.vision_error) {
-        status.className = 'ocr-status error';
-        status.textContent = '❌ Vision API: ' + data.vision_error.message;
-        return;
-      }
-
-      const result = data.result?.trim();
-      const rawText = data.raw_text || data.first_annotation || '';
-
-      if (!result || result === 'ГРЕШКА') {
-        status.className = 'ocr-status error';
-        status.textContent = rawText
-          ? `⚠️ Текст: "${rawText}" — не са намерени само цифри`
-          : '❌ Не е разпознат текст — опитай по-ясна снимка';
+        status.textContent = '❌ Не е разпознат текст — опитай по-ясна снимка';
       } else {
-        document.getElementById('counterInput').value = result;
+        document.getElementById('counterInput').value = digits;
         status.className = 'ocr-status success';
-        status.textContent = `✅ Разпознато: ${result} — провери и коригирай ако трябва`;
+        status.textContent = `✅ Разпознато: ${digits} — провери и коригирай ако трябва`;
       }
     } catch (err) {
       status.className = 'ocr-status error';
-      status.textContent = '❌ Грешка при свързване — въведи ръчно';
+      status.textContent = '❌ Грешка: ' + err.message;
     }
 
-    // Reset input за следваща употреба
     input.value = '';
   };
   reader.readAsDataURL(file);
