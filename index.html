@@ -715,17 +715,23 @@ async function submitRestock() {
 
   // Изчисти формата
   timerReset();
-  document.getElementById('cashInput').value = '';
   document.getElementById('counterInput').value = '';
   document.getElementById('commentInput').value = '';
+  document.getElementById('objectSelect').value = '';
+  document.getElementById('objectInfo').innerHTML = '';
+  document.getElementById('gpsStatus').textContent = '';
+  document.getElementById('ocrPreview').style.display = 'none';
+  document.getElementById('summarySection').innerHTML = '';
   basket = [];
   selectedProdId = null;
   renderBasket();
   renderProductCards();
   document.getElementById('qtyPopup').classList.remove('visible');
-  document.getElementById('summarySection').innerHTML = '';
-  document.getElementById('counterInput').value = '';
-  document.getElementById('ocrPreview').style.display = 'none';
+  // Върни датата към днес
+  document.getElementById('dateInput').value = new Date().toISOString().split('T')[0];
+  // Scroll нагоре
+  document.getElementById('page-restock').scrollTop = 0;
+  window.scrollTo(0, 0);
 }
 
 // ── CASHFLOW ──
