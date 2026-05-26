@@ -695,7 +695,6 @@ async function submitRestock() {
     cost_value: l.product.price_with_vat * l.qty,
     week_number: weekNum,
     period,
-    target: obj?.target_weekly || 0,
     rent: i === 0 ? (obj?.rent || 0) : 0,  // наем само на първия ред
     comment: i === 0 ? comment : null,
     op_type: 'restock'
