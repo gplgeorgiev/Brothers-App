@@ -189,6 +189,7 @@
 
 <div class="tabs">
   <div class="tab active" onclick="switchTab('restock')">⬆ Зареждане</div>
+  <div class="tab" onclick="switchTab('cashflow')">💰 Отчитане</div>
   <div class="tab" onclick="switchTab('history')">📋 История</div>
   <div class="tab" onclick="switchTab('stats')">📊 Статистика</div>
   <div class="tab" onclick="switchTab('settings')">⚙️ Настройки</div>
@@ -233,9 +234,9 @@
   <div id="summarySection"></div>
 
   <!-- 3. БРОЯЧ -->
-  <div class="section-label">Брояч и Cash</div>
+  <div class="section-label">Брояч</div>
   <div class="card">
-    <div class="field">
+    <div class="field" style="margin-bottom:0">
       <label>БРОЯЧ (незадължително)</label>
       <div style="display:flex; gap:8px;">
         <input type="number" id="counterInput" placeholder="напр. 12450" style="flex:1">
@@ -244,19 +245,14 @@
       </div>
     </div>
     <!-- OCR Preview -->
-    <div id="ocrPreview" style="display:none; margin-bottom:14px;">
+    <div id="ocrPreview" style="display:none; margin-top:12px;">
       <div style="border-radius:10px; overflow:hidden; margin-bottom:8px; max-height:180px; display:flex; align-items:center; justify-content:center; background:var(--bg3);">
         <img id="ocrImg" style="max-width:100%; max-height:180px; object-fit:contain; border-radius:10px;">
       </div>
       <div id="ocrStatus" class="ocr-status"></div>
     </div>
-    <!-- Hidden inputs -->
     <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none" onchange="processOCR(this)">
     <input type="file" id="galleryInput" accept="image/*" style="display:none" onchange="processOCR(this)">
-    <div class="field" style="margin-bottom:0">
-      <label>CASH (лв)</label>
-      <input type="number" id="cashInput" placeholder="0.00" step="0.01" min="0">
-    </div>
   </div>
 
   <!-- 4. ТЕХНИК -->
@@ -301,6 +297,32 @@
   <button class="submit-btn" id="submitBtn" onclick="submitRestock()">💾 Запиши зареждането</button>
 </div>
 
+<!-- PAGE: ОТЧИТАНЕ -->
+<div class="page" id="page-cashflow">
+  <div class="section-label">Чакащи отчитане</div>
+  <div id="pendingList"><div class="loading"><div class="spinner"></div> зарежда...</div></div>
+
+  <div class="section-label" style="margin-top:24px">Завършени</div>
+  <div id="completedList"><div class="loading"><div class="spinner"></div> зарежда...</div></div>
+</div>
+
+<!-- CASH MODAL -->
+<div id="cashModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:200; align-items:flex-end; justify-content:center;">
+  <div style="background:var(--bg2); border-radius:20px 20px 0 0; padding:24px; width:100%; max-width:480px;">
+    <div style="font-size:16px; font-weight:800; margin-bottom:4px;" id="modalTitle">Въведи Cash</div>
+    <div style="font-size:13px; color:var(--text2); margin-bottom:20px;" id="modalSub"></div>
+    <div class="field">
+      <label>CASH (лв)</label>
+      <input type="number" id="modalCashInput" placeholder="0.00" step="0.01" min="0"
+        style="font-size:24px; font-weight:700; text-align:center; padding:16px;">
+    </div>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:8px;">
+      <button onclick="closeCashModal()" style="padding:14px; border-radius:12px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:15px; font-weight:700; cursor:pointer;">Отказ</button>
+      <button onclick="saveCash()" style="padding:14px; border-radius:12px; border:none; background:var(--green); color:#fff; font-size:15px; font-weight:700; cursor:pointer;">✓ Запази</button>
+    </div>
+  </div>
+</div>
+
 <!-- PAGE: ИСТОРИЯ -->
 <div class="page" id="page-history">
   <div class="section-label">Последни операции</div>
@@ -337,6 +359,7 @@
 
 <div class="bottom-nav">
   <button class="nav-btn active" onclick="switchTab('restock')" id="nav-restock"><span class="nav-icon">⬆️</span><span class="nav-label">Зареждане</span></button>
+  <button class="nav-btn" onclick="switchTab('cashflow')" id="nav-cashflow"><span class="nav-icon">💰</span><span class="nav-label">Отчитане</span></button>
   <button class="nav-btn" onclick="switchTab('history')" id="nav-history"><span class="nav-icon">📋</span><span class="nav-label">История</span></button>
   <button class="nav-btn" onclick="switchTab('stats')" id="nav-stats"><span class="nav-icon">📊</span><span class="nav-label">Статистика</span></button>
   <button class="nav-btn" onclick="switchTab('settings')" id="nav-settings"><span class="nav-icon">⚙️</span><span class="nav-label">Настройки</span></button>
@@ -646,8 +669,7 @@ async function submitRestock() {
 
   const obj = objects.find(o => o.id == objectId);
   const tech = technicians.find(t => t.id == techId);
-  const cash = parseFloat(document.getElementById('cashInput').value) || 0;
-  const counter = parseInt(document.getElementById('counterInput').value) || null;
+  const counterVal = parseInt(document.getElementById('counterInput').value) || null;
   const comment = document.getElementById('commentInput').value;
   const durationMin = Math.round(timerSeconds / 60);
 
@@ -666,8 +688,7 @@ async function submitRestock() {
     product_id: l.product.id,
     product_name: l.product.name,
     quantity: l.qty,
-    counter: i === 0 ? counter : null,      // брояч само на първия ред
-    cash: i === 0 ? cash : 0,               // cash само на първия ред
+    // брояч и cash са преместени в cashflow
     duration_minutes: i === 0 ? durationMin : 0,
     technician_id: parseInt(techId),
     technician_name: tech?.name,
@@ -680,11 +701,16 @@ async function submitRestock() {
     op_type: 'restock'
   }));
 
-  const { error } = await db.from('operations').insert(rows);
+  const { data: insertedOps, error } = await db.from('operations').insert(rows).select();
 
   btn.disabled = false; btn.textContent = '💾 Запиши зареждането';
 
   if (error) { showToast('❌ ' + error.message, 'error'); return; }
+
+  // Ако има брояч → създай cashflow запис
+  if (counterVal && obj) {
+    await createCashflowEntry(counterVal, obj, tech, date, insertedOps?.[0]?.id);
+  }
 
   showToast(`✅ Записани ${lines.length} продукта!`, 'success');
 
@@ -699,6 +725,167 @@ async function submitRestock() {
   renderProductCards();
   document.getElementById('qtyPopup').classList.remove('visible');
   document.getElementById('summarySection').innerHTML = '';
+  document.getElementById('counterInput').value = '';
+  document.getElementById('ocrPreview').style.display = 'none';
+}
+
+// ── CASHFLOW ──
+let currentCashflowId = null;
+
+async function createCashflowEntry(counter, obj, tech, date, operationId) {
+  // Намери последния cashflow запис за обекта
+  const { data: lastEntry } = await db
+    .from('cashflow')
+    .select('counter, date')
+    .eq('object_id', obj.id)
+    .order('date', { ascending: false })
+    .limit(1);
+
+  const prevCounter = lastEntry?.[0]?.counter ?? null;
+  const prevDate = lastEntry?.[0]?.date ?? null;
+  const drinksSold = prevCounter ? counter - prevCounter : null;
+
+  // Изчисли дни между посещенията
+  let daysSinceLast = null;
+  let target = null;
+  if (prevDate) {
+    const d1 = new Date(date);
+    const d2 = new Date(prevDate);
+    daysSinceLast = Math.round((d1 - d2) / (1000 * 60 * 60 * 24));
+    target = ((obj.target_weekly || 0) / 7) * daysSinceLast;
+  }
+
+  // Изчисли check_value
+  const checkValue = drinksSold ? drinksSold * (obj.k_percent || 0) : null;
+
+  await db.from('cashflow').insert({
+    date,
+    object_id: obj.id,
+    object_name: obj.name,
+    counter,
+    prev_counter: prevCounter,
+    prev_date: prevDate,
+    drinks_sold: drinksSold,
+    days_since_last: daysSinceLast,
+    target: target ? parseFloat(target.toFixed(2)) : null,
+    check_value: checkValue ? parseFloat(checkValue.toFixed(2)) : null,
+    technician_id: tech?.id,
+    technician_name: tech?.name,
+    operation_id: operationId,
+    status: 'pending'
+  });
+}
+
+async function loadCashflow() {
+  // Pending
+  const pendingEl = document.getElementById('pendingList');
+  pendingEl.innerHTML = '<div class="loading"><div class="spinner"></div> зарежда...</div>';
+
+  const { data: pending } = await db
+    .from('cashflow')
+    .select('*')
+    .eq('status', 'pending')
+    .order('date', { ascending: false });
+
+  if (!pending?.length) {
+    pendingEl.innerHTML = '<div class="empty"><div class="empty-icon">✅</div><p>Няма чакащи отчитания</p></div>';
+  } else {
+    pendingEl.innerHTML = pending.map(cf => `
+      <div class="card" style="margin-bottom:10px;">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+          <div>
+            <div style="font-size:16px; font-weight:800;">${cf.object_name}</div>
+            <div style="font-size:12px; color:var(--text2);">${formatDateBG(new Date(cf.date))} · ${cf.technician_name || '—'}</div>
+          </div>
+          <span class="badge amber">Чака</span>
+        </div>
+        <div class="info-row" style="padding-top:0">
+          <span class="key">Брояч</span>
+          <span class="val">${cf.counter ?? '—'}</span>
+        </div>
+        ${cf.drinks_sold != null ? `
+        <div class="info-row">
+          <span class="key">Продадени напитки</span>
+          <span class="val">${cf.drinks_sold}</span>
+        </div>` : ''}
+        ${cf.check_value != null ? `
+        <div class="info-row">
+          <span class="key">Очакван приход</span>
+          <span class="val" style="color:var(--accent)">${cf.check_value.toFixed(2)} лв</span>
+        </div>` : ''}
+        ${cf.target != null ? `
+        <div class="info-row">
+          <span class="key">Таргет (${cf.days_since_last} дни)</span>
+          <span class="val" style="color:var(--amber)">${cf.target.toFixed(2)} лв</span>
+        </div>` : ''}
+        <button onclick="openCashModal(${cf.id}, '${cf.object_name}', ${cf.check_value ?? 0})"
+          style="width:100%; margin-top:12px; padding:12px; border-radius:10px; border:none; background:var(--green); color:#fff; font-size:14px; font-weight:700; cursor:pointer;">
+          💵 Въведи Cash
+        </button>
+      </div>
+    `).join('');
+  }
+
+  // Completed
+  const completedEl = document.getElementById('completedList');
+  const { data: completed } = await db
+    .from('cashflow')
+    .select('*')
+    .eq('status', 'completed')
+    .order('completed_at', { ascending: false })
+    .limit(20);
+
+  if (!completed?.length) {
+    completedEl.innerHTML = '<div class="empty"><div class="empty-icon">📭</div><p>Няма завършени</p></div>';
+  } else {
+    completedEl.innerHTML = completed.map(cf => `
+      <div class="op-item">
+        <div class="op-icon">💰</div>
+        <div class="op-info">
+          <div class="op-title">${cf.object_name}</div>
+          <div class="op-sub">${formatDateBG(new Date(cf.date))} · ${cf.technician_name || '—'}
+            ${cf.drinks_sold != null ? ` · ${cf.drinks_sold} напитки` : ''}
+          </div>
+          ${cf.check_value != null ? `<div style="font-size:11px; color:var(--text3);">Очакван: ${cf.check_value.toFixed(2)} лв</div>` : ''}
+        </div>
+        <div class="op-cash">${cf.cash?.toFixed(2) ?? '—'} лв</div>
+      </div>
+    `).join('');
+  }
+}
+
+function openCashModal(id, objectName, expectedCash) {
+  currentCashflowId = id;
+  document.getElementById('modalTitle').textContent = `💵 ${objectName}`;
+  document.getElementById('modalSub').textContent = expectedCash
+    ? `Очакван приход: ${expectedCash.toFixed(2)} лв`
+    : 'Въведи събраната сума';
+  document.getElementById('modalCashInput').value = '';
+  document.getElementById('cashModal').style.display = 'flex';
+  setTimeout(() => document.getElementById('modalCashInput').focus(), 100);
+}
+
+function closeCashModal() {
+  document.getElementById('cashModal').style.display = 'none';
+  currentCashflowId = null;
+}
+
+async function saveCash() {
+  const cash = parseFloat(document.getElementById('modalCashInput').value);
+  if (!cash || cash <= 0) { showToast('Въведи сума!', 'error'); return; }
+  if (!currentCashflowId) return;
+
+  const { error } = await db.from('cashflow').update({
+    cash,
+    status: 'completed',
+    completed_at: new Date().toISOString()
+  }).eq('id', currentCashflowId);
+
+  if (error) { showToast('❌ ' + error.message, 'error'); return; }
+
+  closeCashModal();
+  showToast('✅ Cash записан!', 'success');
+  loadCashflow();
 }
 
 // ── HISTORY ──
@@ -753,8 +940,9 @@ function switchTab(tab) {
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById(`page-${tab}`).classList.add('active');
   document.getElementById(`nav-${tab}`).classList.add('active');
-  const tabMap = ['restock','history','stats','settings'];
+  const tabMap = ['restock','cashflow','history','stats','settings'];
   document.querySelectorAll('.tab')[tabMap.indexOf(tab)]?.classList.add('active');
+  if(tab==='cashflow') loadCashflow();
   if(tab==='history') loadHistory();
   if(tab==='stats') loadStats();
 }
