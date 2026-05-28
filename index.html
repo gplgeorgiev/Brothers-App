@@ -1077,7 +1077,6 @@ async function openEditHeaderModal(id) {
   const { data } = await db.from('operation_headers').select('*').eq('id', id).single();
   if (!data) return;
   currentEditOpId = id;
-  document.getElementById('editOpProduct').value = data.comment || '';
   document.getElementById('editOpQty').value = data.km || '';
   document.getElementById('editOpComment').value = data.comment || '';
   document.getElementById('editOpModal').style.display = 'flex';
