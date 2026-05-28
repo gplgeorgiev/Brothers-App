@@ -655,18 +655,46 @@ function getGPS() {
   navigator.geolocation.getCurrentPosition(pos => {
     const lat = pos.coords.latitude, lng = pos.coords.longitude;
     status.textContent = `📍 ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-    let nearest = null, minD = Infinity;
-    objects.forEach(o => {
-      if (!o.lat || !o.lng) return;
-      const d = Math.hypot(o.lat - lat, o.lng - lng);
-      if (d < minD) { minD = d; nearest = o; }
-    });
-    if (nearest && minD < 0.02) {
+
+    // Изчисли разстоянието в метри (Haversine)
+    const R = 6371000;
+    const withDist = objects.filter(o => o.lat && o.lng).map(o => {
+      const dLat = (o.lat - lat) * Math.PI / 180;
+      const dLng = (o.lng - lng) * Math.PI / 180;
+      const a = Math.sin(dLat/2)**2 + Math.cos(lat*Math.PI/180) * Math.cos(o.lat*Math.PI/180) * Math.sin(dLng/2)**2;
+      const dist = Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
+      return { ...o, dist };
+    }).sort((a, b) => a.dist - b.dist);
+
+    if (!withDist.length) return;
+    const nearest = withDist[0];
+
+    if (nearest.dist <= 50) {
+      // Под 50м — избира автоматично
       document.getElementById('objectSelect').value = nearest.id;
       document.getElementById('objectSelect').dispatchEvent(new Event('change'));
-      status.textContent += ` → ${nearest.name}`;
+      status.textContent = `📍 ${nearest.name} (${nearest.dist}м)`;
+    } else {
+      // Над 50м — показва топ 3 за избор
+      const top3 = withDist.slice(0, 3);
+      status.innerHTML = `📍 Избери обект:<br>` + top3.map(o =>
+        `<button onclick="selectObjectFromGPS(${o.id})" style="
+          display:inline-block; margin:4px 4px 0 0; padding:6px 12px;
+          background:var(--bg2); border:1px solid var(--border);
+          border-radius:8px; color:var(--text); font-size:12px;
+          font-weight:600; cursor:pointer; font-family:var(--font);">
+          ${o.name} <span style="color:var(--text3)">${o.dist}м</span>
+        </button>`
+      ).join('');
     }
   }, () => { status.textContent = '❌ Грешка при GPS'; }, { enableHighAccuracy: true, timeout: 8000 });
+}
+
+function selectObjectFromGPS(id) {
+  document.getElementById('objectSelect').value = id;
+  document.getElementById('objectSelect').dispatchEvent(new Event('change'));
+  const obj = objects.find(o => o.id === id);
+  document.getElementById('gpsStatus').textContent = `📍 ${obj?.name}`;
 }
 
 // ── TIMER ──
