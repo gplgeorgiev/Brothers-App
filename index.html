@@ -361,8 +361,6 @@
 <div id="editOpModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:200; align-items:flex-end; justify-content:center;">
   <div style="background:var(--bg2); border-radius:20px 20px 0 0; padding:20px; width:100%; max-width:480px; max-height:90vh; overflow-y:auto;">
     <div style="font-size:16px; font-weight:800; margin-bottom:16px;">✏️ Редакция на зареждане</div>
-
-    <div style="font-size:11px; font-weight:700; letter-spacing:1px; color:var(--text3); text-transform:uppercase; margin-bottom:8px;">Хедър</div>
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
       <div class="field" style="margin-bottom:10px;">
         <label>ОБЕКТ</label>
@@ -387,13 +385,29 @@
       <label>КОМЕНТАР</label>
       <input type="text" id="editHdrComment">
     </div>
-
-    <div style="font-size:11px; font-weight:700; letter-spacing:1px; color:var(--text3); text-transform:uppercase; margin-bottom:8px;">Продукти</div>
-    <div id="editOpLines"></div>
-
-    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:12px;">
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
       <button onclick="closeEditOpModal()" style="padding:14px; border-radius:12px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:15px; font-weight:700; cursor:pointer; font-family:var(--font);">Отказ</button>
       <button onclick="saveEditOp()" style="padding:14px; border-radius:12px; border:none; background:var(--accent); color:#fff; font-size:15px; font-weight:700; cursor:pointer; font-family:var(--font);">✓ Запази</button>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT LINE MODAL -->
+<div id="editLineModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:200; align-items:flex-end; justify-content:center;">
+  <div style="background:var(--bg2); border-radius:20px 20px 0 0; padding:24px; width:100%; max-width:480px;">
+    <div style="font-size:16px; font-weight:800; margin-bottom:4px;" id="editLineTitle">✏️ Редакция на ред</div>
+    <div style="font-size:13px; color:var(--text2); margin-bottom:16px;" id="editLineSub"></div>
+    <div class="field">
+      <label>КОЛИЧЕСТВО</label>
+      <div class="qty-control">
+        <div class="qty-btn" onclick="changeEditQty(-1)">−</div>
+        <input class="qty-input" type="number" id="editLineQty" step="1" min="0.5">
+        <div class="qty-btn" onclick="changeEditQty(1)">＋</div>
+      </div>
+    </div>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:8px;">
+      <button onclick="closeEditLineModal()" style="padding:14px; border-radius:12px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:15px; font-weight:700; cursor:pointer; font-family:var(--font);">Отказ</button>
+      <button onclick="saveEditLine()" style="padding:14px; border-radius:12px; border:none; background:var(--accent); color:#fff; font-size:15px; font-weight:700; cursor:pointer; font-family:var(--font);">✓ Запази</button>
     </div>
   </div>
 </div>
@@ -1089,9 +1103,11 @@ async function loadHistory() {
             <span style="font-size:18px;">${getProductIcon(op.product_name)}</span>
             <span style="font-size:13px; font-weight:600;">${op.product_name}</span>
           </div>
-          <div style="display:flex; align-items:center; gap:12px;">
+          <div style="display:flex; align-items:center; gap:8px;">
             <span style="font-size:12px; color:var(--text2);">${op.quantity} ${getProductUnit(op.product_name)}</span>
             <span style="font-size:13px; font-weight:700; color:var(--amber);">${op.cost_value?.toFixed(2)} лв</span>
+            <button onclick="openEditLineModal(${op.id})" style="padding:3px 8px; border-radius:6px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:11px; cursor:pointer;">✏️</button>
+            <button onclick="deleteLine(${op.id})" style="padding:3px 8px; border-radius:6px; border:1px solid var(--red); background:transparent; color:var(--red); font-size:11px; cursor:pointer;">🗑</button>
           </div>
         </div>`).join('')}
       <div style="display:flex; justify-content:space-between; padding-top:8px; border-top:2px solid var(--border); margin-top:4px;">
@@ -1150,19 +1166,7 @@ async function openEditHeaderModal(id) {
   document.getElementById('editOpModal').style.display = 'flex';
 }
 
-function changeEditLineQty(lineId, delta) {
-  const inp = document.querySelector(`.edit-line-qty[data-line="${lineId}"]`);
-  if (!inp) return;
-  inp.value = Math.max(0.5, (parseFloat(inp.value) || 0) + delta);
-}
-
-function removeEditLine(lineId) {
-  const el = document.getElementById(`edit-line-${lineId}`);
-  if (el) { el.style.opacity='0'; el.style.transition='all 0.15s'; setTimeout(()=>el.remove(), 150); }
-}
-
-let newEditLines = [];
-function addEditLine() {
+function addEditLine_unused() {
   const tempId = 'new-' + Date.now();
   newEditLines.push(tempId);
   const linesEl = document.getElementById('editOpLines');
@@ -1214,7 +1218,6 @@ function closeEditOpModal() {
 
 async function saveEditOp() {
   if (!currentEditOpId) return;
-
   const objId = parseInt(document.getElementById('editHdrObject').value);
   const techId = parseInt(document.getElementById('editHdrTech').value);
   const obj = objects.find(o => o.id == objId);
@@ -1223,57 +1226,84 @@ async function saveEditOp() {
   const km = parseFloat(document.getElementById('editHdrKm').value) || 0;
   const comment = document.getElementById('editHdrComment').value;
 
-  // Обнови хедъра
-  const { error: hdrErr } = await db.from('operation_headers').update({
+  const { error } = await db.from('operation_headers').update({
     object_id: objId, object_name: obj?.name,
     technician_id: techId, technician_name: tech?.name,
     date, km, comment
   }).eq('id', currentEditOpId);
-  if (hdrErr) { showToast('❌ ' + hdrErr.message, 'error'); return; }
 
-  // Обнови съществуващите редове
-  const existingLines = document.querySelectorAll('#editOpLines .added-line[data-id]:not([data-id^="new-"])');
-  for (const line of existingLines) {
-    const lineId = line.dataset.id;
-    const prodId = parseInt(line.querySelector('.edit-line-prod').value);
-    const qty = parseFloat(line.querySelector('.edit-line-qty').value) || 1;
-    const prod = products.find(p => p.id == prodId);
-    await db.from('operations').update({
-      product_id: prodId,
-      product_name: prod?.name,
-      quantity: qty,
-      cost_value: parseFloat(((prod?.price_with_vat || 0) * qty).toFixed(2)),
-      date,
-      object_name: obj?.name,
-      technician_name: tech?.name
-    }).eq('id', parseInt(lineId));
-  }
+  if (error) { showToast('❌ ' + error.message, 'error'); return; }
+  closeEditOpModal();
+  showToast('✅ Хедърът е обновен!', 'success');
+  loadHistory();
+}
 
-  // Добави нови редове
-  const newLines = document.querySelectorAll('#editOpLines .added-line[data-id^="new-"]');
-  if (newLines.length) {
-    const newRows = Array.from(newLines).map(line => {
-      const prodId = parseInt(line.querySelector('.edit-line-prod').value);
-      const qty = parseFloat(line.querySelector('.edit-line-qty').value) || 1;
-      const prod = products.find(p => p.id == prodId);
-      return {
-        header_id: currentEditOpId, date,
-        object_name: obj?.name, technician_name: tech?.name,
-        product_id: prodId, product_name: prod?.name,
-        quantity: qty,
-        cost_value: parseFloat(((prod?.price_with_vat || 0) * qty).toFixed(2))
-      };
-    });
-    await db.from('operations').insert(newRows);
-  }
+// ── LINE EDIT ──
+let currentEditLineId = null;
+
+async function openEditLineModal(id) {
+  const { data } = await db.from('operations').select('*').eq('id', id).single();
+  if (!data) return;
+  currentEditLineId = id;
+  document.getElementById('editLineTitle').textContent = `✏️ ${getProductIcon(data.product_name)} ${data.product_name}`;
+  document.getElementById('editLineSub').textContent = `${data.object_name || ''} · ${data.technician_name || ''}`;
+  document.getElementById('editLineQty').value = data.quantity || 1;
+  document.getElementById('editLineModal').style.display = 'flex';
+  setTimeout(() => document.getElementById('editLineQty').focus(), 100);
+}
+
+function closeEditLineModal() {
+  document.getElementById('editLineModal').style.display = 'none';
+  currentEditLineId = null;
+}
+
+function changeEditQty(delta) {
+  const inp = document.getElementById('editLineQty');
+  inp.value = Math.max(0.5, (parseFloat(inp.value) || 0) + delta);
+}
+
+async function saveEditLine() {
+  if (!currentEditLineId) return;
+  const qty = parseFloat(document.getElementById('editLineQty').value) || 1;
+
+  // Вземи продукта за да изчислим cost_value
+  const { data: op } = await db.from('operations').select('product_id, header_id').eq('id', currentEditLineId).single();
+  const prod = products.find(p => p.id == op?.product_id);
+  const costValue = prod ? parseFloat((prod.price_with_vat * qty).toFixed(2)) : null;
+
+  const update = { quantity: qty };
+  if (costValue) update.cost_value = costValue;
+
+  const { error } = await db.from('operations').update(update).eq('id', currentEditLineId);
+  if (error) { showToast('❌ ' + error.message, 'error'); return; }
 
   // Обнови total_cost в хедъра
-  const { data: allLines } = await db.from('operations').select('cost_value').eq('header_id', currentEditOpId);
-  const newTotal = (allLines || []).reduce((s, r) => s + (r.cost_value || 0), 0);
-  await db.from('operation_headers').update({ total_cost: parseFloat(newTotal.toFixed(2)) }).eq('id', currentEditOpId);
+  if (op?.header_id) {
+    const { data: allLines } = await db.from('operations').select('cost_value').eq('header_id', op.header_id);
+    const newTotal = (allLines || []).reduce((s, r) => s + (r.cost_value || 0), 0);
+    await db.from('operation_headers').update({ total_cost: parseFloat(newTotal.toFixed(2)) }).eq('id', op.header_id);
+  }
 
-  closeEditOpModal();
-  showToast('✅ Записът е обновен!', 'success');
+  closeEditLineModal();
+  showToast('✅ Редът е обновен!', 'success');
+  loadHistory();
+}
+
+async function deleteLine(id) {
+  if (!confirm('Изтриване на реда?')) return;
+  // Вземи header_id преди изтриване
+  const { data: op } = await db.from('operations').select('header_id').eq('id', id).single();
+  const { error } = await db.from('operations').delete().eq('id', id);
+  if (error) { showToast('❌ ' + error.message, 'error'); return; }
+
+  // Обнови total_cost
+  if (op?.header_id) {
+    const { data: allLines } = await db.from('operations').select('cost_value').eq('header_id', op.header_id);
+    const newTotal = (allLines || []).reduce((s, r) => s + (r.cost_value || 0), 0);
+    await db.from('operation_headers').update({ total_cost: parseFloat(newTotal.toFixed(2)) }).eq('id', op.header_id);
+  }
+
+  showToast('🗑 Редът е изтрит!', 'success');
   loadHistory();
 }
 
