@@ -360,9 +360,8 @@
 <!-- EDIT OPERATION MODAL -->
 <div id="editOpModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:200; align-items:flex-end; justify-content:center;">
   <div style="background:var(--bg2); border-radius:20px 20px 0 0; padding:24px; width:100%; max-width:480px; max-height:80vh; overflow-y:auto;">
-    <div style="font-size:16px; font-weight:800; margin-bottom:16px;">✏️ Редакция на запис</div>
-    <div class="field"><label>ПРОДУКТ</label><input type="text" id="editOpProduct" style="background:var(--bg3)"></div>
-    <div class="field"><label>КОЛИЧЕСТВО</label><input type="number" id="editOpQty" step="0.5"></div>
+    <div style="font-size:16px; font-weight:800; margin-bottom:16px;">✏️ Редакция на зареждане</div>
+    <div class="field"><label>КМ</label><input type="number" id="editOpQty" step="0.1" min="0"></div>
     <div class="field"><label>КОМЕНТАР</label><input type="text" id="editOpComment"></div>
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:8px;">
       <button onclick="closeEditOpModal()" style="padding:14px; border-radius:12px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:15px; font-weight:700; cursor:pointer;">Отказ</button>
@@ -754,7 +753,7 @@ async function submitRestock() {
         return;
       }
       const lastDate = new Date(lastCf[0].date);
-      const curDate = new Date(document.getElementById('dateInput').value);
+      const curDate = new Date(date);
       if (curDate < lastDate) {
         showToast(`❌ Датата е по-ранна от предишния запис (${lastCf[0].date})!`, 'error');
         return;
@@ -764,46 +763,60 @@ async function submitRestock() {
 
   const obj = objects.find(o => o.id == objectId);
   const tech = technicians.find(t => t.id == techId);
-  const counterVal = parseInt(document.getElementById('counterInput').value) || null;
   const comment = document.getElementById('commentInput').value;
   const durationMin = Math.round(timerSeconds / 60);
-
   const dateObj = new Date(date);
   const weekNum = getWeekNumber(dateObj);
   const period = `${dateObj.getFullYear()}.${String(dateObj.getMonth()+1).padStart(2,'0')}`;
+  const totalCostValue = lines.reduce((s, l) => s + l.product.price_with_vat * l.qty, 0);
 
   const btn = document.getElementById('submitBtn');
   btn.disabled = true; btn.textContent = '⏳ Записва...';
 
-  // Записваме по един ред за всеки продукт
-  const rows = lines.map((l, i) => ({
+  // СТЪПКА 1: Запиши хедъра
+  const { data: header, error: headerError } = await db.from('operation_headers').insert({
     date,
     object_id: parseInt(objectId),
     object_name: obj?.name,
+    technician_id: parseInt(techId),
+    technician_name: tech?.name,
+    duration_minutes: durationMin,
+    km: 0,
+    fuel_price_per_km: 0,
+    fuel_cost: 0,
+    total_cost: parseFloat(totalCostValue.toFixed(2)),
+    week_number: weekNum,
+    period,
+    op_type: 'restock',
+    comment
+  }).select().single();
+
+  if (headerError) {
+    btn.disabled = false; btn.textContent = '💾 Запиши зареждането';
+    showToast('❌ ' + headerError.message, 'error');
+    return;
+  }
+
+  // СТЪПКА 2: Запиши редовете с header_id
+  const rows = lines.map(l => ({
+    header_id: header.id,
+    date,
+    object_name: obj?.name,
+    technician_name: tech?.name,
     product_id: l.product.id,
     product_name: l.product.name,
     quantity: l.qty,
-    // брояч и cash са преместени в cashflow
-    duration_minutes: i === 0 ? durationMin : 0,
-    technician_id: parseInt(techId),
-    technician_name: tech?.name,
-    cost_value: l.product.price_with_vat * l.qty,
-    week_number: weekNum,
-    period,
-    rent: i === 0 ? (obj?.rent || 0) : 0,  // наем само на първия ред
-    comment: i === 0 ? comment : null,
-    op_type: 'restock'
+    cost_value: parseFloat((l.product.price_with_vat * l.qty).toFixed(2))
   }));
 
-  const { data: insertedOps, error } = await db.from('operations').insert(rows).select();
+  const { error: rowsError } = await db.from('operations').insert(rows);
 
   btn.disabled = false; btn.textContent = '💾 Запиши зареждането';
+  if (rowsError) { showToast('❌ ' + rowsError.message, 'error'); return; }
 
-  if (error) { showToast('❌ ' + error.message, 'error'); return; }
-
-  // Ако има брояч → създай cashflow запис
-  if (counterVal && obj) {
-    await createCashflowEntry(counterVal, obj, tech, date, insertedOps?.[0]?.id);
+  // СТЪПКА 3: Ако има брояч → създай cashflow запис
+  if (counterVal2 && obj) {
+    await createCashflowEntry(counterVal2, obj, tech, date, header.id);
   }
 
   showToast(`✅ Записани ${lines.length} продукта!`, 'success');
@@ -822,9 +835,7 @@ async function submitRestock() {
   renderBasket();
   renderProductCards();
   document.getElementById('qtyPopup').classList.remove('visible');
-  // Върни датата към днес
   document.getElementById('dateInput').value = new Date().toISOString().split('T')[0];
-  // Scroll нагоре
   document.getElementById('page-restock').scrollTop = 0;
   window.scrollTo(0, 0);
 }
@@ -871,7 +882,7 @@ async function createCashflowEntry(counter, obj, tech, date, operationId) {
     check_value: checkValue ? parseFloat(checkValue.toFixed(2)) : null,
     technician_id: tech?.id,
     technician_name: tech?.name,
-    operation_id: operationId,
+    operation_id: operationId, // сега сочи към header_id
     status: 'pending'
   });
 }
@@ -1019,35 +1030,74 @@ async function loadHistory() {
   const objFilter = document.getElementById('histFilterObject')?.value || '';
   const dateFilter = document.getElementById('histFilterDate')?.value || '';
 
-  let q = db.from('operations').select('*').order('date', { ascending: false }).order('created_at', { ascending: false }).limit(50);
+  // Зареди хедъри с JOIN към редовете
+  let q = db.from('operation_headers')
+    .select('*, operations(id, product_name, product_id, quantity, cost_value)')
+    .order('date', { ascending: false })
+    .order('created_at', { ascending: false })
+    .limit(30);
   if (objFilter) q = q.eq('object_id', parseInt(objFilter));
   if (dateFilter) q = q.gte('date', dateFilter);
 
   const { data } = await q;
   if (!data?.length) { list.innerHTML = '<div class="empty"><div class="empty-icon">📭</div><p>Няма записи</p></div>'; return; }
-  list.innerHTML = data.map(op => `
-    <div class="op-item" style="align-items:flex-start;">
-      <div class="op-icon" style="margin-top:2px;">${getProductIcon(op.product_name)}</div>
-      <div class="op-info">
-        <div class="op-title">${op.object_name || '—'} · ${op.product_name || '—'}</div>
-        <div class="op-sub">${formatDateBG(new Date(op.date))} · ${op.technician_name || '—'} · ${op.quantity} ${getProductUnit(op.product_name)}</div>
-        ${op.comment ? `<div style="font-size:11px; color:var(--text3); margin-top:2px;">💬 ${op.comment}</div>` : ''}
+
+  list.innerHTML = data.map(h => `
+    <div class="card" style="margin-bottom:10px;">
+      <div style="display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:8px;">
+        <div>
+          <div style="font-size:15px; font-weight:800;">${h.object_name || '—'}</div>
+          <div style="font-size:12px; color:var(--text2);">${formatDateBG(new Date(h.date))} · ${h.technician_name || '—'}</div>
+          ${h.comment ? `<div style="font-size:11px; color:var(--text3); margin-top:2px;">💬 ${h.comment}</div>` : ''}
+        </div>
+        <div style="display:flex; gap:5px;">
+          <button onclick="openEditHeaderModal(${h.id})" style="padding:5px 10px; border-radius:7px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:11px; font-weight:700; cursor:pointer;">✏️</button>
+          <button onclick="deleteHeader(${h.id})" style="padding:5px 10px; border-radius:7px; border:1px solid var(--red); background:transparent; color:var(--red); font-size:11px; font-weight:700; cursor:pointer;">🗑</button>
+        </div>
       </div>
-      <div style="display:flex; flex-direction:column; gap:5px; flex-shrink:0;">
-        <button onclick="openEditOpModal(${op.id})" style="padding:5px 10px; border-radius:7px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:11px; font-weight:700; cursor:pointer;">✏️</button>
-        <button onclick="deleteOp(${op.id})" style="padding:5px 10px; border-radius:7px; border:1px solid var(--red); background:transparent; color:var(--red); font-size:11px; font-weight:700; cursor:pointer;">🗑</button>
+      ${(h.operations||[]).map(op => `
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-top:1px solid var(--border);">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-size:18px;">${getProductIcon(op.product_name)}</span>
+            <span style="font-size:13px; font-weight:600;">${op.product_name}</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:12px;">
+            <span style="font-size:12px; color:var(--text2);">${op.quantity} ${getProductUnit(op.product_name)}</span>
+            <span style="font-size:13px; font-weight:700; color:var(--amber);">${op.cost_value?.toFixed(2)} лв</span>
+          </div>
+        </div>`).join('')}
+      <div style="display:flex; justify-content:space-between; padding-top:8px; border-top:2px solid var(--border); margin-top:4px;">
+        <span style="font-size:12px; color:var(--text2);">${h.duration_minutes ? `⏱ ${h.duration_minutes} мин` : ''} ${h.km ? `· 🚗 ${h.km} км` : ''}</span>
+        <span style="font-size:14px; font-weight:800; color:var(--accent);">${h.total_cost?.toFixed(2)} лв</span>
       </div>
     </div>`).join('');
 }
 
-async function openEditOpModal(id) {
-  const { data } = await db.from('operations').select('*').eq('id', id).single();
+async function openEditHeaderModal(id) {
+  const { data } = await db.from('operation_headers').select('*').eq('id', id).single();
   if (!data) return;
   currentEditOpId = id;
-  document.getElementById('editOpProduct').value = data.product_name || '';
-  document.getElementById('editOpQty').value = data.quantity || '';
+  document.getElementById('editOpProduct').value = data.comment || '';
+  document.getElementById('editOpQty').value = data.km || '';
   document.getElementById('editOpComment').value = data.comment || '';
   document.getElementById('editOpModal').style.display = 'flex';
+}
+
+async function deleteHeader(id) {
+  if (!confirm('Изтриване на цялото зареждане и всички продукти?')) return;
+  // Изтрий свързания cashflow
+  await db.from('cashflow').delete().eq('operation_id', id);
+  // Изтрий редовете
+  await db.from('operations').delete().eq('header_id', id);
+  // Изтрий хедъра
+  const { error } = await db.from('operation_headers').delete().eq('id', id);
+  if (error) { showToast('❌ ' + error.message, 'error'); return; }
+  showToast('🗑 Изтрито!', 'success');
+  loadHistory();
+}
+
+async function openEditOpModal(id) {
+  await openEditHeaderModal(id);
 }
 
 function closeEditOpModal() {
@@ -1057,15 +1107,9 @@ function closeEditOpModal() {
 
 async function saveEditOp() {
   if (!currentEditOpId) return;
-  const qty = parseFloat(document.getElementById('editOpQty').value) || 0;
+  const km = parseFloat(document.getElementById('editOpQty').value) || 0;
   const comment = document.getElementById('editOpComment').value;
-  const prod = products.find(p => p.name === document.getElementById('editOpProduct').value);
-  const costValue = prod ? prod.price_with_vat * qty : null;
-
-  const update = { quantity: qty, comment };
-  if (costValue) update.cost_value = costValue;
-
-  const { error } = await db.from('operations').update(update).eq('id', currentEditOpId);
+  const { error } = await db.from('operation_headers').update({ km, comment }).eq('id', currentEditOpId);
   if (error) { showToast('❌ ' + error.message, 'error'); return; }
   closeEditOpModal();
   showToast('✅ Записът е обновен!', 'success');
@@ -1073,7 +1117,10 @@ async function saveEditOp() {
 }
 
 async function deleteOp(id) {
-  if (!confirm('Изтриване на записа?')) return;
+  if (!confirm('Изтриване на записа и свързаното отчитане?')) return;
+  // Изтрий свързания cashflow запис ако съществува
+  await db.from('cashflow').delete().eq('operation_id', id);
+  // Изтрий операцията
   const { error } = await db.from('operations').delete().eq('id', id);
   if (error) { showToast('❌ ' + error.message, 'error'); return; }
   showToast('🗑 Изтрито!', 'success');
@@ -1085,24 +1132,25 @@ async function loadStats() {
   const grid = document.getElementById('statsGrid');
   grid.innerHTML = '<div class="loading" style="grid-column:1/-1"><div class="spinner"></div></div>';
   const weekStart = getWeekStart();
-  const [{ data: opsData }, { data: cashData }] = await Promise.all([
-    db.from('operations').select('*').gte('date', weekStart),
+  const [{ data: headersData }, { data: cashData }] = await Promise.all([
+    db.from('operation_headers').select('*, operations(cost_value)').gte('date', weekStart),
     db.from('cashflow').select('*').gte('date', weekStart).eq('status', 'completed')
   ]);
-  if (!opsData) return;
+  if (!headersData) return;
   const totalCash = (cashData || []).reduce((s,r) => s+(r.cash||0), 0);
-  const totalCost = opsData.reduce((s,r) => s+(r.cost_value||0), 0);
-  const uniqueObjs = new Set(opsData.map(r=>r.object_id)).size;
+  const totalCost = headersData.reduce((s,h) => s+(h.total_cost||0), 0);
+  const uniqueObjs = new Set(headersData.map(h=>h.object_id)).size;
+  const totalRestocks = headersData.length;
   grid.innerHTML = `
     <div class="stat-card"><div class="stat-label">Cash тази седм.</div><div class="stat-value green">${totalCash.toFixed(0)} лв</div></div>
     <div class="stat-card"><div class="stat-label">Стойност заредено</div><div class="stat-value amber">${totalCost.toFixed(0)} лв</div></div>
-    <div class="stat-card"><div class="stat-label">Зареждания</div><div class="stat-value blue">${opsData.length}</div></div>
+    <div class="stat-card"><div class="stat-label">Зареждания</div><div class="stat-value blue">${totalRestocks}</div></div>
     <div class="stat-card"><div class="stat-label">Обекти</div><div class="stat-value">${uniqueObjs}</div></div>`;
   const byObj = {};
-  opsData.forEach(r => {
-    if(!byObj[r.object_name]) byObj[r.object_name]={cash:0,cost:0,ops:0};
-    byObj[r.object_name].cost+=r.cost_value||0;
-    byObj[r.object_name].ops++;
+  headersData.forEach(h => {
+    if(!byObj[h.object_name]) byObj[h.object_name]={cash:0,cost:0,ops:0};
+    byObj[h.object_name].cost+=h.total_cost||0;
+    byObj[h.object_name].ops++;
   });
   (cashData||[]).forEach(r => {
     if(!byObj[r.object_name]) byObj[r.object_name]={cash:0,cost:0,ops:0};
