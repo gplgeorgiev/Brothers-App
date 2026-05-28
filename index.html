@@ -1074,12 +1074,15 @@ async function loadHistory() {
 }
 
 async function openEditHeaderModal(id) {
-  const { data } = await db.from('operation_headers').select('*').eq('id', id).single();
-  if (!data) return;
+  console.log('openEditHeaderModal called with id:', id);
+  const { data, error } = await db.from('operation_headers').select('*').eq('id', id).single();
+  console.log('data:', data, 'error:', error);
+  if (!data) { showToast('❌ Не намерих запис: ' + (error?.message || ''), 'error'); return; }
   currentEditOpId = id;
   document.getElementById('editOpQty').value = data.km || '';
   document.getElementById('editOpComment').value = data.comment || '';
   document.getElementById('editOpModal').style.display = 'flex';
+  console.log('Modal should be visible now');
 }
 
 async function deleteHeader(id) {
