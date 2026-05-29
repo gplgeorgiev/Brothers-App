@@ -1404,8 +1404,10 @@ async function loadHistory() {
   if (dateFilter) q = q.gte('date', dateFilter);
 
   const { data, error } = await q;
+  console.log('History data:', data, 'error:', error);
   if (error) { list.innerHTML = `<div class="empty"><div class="empty-icon">❌</div><p>${error.message}</p></div>`; return; }
   if (!data?.length) { list.innerHTML = '<div class="empty"><div class="empty-icon">📭</div><p>Няма записи</p></div>'; return; }
+  console.log('First record:', JSON.stringify(data[0]));
 
   list.innerHTML = data.map(h => `
     <div class="card" style="margin-bottom:10px;">
