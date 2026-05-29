@@ -1403,7 +1403,8 @@ async function loadHistory() {
   if (objFilter) q = q.eq('object_id', parseInt(objFilter));
   if (dateFilter) q = q.gte('date', dateFilter);
 
-  const { data } = await q;
+  const { data, error } = await q;
+  if (error) { list.innerHTML = `<div class="empty"><div class="empty-icon">❌</div><p>${error.message}</p></div>`; return; }
   if (!data?.length) { list.innerHTML = '<div class="empty"><div class="empty-icon">📭</div><p>Няма записи</p></div>'; return; }
 
   list.innerHTML = data.map(h => `
