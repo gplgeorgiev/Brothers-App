@@ -1,0 +1,1492 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#0ea5a0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Brothers">
+<title>Coffee Brothers</title>
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="manifest" href="manifest.json">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --bg: #f0f2f5; --bg2: #ffffff; --bg3: #e8ecf0;
+    --border: #d0d7e2; --accent: #0ea5a0; --accent2: #e8622a;
+    --green: #16a34a; --amber: #d97706; --red: #dc2626;
+    --text: #1a2236; --text2: #5a6580; --text3: #9aa3b8;
+    --radius: 14px; --font: 'Manrope', sans-serif; --mono: 'JetBrains Mono', monospace;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { font-family:var(--font); background:var(--bg); color:var(--text); min-height:100vh; max-width:480px; margin:0 auto; padding-bottom:90px; }
+
+  /* HEADER */
+  .header { position:sticky; top:0; z-index:100; background:rgba(240,242,245,0.92); backdrop-filter:blur(16px); border-bottom:1px solid var(--border); padding:14px 20px; display:flex; align-items:center; justify-content:space-between; }
+  .header-title { font-size:17px; font-weight:700; letter-spacing:-0.3px; }
+  .header-sub { font-size:12px; color:var(--text2); font-family:var(--mono); }
+  .header-avatar { width:36px; height:36px; border-radius:50%; background:linear-gradient(135deg,var(--accent),var(--accent2)); display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:700; cursor:pointer; }
+
+  /* TABS */
+  .tabs { display:flex; gap:4px; padding:12px 16px 0; overflow-x:auto; scrollbar-width:none; }
+  .tabs::-webkit-scrollbar { display:none; }
+  .tab { flex-shrink:0; padding:8px 16px; border-radius:8px; font-size:13px; font-weight:600; border:1px solid var(--border); background:var(--bg2); color:var(--text2); cursor:pointer; transition:all 0.2s; }
+  .tab.active { background:var(--accent); border-color:var(--accent); color:#fff; }
+
+  /* PAGES */
+  .page { display:none; padding:16px; }
+  .page.active { display:block; }
+
+  /* SECTION LABEL */
+  .section-label { font-size:11px; font-weight:700; letter-spacing:1.2px; color:var(--text3); text-transform:uppercase; margin:20px 0 10px; }
+
+  /* CARD */
+  .card { background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius); padding:16px; margin-bottom:12px; }
+
+  /* FIELD */
+  .field { margin-bottom:14px; }
+  .field label { display:block; font-size:12px; font-weight:600; color:var(--text2); margin-bottom:6px; letter-spacing:0.3px; }
+  .field input, .field select, .field textarea { width:100%; background:var(--bg3); border:1px solid var(--border); border-radius:10px; padding:12px 14px; color:var(--text); font-family:var(--font); font-size:15px; outline:none; transition:border-color 0.2s; appearance:none; }
+  .field input:focus, .field select:focus { border-color:var(--accent); }
+  .field select { background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238b92a8' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 14px center; padding-right:36px; }
+
+  /* GPS ROW */
+  .gps-row { display:flex; gap:8px; align-items:stretch; }
+  .gps-row .field { flex:1; margin-bottom:0; }
+  .gps-btn { flex-shrink:0; background:var(--bg3); border:1px solid var(--border); border-radius:10px; padding:0 14px; color:var(--text2); cursor:pointer; font-size:20px; display:flex; align-items:center; transition:all 0.2s; }
+  .gps-btn:active { border-color:var(--accent); color:var(--accent); }
+  .gps-status { font-size:11px; color:var(--text3); margin-top:5px; font-family:var(--mono); }
+
+  /* OCR */
+  .ocr-btn { flex-shrink:0; width:48px; height:48px; background:var(--bg3); border:1px solid var(--border); border-radius:10px; font-size:20px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all 0.2s; }
+  .ocr-btn:active { border-color:var(--accent); transform:scale(0.92); }
+  .ocr-status { font-size:13px; font-weight:600; padding:8px 12px; border-radius:8px; text-align:center; }
+  .ocr-status.loading { background:rgba(14,165,160,0.1); color:var(--accent); }
+  .ocr-status.success { background:rgba(22,163,74,0.1); color:var(--green); }
+  .ocr-status.error { background:rgba(220,38,38,0.1); color:var(--red); }
+
+  /* TIMER */
+  .timer-row { display:flex; align-items:center; gap:10px; background:var(--bg3); border:1px solid var(--border); border-radius:10px; padding:12px 14px; }
+  .timer-display { font-family:var(--mono); font-size:22px; font-weight:500; color:var(--accent); flex:1; }
+  .timer-btn { padding:8px 14px; border-radius:8px; border:none; font-size:12px; font-weight:700; cursor:pointer; transition:all 0.15s; }
+  .timer-btn.start { background:var(--green); color:#fff; }
+  .timer-btn.stop { background:var(--red); color:#fff; }
+  .timer-btn.reset { background:var(--bg2); border:1px solid var(--border); color:var(--text2); }
+
+  /* ====== PRODUCT PICKER ====== */
+  .product-scroll-wrap { margin:0 -16px; padding:0 16px 6px; overflow-x:auto; scrollbar-width:none; display:flex; gap:10px; margin-bottom:14px; }
+  .product-scroll-wrap::-webkit-scrollbar { display:none; }
+  .prod-card { flex-shrink:0; width:86px; background:var(--bg3); border:2px solid var(--border); border-radius:14px; padding:12px 8px 10px; text-align:center; cursor:pointer; transition:all 0.15s; user-select:none; }
+  .prod-card:active { transform:scale(0.93); }
+  .prod-card.selected { border-color:var(--accent); background:rgba(79,142,247,0.1); }
+  .prod-card .pc-icon { font-size:28px; margin-bottom:5px; line-height:1; }
+  .prod-card .pc-name { font-size:11px; font-weight:700; color:var(--text2); line-height:1.2; }
+  .prod-card.selected .pc-name { color:var(--accent); }
+
+  .qty-popup { display:none; background:var(--bg2); border:1px solid var(--accent); border-radius:12px; padding:12px; margin-bottom:10px; }
+  .qty-popup.visible { display:flex; flex-wrap:wrap; align-items:center; gap:8px; animation:popIn 0.18s ease; }
+  @keyframes popIn { from { opacity:0; transform:scale(0.95) translateY(-4px); } to { opacity:1; transform:scale(1) translateY(0); } }
+  .qty-popup .prod-label { flex:1; min-width:0; font-size:13px; font-weight:700; display:flex; align-items:center; gap:6px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+  .qty-popup .prod-label span { font-size:18px; flex-shrink:0; }
+  .qty-popup .qty-controls { display:flex; align-items:center; gap:8px; flex-shrink:0; }
+  .qty-big-btn { width:38px; height:38px; border-radius:10px; background:var(--bg3); border:1px solid var(--border); color:var(--text); font-size:20px; font-weight:700; display:flex; align-items:center; justify-content:center; cursor:pointer; transition:all 0.15s; flex-shrink:0; user-select:none; }
+  .qty-big-btn:active { background:var(--accent); border-color:var(--accent); transform:scale(0.88); }
+  .qty-big-val { min-width:36px; text-align:center; font-family:var(--mono); font-size:18px; font-weight:800; color:var(--text); }
+  .qty-big-input { width:52px; text-align:center; background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:6px 4px; color:var(--text); font-family:var(--mono); font-size:18px; font-weight:800; outline:none; -moz-appearance:textfield; }
+  .qty-big-input::-webkit-inner-spin-button, .qty-big-input::-webkit-outer-spin-button { -webkit-appearance:none; }
+  .qty-big-input:focus { border-color:var(--accent); }
+  .qty-add-btn { width:100%; padding:11px; border-radius:10px; border:none; background:var(--accent); color:#fff; font-size:14px; font-weight:700; font-family:var(--font); cursor:pointer; transition:all 0.15s; }
+  .qty-add-btn:active { transform:scale(0.97); opacity:0.85; }
+
+  .added-lines { display:flex; flex-direction:column; gap:8px; margin-bottom:4px; }
+  .added-line { display:flex; align-items:center; gap:10px; background:var(--bg3); border:1px solid var(--border); border-radius:10px; padding:10px 12px; animation:slideIn 0.18s ease; }
+  @keyframes slideIn { from { opacity:0; transform:translateY(-5px); } to { opacity:1; transform:translateY(0); } }
+  .added-line .al-icon { font-size:22px; flex-shrink:0; }
+  .added-line .al-name { flex:1; font-size:13px; font-weight:700; }
+  .added-line .al-qty { font-family:var(--mono); font-size:13px; color:var(--text2); }
+  .added-line .al-remove { width:26px; height:26px; border-radius:6px; background:transparent; border:1px solid var(--border); color:var(--text3); font-size:14px; display:flex; align-items:center; justify-content:center; cursor:pointer; transition:all 0.15s; flex-shrink:0; }
+  .added-line .al-remove:active { background:rgba(239,68,68,0.15); border-color:var(--red); color:var(--red); }
+
+  /* SUMMARY */
+  .summary-card {
+    background:linear-gradient(135deg, rgba(79,142,247,0.08), rgba(124,58,237,0.08));
+    border:1px solid rgba(79,142,247,0.25);
+    border-radius:var(--radius); padding:16px; margin-bottom:12px;
+  }
+  .summary-row { display:flex; justify-content:space-between; align-items:center; padding:5px 0; font-size:13px; }
+  .summary-row .key { color:var(--text2); }
+  .summary-row .val { font-weight:700; font-family:var(--mono); }
+  .summary-total { display:flex; justify-content:space-between; align-items:center; padding-top:10px; margin-top:6px; border-top:1px solid rgba(79,142,247,0.2); }
+  .summary-total .key { font-size:13px; font-weight:700; }
+  .summary-total .val { font-size:18px; font-weight:800; color:var(--amber); font-family:var(--mono); }
+
+  /* SUBMIT */
+  .submit-btn { width:100%; padding:16px; border-radius:12px; border:none; background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff; font-size:16px; font-weight:700; cursor:pointer; transition:all 0.2s; margin-top:8px; font-family:var(--font); }
+  .submit-btn:active { transform:scale(0.97); opacity:0.9; }
+  .submit-btn:disabled { opacity:0.5; cursor:not-allowed; }
+
+  /* BOTTOM NAV */
+  .bottom-nav { position:fixed; bottom:0; left:50%; transform:translateX(-50%); width:100%; max-width:480px; background:rgba(240,242,245,0.95); backdrop-filter:blur(16px); border-top:1px solid var(--border); display:flex; padding:8px 16px 16px; z-index:100; }
+  .nav-btn { flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; padding:8px; border-radius:10px; cursor:pointer; transition:all 0.2s; border:none; background:transparent; }
+  .nav-btn.active { background:rgba(79,142,247,0.12); }
+  .nav-icon { font-size:22px; }
+  .nav-label { font-size:10px; font-weight:600; color:var(--text3); }
+  .nav-btn.active .nav-label { color:var(--accent); }
+
+  /* TOAST */
+  .toast { position:fixed; top:80px; left:50%; transform:translateX(-50%) translateY(-20px); background:var(--bg2); border:1px solid var(--border); box-shadow:0 4px 20px rgba(0,0,0,0.12); border-radius:10px; padding:12px 20px; font-size:14px; font-weight:600; opacity:0; transition:all 0.3s; z-index:999; white-space:nowrap; pointer-events:none; }
+  .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+  .toast.success { border-color:var(--green); color:var(--green); }
+  .toast.error { border-color:var(--red); color:var(--red); }
+
+  /* INFO ROW */
+  .info-row { display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid var(--border); font-size:13px; }
+  .info-row:last-child { border-bottom:none; }
+  .info-row .key { color:var(--text2); }
+  .info-row .val { font-weight:600; font-family:var(--mono); }
+
+  /* STATS */
+  .stats-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .stat-card { background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius); padding:16px; }
+  .stat-label { font-size:11px; color:var(--text3); font-weight:600; text-transform:uppercase; letter-spacing:0.8px; margin-bottom:6px; }
+  .stat-value { font-size:22px; font-weight:800; font-family:var(--mono); }
+  .stat-value.green { color:var(--green); }
+  .stat-value.amber { color:var(--amber); }
+  .stat-value.blue { color:var(--accent); }
+
+  /* HISTORY */
+  .op-item { background:var(--bg2); border:1px solid var(--border); border-radius:12px; padding:14px; margin-bottom:8px; display:flex; align-items:center; gap:12px; }
+  .op-icon { font-size:26px; flex-shrink:0; }
+  .op-info { flex:1; min-width:0; }
+  .op-title { font-size:14px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .op-sub { font-size:12px; color:var(--text2); margin-top:2px; }
+  .op-cash { font-family:var(--mono); font-size:15px; font-weight:700; color:var(--green); }
+
+  .badge { display:inline-block; padding:3px 8px; border-radius:5px; font-size:11px; font-weight:700; background:rgba(79,142,247,0.15); color:var(--accent); }
+  .badge.green { background:rgba(34,197,94,0.15); color:var(--green); }
+  .badge.amber { background:rgba(245,158,11,0.15); color:var(--amber); }
+
+  .loading { display:flex; align-items:center; justify-content:center; padding:40px; color:var(--text3); font-size:14px; gap:10px; }
+  .spinner { width:18px; height:18px; border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 0.7s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .empty { text-align:center; padding:40px 20px; color:var(--text3); }
+  .empty .empty-icon { font-size:48px; margin-bottom:12px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <div class="header-title" style="display:flex;align-items:center;gap:8px;"><img src="icon-192.png" style="width:28px;height:28px;border-radius:6px;object-fit:cover;"> Brothers</div>
+    <div class="header-sub" id="headerDate">зарежда...</div>
+  </div>
+  <div class="header-avatar" id="avatarBtn">?</div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('restock')">⬆ Зареждане</div>
+  <div class="tab" onclick="switchTab('cashflow')">💰 Отчитане</div>
+  <div class="tab" onclick="switchTab('history')">📋 История</div>
+  <div class="tab" onclick="switchTab('stats')">📊 Статистика</div>
+  <div class="tab" onclick="switchTab('settings')">⚙️ Настройки</div>
+</div>
+
+<!-- PAGE: ЗАРЕЖДАНЕ -->
+<div class="page active" id="page-restock">
+
+  <!-- 1. ОБЕКТ -->
+  <div class="section-label">Обект</div>
+  <div class="card">
+    <div class="gps-row">
+      <div class="field">
+        <label>ОБЕКТ</label>
+        <select id="objectSelect"><option value="">— избери обект —</option></select>
+      </div>
+      <button class="gps-btn" onclick="getGPS()">📍</button>
+    </div>
+    <div class="gps-status" id="gpsStatus"></div>
+    <div id="objectInfo"></div>
+  </div>
+
+  <!-- 2. ПРОДУКТИ -->
+  <div class="section-label">Продукти</div>
+  <div class="card">
+    <div class="product-scroll-wrap" id="productScrollWrap">
+      <div class="loading" style="padding:20px 0"><div class="spinner"></div></div>
+    </div>
+    <div class="qty-popup" id="qtyPopup">
+      <div class="prod-label"><span id="popupIcon">☕</span><span id="popupName">Продукт</span></div>
+      <div class="qty-controls">
+        <div class="qty-big-btn" onclick="changePopupQty(-1)">−</div>
+        <input class="qty-big-input" id="popupQtyInput" type="number" value="1" min="1" step="1" oninput="popupQty=parseFloat(this.value)||1">
+        <div class="qty-big-btn" onclick="changePopupQty(1)">＋</div>
+      </div>
+      <button class="qty-add-btn" onclick="addToBasket()">✓ Добави</button>
+    </div>
+    <div class="added-lines" id="addedLines"></div>
+  </div>
+
+  <!-- РЕЗЮМЕ -->
+  <div id="summarySection"></div>
+
+  <!-- 3. БРОЯЧ -->
+  <div class="section-label">Брояч</div>
+  <div class="card">
+    <div class="field" style="margin-bottom:0">
+      <label>БРОЯЧ (незадължително)</label>
+      <div style="display:flex; gap:8px;">
+        <input type="number" id="counterInput" placeholder="напр. 12450" style="flex:1">
+        <button class="ocr-btn" onclick="triggerCamera()" title="Снимай брояча">📷</button>
+        <button class="ocr-btn" onclick="triggerGallery()" title="От галерия">🖼️</button>
+      </div>
+    </div>
+    <!-- OCR Preview -->
+    <div id="ocrPreview" style="display:none; margin-top:12px;">
+      <div style="border-radius:10px; overflow:hidden; margin-bottom:8px; max-height:180px; display:flex; align-items:center; justify-content:center; background:var(--bg3);">
+        <img id="ocrImg" style="max-width:100%; max-height:180px; object-fit:contain; border-radius:10px;">
+      </div>
+      <div id="ocrStatus" class="ocr-status"></div>
+    </div>
+    <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none" onchange="processOCR(this)">
+    <input type="file" id="galleryInput" accept="image/*" style="display:none" onchange="processOCR(this)">
+  </div>
+
+  <!-- 4. ТЕХНИК -->
+  <div class="section-label">Техник</div>
+  <div class="card">
+    <div class="field" style="margin-bottom:0">
+      <label>КОЙ ЗАРЕЖДА</label>
+      <select id="techSelect"><option value="">— избери техник —</option></select>
+    </div>
+  </div>
+
+  <!-- 5. ДАТА -->
+  <div class="section-label">Дата</div>
+  <div class="card">
+    <div class="field" style="margin-bottom:0">
+      <label>ДАТА</label>
+      <input type="date" id="dateInput">
+    </div>
+  </div>
+
+  <!-- 6. БЕЛЕЖКА -->
+  <div class="section-label">Бележка</div>
+  <div class="card">
+    <div class="field" style="margin-bottom:0">
+      <label>КОМЕНТАР (незадължително)</label>
+      <textarea id="commentInput" rows="2" style="resize:none; background:var(--bg3); border:1px solid var(--border); border-radius:10px; padding:12px 14px; color:var(--text); font-family:var(--font); font-size:14px; width:100%; outline:none;" placeholder="напр. почистена филтър лента..."></textarea>
+    </div>
+  </div>
+
+  <!-- 7. ПРЕСТОЙ -->
+  <div class="section-label">Престой</div>
+  <div class="card">
+    <div class="timer-row">
+      <div class="timer-display" id="timerDisplay">00:00:00</div>
+      <button class="timer-btn start" id="timerStartBtn" onclick="timerStart()">▶ Старт</button>
+      <button class="timer-btn stop" id="timerStopBtn" onclick="timerStop()" style="display:none">⏹ Стоп</button>
+      <button class="timer-btn reset" onclick="timerReset()">↺</button>
+    </div>
+  </div>
+
+  <!-- 8. ЗАПИШИ -->
+  <button class="submit-btn" id="submitBtn" onclick="submitRestock()">💾 Запиши зареждането</button>
+</div>
+
+<!-- PAGE: ОТЧИТАНЕ -->
+<div class="page" id="page-cashflow">
+  <!-- Филтри -->
+  <div class="section-label">Филтър</div>
+  <div class="card">
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+      <div class="field" style="margin-bottom:0">
+        <label>ОБЕКТ</label>
+        <select id="cfFilterObject" onchange="loadCashflow()">
+          <option value="">Всички</option>
+        </select>
+      </div>
+      <div class="field" style="margin-bottom:0">
+        <label>ДАТА ОТ</label>
+        <input type="date" id="cfFilterDate" onchange="loadCashflow()">
+      </div>
+    </div>
+  </div>
+  <div class="section-label">Чакащи отчитане</div>
+  <div id="pendingList"><div class="loading"><div class="spinner"></div> зарежда...</div></div>
+  <div class="section-label" style="margin-top:24px">Завършени</div>
+  <div id="completedList"><div class="loading"><div class="spinner"></div> зарежда...</div></div>
+</div>
+
+<!-- CASH MODAL -->
+<div id="cashModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:200; align-items:flex-end; justify-content:center;">
+  <div style="background:var(--bg2); border-radius:20px 20px 0 0; padding:24px; width:100%; max-width:480px;">
+    <div style="font-size:16px; font-weight:800; margin-bottom:4px;" id="modalTitle">Въведи Cash</div>
+    <div style="font-size:13px; color:var(--text2); margin-bottom:20px;" id="modalSub"></div>
+    <div class="field">
+      <label>CASH (лв)</label>
+      <input type="number" id="modalCashInput" placeholder="0.00" step="0.01" min="0"
+        style="font-size:24px; font-weight:700; text-align:center; padding:16px;">
+    </div>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:8px;">
+      <button onclick="closeCashModal()" style="padding:14px; border-radius:12px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:15px; font-weight:700; cursor:pointer;">Отказ</button>
+      <button onclick="saveCash()" style="padding:14px; border-radius:12px; border:none; background:var(--green); color:#fff; font-size:15px; font-weight:700; cursor:pointer;">✓ Запази</button>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT CASHFLOW MODAL -->
+<div id="editCfModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:200; align-items:flex-end; justify-content:center;">
+  <div style="background:var(--bg2); border-radius:20px 20px 0 0; padding:24px; width:100%; max-width:480px;">
+    <div style="font-size:15px; font-weight:800; margin-bottom:16px;" id="editCfTitle">✏️ Редакция</div>
+    <div class="field">
+      <label>БРОЯЧ</label>
+      <input type="number" id="editCfCounter" placeholder="напр. 12450">
+    </div>
+    <div class="field">
+      <label>CASH (лв)</label>
+      <input type="number" id="editCfCash" placeholder="0.00" step="0.01">
+    </div>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:8px;">
+      <button onclick="closeEditCfModal()" style="padding:14px; border-radius:12px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:15px; font-weight:700; cursor:pointer;">Отказ</button>
+      <button onclick="saveEditCf()" style="padding:14px; border-radius:12px; border:none; background:var(--accent); color:#fff; font-size:15px; font-weight:700; cursor:pointer;">✓ Запази</button>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT HEADER MODAL -->
+<div id="editOpModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:200; align-items:flex-end; justify-content:center;">
+  <div style="background:var(--bg2); border-radius:20px 20px 0 0; padding:20px; width:100%; max-width:480px; max-height:90vh; overflow-y:auto;">
+    <div style="font-size:16px; font-weight:800; margin-bottom:16px;">✏️ Редакция на зареждане</div>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+      <div class="field" style="margin-bottom:10px;">
+        <label>ОБЕКТ</label>
+        <select id="editHdrObject" style="background:var(--bg3); border:1px solid var(--border); border-radius:10px; padding:10px 12px; color:var(--text); font-family:var(--font); font-size:14px; width:100%; outline:none; appearance:none;"></select>
+      </div>
+      <div class="field" style="margin-bottom:10px;">
+        <label>ТЕХНИК</label>
+        <select id="editHdrTech" style="background:var(--bg3); border:1px solid var(--border); border-radius:10px; padding:10px 12px; color:var(--text); font-family:var(--font); font-size:14px; width:100%; outline:none; appearance:none;"></select>
+      </div>
+    </div>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+      <div class="field" style="margin-bottom:10px;">
+        <label>ДАТА</label>
+        <input type="date" id="editHdrDate">
+      </div>
+      <div class="field" style="margin-bottom:10px;">
+        <label>КМ</label>
+        <input type="number" id="editHdrKm" step="0.1" min="0">
+      </div>
+    </div>
+    <div class="field" style="margin-bottom:14px;">
+      <label>КОМЕНТАР</label>
+      <input type="text" id="editHdrComment">
+    </div>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+      <button onclick="closeEditOpModal()" style="padding:14px; border-radius:12px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:15px; font-weight:700; cursor:pointer; font-family:var(--font);">Отказ</button>
+      <button onclick="saveEditOp()" style="padding:14px; border-radius:12px; border:none; background:var(--accent); color:#fff; font-size:15px; font-weight:700; cursor:pointer; font-family:var(--font);">✓ Запази</button>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT LINE MODAL -->
+<div id="editLineModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:200; align-items:flex-end; justify-content:center;">
+  <div style="background:var(--bg2); border-radius:20px 20px 0 0; padding:24px; width:100%; max-width:480px;">
+    <div style="font-size:16px; font-weight:800; margin-bottom:4px;" id="editLineTitle">✏️ Редакция на ред</div>
+    <div style="font-size:13px; color:var(--text2); margin-bottom:16px;" id="editLineSub"></div>
+    <div class="field">
+      <label>КОЛИЧЕСТВО</label>
+      <div style="display:flex; align-items:center; justify-content:center; gap:16px; padding:12px; background:var(--bg3); border-radius:12px; border:1px solid var(--border);">
+        <div style="display:flex; flex-direction:column; gap:6px;">
+          <button onclick="changeEditQty(1)" style="width:36px; height:36px; border-radius:8px; background:var(--accent); border:none; color:#fff; font-size:18px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center;">＋</button>
+          <button onclick="changeEditQty(-1)" style="width:36px; height:36px; border-radius:8px; background:var(--bg2); border:1px solid var(--border); color:var(--text); font-size:18px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center;">−</button>
+        </div>
+        <input type="number" id="editLineQty" step="1" min="0.5"
+          style="width:90px; text-align:center; background:var(--bg2); border:1px solid var(--border); border-radius:10px; padding:14px 8px; color:var(--text); font-family:var(--mono); font-size:28px; font-weight:800; outline:none;">
+      </div>
+    </div>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:8px;">
+      <button onclick="closeEditLineModal()" style="padding:14px; border-radius:12px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:15px; font-weight:700; cursor:pointer; font-family:var(--font);">Отказ</button>
+      <button onclick="saveEditLine()" style="padding:14px; border-radius:12px; border:none; background:var(--accent); color:#fff; font-size:15px; font-weight:700; cursor:pointer; font-family:var(--font);">✓ Запази</button>
+    </div>
+  </div>
+</div>
+
+<!-- PAGE: ИСТОРИЯ -->
+<div class="page" id="page-history">
+  <div class="section-label">Филтър</div>
+  <div class="card">
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+      <div class="field" style="margin-bottom:0">
+        <label>ОБЕКТ</label>
+        <select id="histFilterObject" onchange="loadHistory()">
+          <option value="">Всички</option>
+        </select>
+      </div>
+      <div class="field" style="margin-bottom:0">
+        <label>ДАТА ОТ</label>
+        <input type="date" id="histFilterDate" onchange="loadHistory()">
+      </div>
+    </div>
+  </div>
+  <div class="section-label">Операции</div>
+  <div id="historyList"><div class="loading"><div class="spinner"></div> зарежда...</div></div>
+</div>
+
+<!-- PAGE: СТАТИСТИКА -->
+<div class="page" id="page-stats">
+  <div class="section-label">Тази седмица</div>
+  <div class="stats-grid" id="statsGrid"><div class="loading" style="grid-column:1/-1"><div class="spinner"></div></div></div>
+  <div class="section-label" style="margin-top:24px">По обект</div>
+  <div id="objectStats"></div>
+</div>
+
+<!-- PAGE: НАСТРОЙКИ -->
+<div class="page" id="page-settings">
+  <div class="section-label">Връзка</div>
+  <div class="card">
+    <div class="info-row"><span class="key">Supabase</span><span class="badge green">свързан</span></div>
+    <div class="info-row"><span class="key">Обекти</span><span class="val" id="objCount">—</span></div>
+    <div class="info-row"><span class="key">Продукти</span><span class="val" id="prodCount">—</span></div>
+    <div class="info-row"><span class="key">Техници</span><span class="val" id="techCount">—</span></div>
+  </div>
+  <div class="section-label">По подразбиране</div>
+  <div class="card">
+    <div class="field" style="margin-bottom:0">
+      <label>ТЕХНИК (запомня се)</label>
+      <select id="defaultTechSelect" onchange="saveDefaultTech()"><option value="">— избери —</option></select>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="bottom-nav">
+  <button class="nav-btn active" onclick="switchTab('restock')" id="nav-restock"><span class="nav-icon">⬆️</span><span class="nav-label">Зареждане</span></button>
+  <button class="nav-btn" onclick="switchTab('cashflow')" id="nav-cashflow"><span class="nav-icon">💰</span><span class="nav-label">Отчитане</span></button>
+  <button class="nav-btn" onclick="switchTab('history')" id="nav-history"><span class="nav-icon">📋</span><span class="nav-label">История</span></button>
+  <button class="nav-btn" onclick="switchTab('stats')" id="nav-stats"><span class="nav-icon">📊</span><span class="nav-label">Статистика</span></button>
+  <button class="nav-btn" onclick="switchTab('settings')" id="nav-settings"><span class="nav-icon">⚙️</span><span class="nav-label">Настройки</span></button>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://yqbfrncncserfpcdikxy.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_n4UfSazXU9vhI9fs2paVNQ_3kz_SD9L';
+const { createClient } = supabase;
+const db = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let objects = [], products = [], technicians = [];
+let timerInterval = null, timerSeconds = 0, timerRunning = false;
+let lineCounter = 0;
+
+// ── INIT ──
+document.addEventListener('DOMContentLoaded', async () => {
+  document.getElementById('dateInput').value = new Date().toISOString().split('T')[0];
+  document.getElementById('headerDate').textContent = formatDateBG(new Date());
+  await Promise.all([loadObjects(), loadProducts(), loadTechnicians()]);
+  loadDefaultTech();
+  renderProductCards();
+});
+
+// ── LOAD DATA ──
+async function loadObjects() {
+  const { data } = await db.from('objects').select('*').eq('active', true).order('name');
+  if (!data) return;
+  objects = data;
+  const sel = document.getElementById('objectSelect');
+  data.forEach(o => {
+    const opt = document.createElement('option');
+    opt.value = o.id; opt.textContent = o.name; sel.appendChild(opt);
+  });
+  document.getElementById('objCount').textContent = data.length;
+  // Попълни филтрите с обектите
+  ['cfFilterObject','histFilterObject'].forEach(selId => {
+    const sel = document.getElementById(selId);
+    if (!sel) return;
+    sel.innerHTML = '<option value="">Всички</option>';
+    data.forEach(o => {
+      const opt = document.createElement('option');
+      opt.value = o.id; opt.textContent = o.name; sel.appendChild(opt);
+    });
+  });
+}
+
+async function loadProducts() {
+  const { data } = await db.from('products').select('*').eq('active', true).order('sort_order', {ascending:true, nullsFirst:false}).order('name');
+  if (!data) return;
+  products = data.filter(p => !p.auto_add);
+  document.getElementById('prodCount').textContent = data.length;
+  renderProductCards();
+}
+
+async function loadTechnicians() {
+  const { data } = await db.from('technicians').select('*').eq('active', true).order('name');
+  if (!data) return;
+  technicians = data;
+  [document.getElementById('techSelect'), document.getElementById('defaultTechSelect')].forEach(sel => {
+    data.forEach(t => {
+      const opt = document.createElement('option');
+      opt.value = t.id; opt.textContent = t.name; sel.appendChild(opt);
+    });
+  });
+  document.getElementById('techCount').textContent = data.length;
+}
+
+// ── PRODUCT PICKER ──
+let selectedProdId = null;
+let popupQty = 1;
+let basket = []; // [{product, qty}]
+
+function renderProductCards() {
+  const wrap = document.getElementById('productScrollWrap');
+  wrap.innerHTML = products.map(p => `
+    <div class="prod-card" id="pc-${p.id}" onclick="selectProdCard(${p.id})">
+      <div class="pc-icon">${p.icon || '📦'}</div>
+      <div class="pc-name">${p.name}</div>
+    </div>
+  `).join('');
+}
+
+function selectProdCard(id) {
+  selectedProdId = id;
+  popupQty = 1;
+  document.querySelectorAll('.prod-card').forEach(c => c.classList.remove('selected'));
+  document.getElementById(`pc-${id}`)?.classList.add('selected');
+  const prod = products.find(p => p.id === id);
+  if (!prod) return;
+  document.getElementById('popupIcon').textContent = prod.icon || '📦';
+  document.getElementById('popupName').textContent = prod.name;
+  const qinp = document.getElementById('popupQtyInput'); if(qinp) qinp.value = popupQty;
+  document.getElementById('qtyPopup').classList.add('visible');
+  // scroll картата в изглед
+  document.getElementById(`pc-${id}`)?.scrollIntoView({ behavior:'smooth', block:'nearest', inline:'center' });
+}
+
+function changePopupQty(delta) {
+  popupQty = Math.max(1, popupQty + delta);
+  // показваме като цяло число ако е цяло
+  const inp = document.getElementById('popupQtyInput'); if(inp) inp.value = popupQty;
+}
+
+function addToBasket() {
+  if (!selectedProdId) return;
+  const prod = products.find(p => p.id === selectedProdId);
+  if (!prod) return;
+  const inp = document.getElementById('popupQtyInput');
+  if (inp) popupQty = parseFloat(inp.value) || 1;
+  const existing = basket.find(b => b.product.id === selectedProdId);
+  if (existing) { existing.qty += popupQty; } 
+  else { basket.push({ product: prod, qty: popupQty }); }
+  // скрий popup, де-селектирай
+  document.getElementById('qtyPopup').classList.remove('visible');
+  document.querySelectorAll('.prod-card').forEach(c => c.classList.remove('selected'));
+  selectedProdId = null;
+  renderBasket();
+  updateSummary();
+}
+
+function removeFromBasket(idx) {
+  basket.splice(idx, 1);
+  renderBasket();
+  updateSummary();
+}
+
+function renderBasket() {
+  const el = document.getElementById('addedLines');
+  if (!basket.length) { el.innerHTML = ''; return; }
+  el.innerHTML = basket.map((b, i) => `
+    <div class="added-line">
+      <div class="al-icon">${b.product.icon || '📦'}</div>
+      <div class="al-name">${b.product.name}</div>
+      <div class="al-qty">${Number.isInteger(b.qty) ? b.qty : b.qty.toFixed(1)} ${b.product.unit}</div>
+      <div class="al-remove" onclick="removeFromBasket(${i})">✕</div>
+    </div>
+  `).join('');
+}
+
+function getLines() { return basket; }
+
+// ── SUMMARY ──
+function updateSummary() {
+  const lines = getLines();
+  const sec = document.getElementById('summarySection');
+  if (!lines.length) { sec.innerHTML = ''; return; }
+
+  const totalCost = lines.reduce((s, l) => s + l.product.price_with_vat * l.qty, 0);
+
+  sec.innerHTML = `
+    <div class="section-label">Резюме</div>
+    <div class="summary-card">
+      ${lines.map(l => `
+        <div class="summary-row">
+          <span class="key">${l.product.icon || '📦'} ${l.product.name} × ${l.qty} ${l.product.unit}</span>
+          <span class="val">${(l.product.price_with_vat * l.qty).toFixed(2)} лв</span>
+        </div>
+      `).join('')}
+      <div class="summary-total">
+        <span class="key">Общо заредено</span>
+        <span class="val">${totalCost.toFixed(2)} лв</span>
+      </div>
+    </div>
+  `;
+}
+
+// ── OBJECT INFO ──
+document.getElementById('objectSelect').addEventListener('change', function() {
+  const obj = objects.find(o => o.id == this.value);
+  if (obj) {
+    document.getElementById('objectInfo').innerHTML = `
+      <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap;">
+        <span class="badge">🎯 ${obj.target_weekly} лв/седм.</span>
+        <span class="badge amber">🏠 ${obj.rent} лв наем</span>
+        ${obj.serial_number ? `<span class="badge">${obj.serial_number}</span>` : ''}
+      </div>`;
+  } else { document.getElementById('objectInfo').innerHTML = ''; }
+});
+
+// ── GPS ──
+function getGPS() {
+  const status = document.getElementById('gpsStatus');
+  status.textContent = '⏳ търсим GPS...';
+  if (!navigator.geolocation) { status.textContent = '❌ GPS не се поддържа'; return; }
+  navigator.geolocation.getCurrentPosition(pos => {
+    const lat = pos.coords.latitude, lng = pos.coords.longitude;
+    status.textContent = `📍 ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+
+    // Изчисли разстоянието в метри (Haversine)
+    const R = 6371000;
+    const withDist = objects.filter(o => o.lat && o.lng).map(o => {
+      const dLat = (o.lat - lat) * Math.PI / 180;
+      const dLng = (o.lng - lng) * Math.PI / 180;
+      const a = Math.sin(dLat/2)**2 + Math.cos(lat*Math.PI/180) * Math.cos(o.lat*Math.PI/180) * Math.sin(dLng/2)**2;
+      const dist = Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
+      return { ...o, dist };
+    }).sort((a, b) => a.dist - b.dist);
+
+    if (!withDist.length) return;
+    const nearest = withDist[0];
+
+    if (nearest.dist <= 50) {
+      // Под 50м — избира автоматично
+      document.getElementById('objectSelect').value = nearest.id;
+      document.getElementById('objectSelect').dispatchEvent(new Event('change'));
+      status.textContent = `📍 ${nearest.name} (${nearest.dist}м)`;
+    } else {
+      // Над 50м — показва топ 3 за избор
+      const top3 = withDist.slice(0, 3);
+      status.innerHTML = `📍 Избери обект:<br>` + top3.map(o =>
+        `<button onclick="selectObjectFromGPS(${o.id})" style="
+          display:inline-block; margin:4px 4px 0 0; padding:6px 12px;
+          background:var(--bg2); border:1px solid var(--border);
+          border-radius:8px; color:var(--text); font-size:12px;
+          font-weight:600; cursor:pointer; font-family:var(--font);">
+          ${o.name} <span style="color:var(--text3)">${o.dist}м</span>
+        </button>`
+      ).join('');
+    }
+  }, () => { status.textContent = '❌ Грешка при GPS'; }, { enableHighAccuracy: true, timeout: 8000 });
+}
+
+function selectObjectFromGPS(id) {
+  document.getElementById('objectSelect').value = id;
+  document.getElementById('objectSelect').dispatchEvent(new Event('change'));
+  const obj = objects.find(o => o.id === id);
+  document.getElementById('gpsStatus').textContent = `📍 ${obj?.name}`;
+}
+
+// ── TIMER ──
+function timerStart() {
+  if (timerRunning) return;
+  timerRunning = true;
+  document.getElementById('timerStartBtn').style.display = 'none';
+  document.getElementById('timerStopBtn').style.display = 'inline-flex';
+  timerInterval = setInterval(() => { timerSeconds++; updateTimerDisplay(); }, 1000);
+}
+function timerStop() {
+  timerRunning = false; clearInterval(timerInterval);
+  document.getElementById('timerStartBtn').style.display = 'inline-flex';
+  document.getElementById('timerStopBtn').style.display = 'none';
+}
+function timerReset() { timerStop(); timerSeconds = 0; updateTimerDisplay(); }
+function updateTimerDisplay() {
+  const h = String(Math.floor(timerSeconds/3600)).padStart(2,'0');
+  const m = String(Math.floor((timerSeconds%3600)/60)).padStart(2,'0');
+  const s = String(timerSeconds%60).padStart(2,'0');
+  document.getElementById('timerDisplay').textContent = `${h}:${m}:${s}`;
+}
+
+// ── OCR БРОЯЧ ──
+function triggerCamera() { document.getElementById('cameraInput').click(); }
+function triggerGallery() { document.getElementById('galleryInput').click(); }
+
+function resizeImage(base64, maxSize) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      let w = img.width, h = img.height;
+      if (w > maxSize || h > maxSize) {
+        if (w > h) { h = Math.round(h * maxSize / w); w = maxSize; }
+        else { w = Math.round(w * maxSize / h); h = maxSize; }
+      }
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      resolve(canvas);
+    };
+    img.src = base64;
+  });
+}
+
+async function processOCR(input) {
+  const file = input.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    const originalBase64 = e.target.result;
+    const preview = document.getElementById('ocrPreview');
+    const img = document.getElementById('ocrImg');
+    const status = document.getElementById('ocrStatus');
+
+    img.src = originalBase64;
+    preview.style.display = 'block';
+    status.className = 'ocr-status loading';
+    status.textContent = '⏳ Обработвам снимката...';
+
+    try {
+      // Намали снимката
+      const canvas = await resizeImage(originalBase64, 1024);
+      const base64Data = canvas.toDataURL('image/jpeg', 0.85).split(',')[1];
+      status.textContent = '⏳ Разпознавам числото...';
+
+      // Google Vision през Supabase Edge Function
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/ocr-counter`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${SUPABASE_KEY}`
+        },
+        body: JSON.stringify({ image_base64: base64Data })
+      });
+
+      const data = await response.json();
+      console.log('OCR response:', JSON.stringify(data));
+
+      if (data.error) {
+        status.className = 'ocr-status error';
+        status.textContent = '❌ Грешка: ' + data.error;
+      } else if (data.vision_error) {
+        status.className = 'ocr-status error';
+        status.textContent = '❌ Vision: ' + data.vision_error.message;
+      } else if (!data.result || data.result === 'ГРЕШКА') {
+        status.className = 'ocr-status error';
+        status.textContent = data.raw_text
+          ? `⚠️ Текст: "${data.raw_text}" — не са намерени цифри`
+          : '❌ Не е разпознат текст — опитай по-ясна снимка';
+      } else {
+        document.getElementById('counterInput').value = data.result;
+        status.className = 'ocr-status success';
+        status.textContent = `✅ Разпознато: ${data.result} — провери и коригирай ако трябва`;
+      }
+    } catch (err) {
+      status.className = 'ocr-status error';
+      status.textContent = '❌ Грешка: ' + err.message;
+    }
+
+    input.value = '';
+  };
+  reader.readAsDataURL(file);
+}
+
+// ── SUBMIT ──
+async function submitRestock() {
+  const techId = document.getElementById('techSelect').value;
+  const objectId = document.getElementById('objectSelect').value;
+  const date = document.getElementById('dateInput').value;
+  const lines = getLines();
+
+  if (!techId) { showToast('Избери техник!', 'error'); return; }
+  if (!objectId) { showToast('Избери обект!', 'error'); return; }
+  if (!lines.length) {
+    const confirmed = await showConfirm('Не сте избрали продукти, желаете ли запис?');
+    if (!confirmed) return;
+  }
+
+  // Валидация на брояч и дата
+  const counterVal2 = parseInt(document.getElementById('counterInput').value) || null;
+  if (counterVal2) {
+    const { data: lastCf } = await db.from('cashflow')
+      .select('counter, date')
+      .eq('object_id', parseInt(objectId))
+      .order('date', { ascending: false })
+      .limit(1);
+    if (lastCf?.[0]) {
+      if (counterVal2 < lastCf[0].counter) {
+        showToast(`❌ Броячът (${counterVal2}) е по-малък от предишния (${lastCf[0].counter})!`, 'error');
+        return;
+      }
+      const lastDate = new Date(lastCf[0].date);
+      const curDate = new Date(date);
+      if (curDate < lastDate) {
+        showToast(`❌ Датата е по-ранна от предишния запис (${lastCf[0].date})!`, 'error');
+        return;
+      }
+    }
+  }
+
+  const obj = objects.find(o => o.id == objectId);
+  const tech = technicians.find(t => t.id == techId);
+  const comment = document.getElementById('commentInput').value;
+  const durationMin = Math.round(timerSeconds / 60);
+  const dateObj = new Date(date);
+  const weekNum = getWeekNumber(dateObj);
+  const period = `${dateObj.getFullYear()}.${String(dateObj.getMonth()+1).padStart(2,'0')}`;
+  const totalCostValue = lines.reduce((s, l) => s + l.product.price_with_vat * l.qty, 0);
+
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true; btn.textContent = '⏳ Записва...';
+
+  // СТЪПКА 1: Запиши хедъра
+  const { data: header, error: headerError } = await db.from('operation_headers').insert({
+    date,
+    object_id: parseInt(objectId),
+    object_name: obj?.name,
+    technician_id: parseInt(techId),
+    technician_name: tech?.name,
+    duration_minutes: durationMin,
+    km: 0,
+    fuel_price_per_km: 0,
+    fuel_cost: 0,
+    total_cost: parseFloat(totalCostValue.toFixed(2)),
+    week_number: weekNum,
+    period,
+    op_type: 'restock',
+    comment
+  }).select().single();
+
+  if (headerError) {
+    btn.disabled = false; btn.textContent = '💾 Запиши зареждането';
+    showToast('❌ ' + headerError.message, 'error');
+    return;
+  }
+
+  // СТЪПКА 2: Запиши редовете с header_id
+  const rows = lines.map(l => ({
+    header_id: header.id,
+    date,
+    object_name: obj?.name,
+    technician_name: tech?.name,
+    product_id: l.product.id,
+    product_name: l.product.name,
+    quantity: l.qty,
+    cost_value: parseFloat((l.product.price_with_vat * l.qty).toFixed(2))
+  }));
+
+  const { error: rowsError } = await db.from('operations').insert(rows);
+
+  btn.disabled = false; btn.textContent = '💾 Запиши зареждането';
+  if (rowsError) { showToast('❌ ' + rowsError.message, 'error'); return; }
+
+  // СТЪПКА 3: Ако има брояч → създай cashflow запис
+  if (counterVal2 && obj) {
+    await createCashflowEntry(counterVal2, obj, tech, date, header.id);
+  }
+
+  showToast(`✅ Записани ${lines.length} продукта!`, 'success');
+
+  // Изчисти формата
+  timerReset();
+  document.getElementById('counterInput').value = '';
+  document.getElementById('commentInput').value = '';
+  document.getElementById('objectSelect').value = '';
+  document.getElementById('objectInfo').innerHTML = '';
+  document.getElementById('gpsStatus').textContent = '';
+  document.getElementById('ocrPreview').style.display = 'none';
+  document.getElementById('summarySection').innerHTML = '';
+  basket = [];
+  selectedProdId = null;
+  renderBasket();
+  renderProductCards();
+  document.getElementById('qtyPopup').classList.remove('visible');
+  document.getElementById('dateInput').value = new Date().toISOString().split('T')[0];
+  document.getElementById('page-restock').scrollTop = 0;
+  window.scrollTo(0, 0);
+}
+
+// ── CASHFLOW ──
+let currentCashflowId = null;
+
+async function createCashflowEntry(counter, obj, tech, date, operationId) {
+  // Намери последния cashflow запис за обекта
+  const { data: lastEntry } = await db
+    .from('cashflow')
+    .select('counter, date')
+    .eq('object_id', obj.id)
+    .order('date', { ascending: false })
+    .limit(1);
+
+  const prevCounter = lastEntry?.[0]?.counter ?? null;
+  const prevDate = lastEntry?.[0]?.date ?? null;
+  const drinksSold = prevCounter ? counter - prevCounter : null;
+
+  // Изчисли дни между посещенията
+  let daysSinceLast = null;
+  let target = null;
+  if (prevDate) {
+    const d1 = new Date(date);
+    const d2 = new Date(prevDate);
+    daysSinceLast = Math.round((d1 - d2) / (1000 * 60 * 60 * 24));
+    target = ((obj.target_weekly || 0) / 7) * daysSinceLast;
+  }
+
+  // Изчисли check_value
+  const checkValue = drinksSold ? drinksSold * (obj.k_percent || 0) : null;
+
+  await db.from('cashflow').insert({
+    date,
+    object_id: obj.id,
+    object_name: obj.name,
+    counter,
+    prev_counter: prevCounter,
+    prev_date: prevDate,
+    drinks_sold: drinksSold,
+    days_since_last: daysSinceLast,
+    target: target ? parseFloat(target.toFixed(2)) : null,
+    check_value: checkValue ? parseFloat(checkValue.toFixed(2)) : null,
+    technician_id: tech?.id,
+    technician_name: tech?.name,
+    operation_id: operationId, // header_id от operation_headers
+    status: 'pending'
+  });
+}
+
+async function loadCashflow() {
+  const objFilter = document.getElementById('cfFilterObject')?.value || '';
+  const dateFilter = document.getElementById('cfFilterDate')?.value || '';
+
+  // Pending
+  const pendingEl = document.getElementById('pendingList');
+  pendingEl.innerHTML = '<div class="loading"><div class="spinner"></div> зарежда...</div>';
+
+  let pendingQ = db.from('cashflow').select('*').eq('status', 'pending').order('date', { ascending: false });
+  if (objFilter) pendingQ = pendingQ.eq('object_id', parseInt(objFilter));
+  if (dateFilter) pendingQ = pendingQ.gte('date', dateFilter);
+  const { data: pending } = await pendingQ;
+
+  if (!pending?.length) {
+    pendingEl.innerHTML = '<div class="empty"><div class="empty-icon">✅</div><p>Няма чакащи отчитания</p></div>';
+  } else {
+    pendingEl.innerHTML = pending.map(cf => `
+      <div class="card" style="margin-bottom:10px;">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+          <div>
+            <div style="font-size:16px; font-weight:800;">${cf.object_name}</div>
+            <div style="font-size:12px; color:var(--text2);">${formatDateBG(new Date(cf.date))} · ${cf.technician_name || '—'}</div>
+          </div>
+          <span class="badge amber">Чака</span>
+        </div>
+        <div class="info-row" style="padding-top:0"><span class="key">Брояч</span><span class="val">${cf.counter ?? '—'}</span></div>
+        ${cf.drinks_sold != null ? `<div class="info-row"><span class="key">Продадени напитки</span><span class="val">${cf.drinks_sold}</span></div>` : ''}
+        ${cf.check_value != null ? `<div class="info-row"><span class="key">Очакван приход</span><span class="val" style="color:var(--accent)">${cf.check_value.toFixed(2)} лв</span></div>` : ''}
+        ${cf.target != null ? `<div class="info-row"><span class="key">Таргет (${cf.days_since_last} дни)</span><span class="val" style="color:var(--amber)">${cf.target.toFixed(2)} лв</span></div>` : ''}
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:12px;">
+          <button onclick="openCashModal(${cf.id}, '${cf.object_name}', ${cf.check_value ?? 0})"
+            style="padding:11px; border-radius:10px; border:none; background:var(--green); color:#fff; font-size:13px; font-weight:700; cursor:pointer;">💵 Въведи Cash</button>
+          <button onclick="openEditCfModal(${cf.id})"
+            style="padding:11px; border-radius:10px; border:1px solid var(--border); background:var(--bg3); color:var(--text); font-size:13px; font-weight:700; cursor:pointer;">✏️ Редакция</button>
+        </div>
+      </div>`).join('');
+  }
+
+  // Completed
+  const completedEl = document.getElementById('completedList');
+  let completedQ = db.from('cashflow').select('*').eq('status', 'completed').order('completed_at', { ascending: false }).limit(30);
+  if (objFilter) completedQ = completedQ.eq('object_id', parseInt(objFilter));
+  if (dateFilter) completedQ = completedQ.gte('date', dateFilter);
+  const { data: completed } = await completedQ;
+
+  if (!completed?.length) {
+    completedEl.innerHTML = '<div class="empty"><div class="empty-icon">📭</div><p>Няма завършени</p></div>';
+  } else {
+    completedEl.innerHTML = completed.map(cf => `
+      <div class="op-item">
+        <div class="op-icon">💰</div>
+        <div class="op-info">
+          <div class="op-title">${cf.object_name}</div>
+          <div class="op-sub">${formatDateBG(new Date(cf.date))} · ${cf.technician_name || '—'}${cf.drinks_sold != null ? ` · ${cf.drinks_sold} напитки` : ''}</div>
+          ${cf.check_value != null ? `<div style="font-size:11px; color:var(--text3);">Очакван: ${cf.check_value.toFixed(2)} лв</div>` : ''}
+        </div>
+        <div style="display:flex; flex-direction:column; align-items:flex-end; gap:6px;">
+          <div class="op-cash">${cf.cash?.toFixed(2) ?? '—'} лв</div>
+          <button onclick="openEditCfModal(${cf.id})" style="padding:4px 10px; border-radius:6px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:11px; font-weight:700; cursor:pointer;">✏️</button>
+        </div>
+      </div>`).join('');
+  }
+}
+
+// Edit cashflow modal — отделен modal
+let currentEditCfId = null;
+async function openEditCfModal(id) {
+  const { data } = await db.from('cashflow').select('*').eq('id', id).single();
+  if (!data) return;
+  currentEditCfId = id;
+  document.getElementById('editCfTitle').textContent = `✏️ ${data.object_name} · ${data.date}`;
+  document.getElementById('editCfCounter').value = data.counter || '';
+  document.getElementById('editCfCash').value = data.cash || '';
+  document.getElementById('editCfModal').style.display = 'flex';
+  setTimeout(() => document.getElementById('editCfCash').focus(), 100);
+}
+
+function closeEditCfModal() {
+  document.getElementById('editCfModal').style.display = 'none';
+  currentEditCfId = null;
+}
+
+async function saveEditCf() {
+  if (!currentEditCfId) return;
+  const cash = parseFloat(document.getElementById('editCfCash').value) || null;
+  const counter = parseInt(document.getElementById('editCfCounter').value) || null;
+
+  // Вземи текущия запис за да преизчислим
+  const { data: cf } = await db.from('cashflow').select('*').eq('id', currentEditCfId).single();
+  if (!cf) return;
+
+  const update = { counter };
+
+  // Преизчисли drinks_sold ако има брояч и предишен брояч
+  if (counter && cf.prev_counter != null) {
+    update.drinks_sold = counter - cf.prev_counter;
+
+    // Преизчисли check_value
+    const obj = objects.find(o => o.id === cf.object_id);
+    if (obj) {
+      update.check_value = parseFloat((update.drinks_sold * (obj.k_percent || 0)).toFixed(2));
+    }
+  }
+
+  // Преизчисли target ако имаме дни
+  if (cf.days_since_last != null) {
+    const obj = objects.find(o => o.id === cf.object_id);
+    if (obj) {
+      update.target = parseFloat(((obj.target_weekly / 7) * cf.days_since_last).toFixed(2));
+    }
+  }
+
+  if (cash) {
+    update.cash = cash;
+    update.status = 'completed';
+    update.completed_at = new Date().toISOString();
+  }
+
+  const { error } = await db.from('cashflow').update(update).eq('id', currentEditCfId);
+  if (error) { showToast('❌ ' + error.message, 'error'); return; }
+
+  // Каскадно обнови следващите записи за същия обект
+  if (counter) {
+    await recalcNextCashflow(cf.object_id, cf.date, counter);
+  }
+
+  closeEditCfModal();
+  showToast('✅ Записът е обновен!', 'success');
+  loadCashflow();
+}
+
+async function recalcNextCashflow(objectId, fromDate, newPrevCounter) {
+  // Вземи текущия запис (fromDate) за да имаме prev_date за следващия
+  const { data: current } = await db.from('cashflow')
+    .select('date')
+    .eq('object_id', objectId)
+    .eq('date', fromDate)
+    .order('id', { ascending: false })
+    .limit(1);
+
+  const obj = objects.find(o => o.id === objectId);
+
+  // Вземи всички следващи записи сортирани по дата
+  const { data: nextEntries } = await db.from('cashflow')
+    .select('*')
+    .eq('object_id', objectId)
+    .gt('date', fromDate)
+    .order('date', { ascending: true });
+
+  if (!nextEntries?.length) return;
+
+  let prevCounter = newPrevCounter;
+  let prevDate = fromDate;
+
+  for (const entry of nextEntries) {
+    const drinksSold = entry.counter != null ? entry.counter - prevCounter : null;
+    const checkValue = drinksSold != null && obj
+      ? parseFloat((drinksSold * (obj.k_percent || 0)).toFixed(2))
+      : null;
+
+    // Преизчисли days_since_last и target
+    const d1 = new Date(entry.date);
+    const d2 = new Date(prevDate);
+    const daysSinceLast = Math.round((d1 - d2) / (1000 * 60 * 60 * 24));
+    const target = obj
+      ? parseFloat(((obj.target_weekly / 7) * daysSinceLast).toFixed(2))
+      : null;
+
+    await db.from('cashflow').update({
+      prev_counter: prevCounter,
+      prev_date: prevDate,
+      drinks_sold: drinksSold,
+      check_value: checkValue,
+      days_since_last: daysSinceLast,
+      target
+    }).eq('id', entry.id);
+
+    if (entry.counter != null) prevCounter = entry.counter;
+    prevDate = entry.date;
+  }
+}
+
+function openCashModal(id, objectName, expectedCash) {
+  currentCashflowId = id;
+  document.getElementById('modalTitle').textContent = `💵 ${objectName}`;
+  document.getElementById('modalSub').textContent = expectedCash
+    ? `Очакван приход: ${expectedCash.toFixed(2)} лв`
+    : 'Въведи събраната сума';
+  document.getElementById('modalCashInput').value = '';
+  document.getElementById('cashModal').style.display = 'flex';
+  setTimeout(() => document.getElementById('modalCashInput').focus(), 100);
+}
+
+function closeCashModal() {
+  document.getElementById('cashModal').style.display = 'none';
+  currentCashflowId = null;
+}
+
+async function saveCash() {
+  const cash = parseFloat(document.getElementById('modalCashInput').value);
+  if (!cash || cash <= 0) { showToast('Въведи сума!', 'error'); return; }
+  if (!currentCashflowId) return;
+
+  const { error } = await db.from('cashflow').update({
+    cash,
+    status: 'completed',
+    completed_at: new Date().toISOString()
+  }).eq('id', currentCashflowId);
+
+  if (error) { showToast('❌ ' + error.message, 'error'); return; }
+
+  closeCashModal();
+  showToast('✅ Cash записан!', 'success');
+  loadCashflow();
+}
+
+// ── HISTORY ──
+let currentEditOpId = null;
+
+async function loadHistory() {
+  const list = document.getElementById('historyList');
+  list.innerHTML = '<div class="loading"><div class="spinner"></div> зарежда...</div>';
+
+  const objFilter = document.getElementById('histFilterObject')?.value || '';
+  const dateFilter = document.getElementById('histFilterDate')?.value || '';
+
+  // Зареди хедъри с JOIN към редовете
+  let q = db.from('operation_headers')
+    .select('*, operations(id, product_name, product_id, quantity, cost_value)')
+    .order('date', { ascending: false })
+    .order('created_at', { ascending: false })
+    .limit(30);
+  if (objFilter) q = q.eq('object_id', parseInt(objFilter));
+  if (dateFilter) q = q.gte('date', dateFilter);
+
+  const { data } = await q;
+  if (!data?.length) { list.innerHTML = '<div class="empty"><div class="empty-icon">📭</div><p>Няма записи</p></div>'; return; }
+
+  list.innerHTML = data.map(h => `
+    <div class="card" style="margin-bottom:10px;">
+      <div style="display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:8px;">
+        <div>
+          <div style="font-size:15px; font-weight:800;">${h.object_name || '—'}</div>
+          <div style="font-size:12px; color:var(--text2);">${formatDateBG(new Date(h.date))} · ${h.technician_name || '—'}</div>
+          ${h.comment ? `<div style="font-size:11px; color:var(--text3); margin-top:2px;">💬 ${h.comment}</div>` : ''}
+        </div>
+        <div style="display:flex; gap:5px;">
+          <button onclick="openEditHeaderModal(${h.id})" style="padding:5px 10px; border-radius:7px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:11px; font-weight:700; cursor:pointer;">✏️</button>
+          <button onclick="deleteHeader(${h.id})" style="padding:5px 10px; border-radius:7px; border:1px solid var(--red); background:transparent; color:var(--red); font-size:11px; font-weight:700; cursor:pointer;">🗑</button>
+        </div>
+      </div>
+      ${(h.operations||[]).map(op => `
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-top:1px solid var(--border);">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-size:18px;">${getProductIcon(op.product_name)}</span>
+            <span style="font-size:13px; font-weight:600;">${op.product_name}</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-size:12px; color:var(--text2);">${op.quantity} ${getProductUnit(op.product_name)}</span>
+            <span style="font-size:13px; font-weight:700; color:var(--amber);">${op.cost_value?.toFixed(2)} лв</span>
+            <button onclick="openEditLineModal(${op.id})" style="padding:3px 8px; border-radius:6px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:11px; cursor:pointer;">✏️</button>
+            <button onclick="deleteLine(${op.id})" style="padding:3px 8px; border-radius:6px; border:1px solid var(--red); background:transparent; color:var(--red); font-size:11px; cursor:pointer;">🗑</button>
+          </div>
+        </div>`).join('')}
+      <div style="display:flex; justify-content:space-between; padding-top:8px; border-top:2px solid var(--border); margin-top:4px;">
+        <span style="font-size:12px; color:var(--text2);">${h.duration_minutes ? `⏱ ${h.duration_minutes} мин` : ''} ${h.km ? `· 🚗 ${h.km} км` : ''}</span>
+        <span style="font-size:14px; font-weight:800; color:var(--accent);">${h.total_cost?.toFixed(2)} лв</span>
+      </div>
+    </div>`).join('');
+}
+
+async function openEditHeaderModal(id) {
+  currentEditOpId = id;
+  const { data: hdr, error } = await db.from('operation_headers').select('*').eq('id', id).single();
+  if (!hdr) { showToast('❌ ' + (error?.message || 'Не намерих запис'), 'error'); return; }
+
+  const objSel = document.getElementById('editHdrObject');
+  objSel.innerHTML = objects.map(o => `<option value="${o.id}" ${o.id == hdr.object_id ? 'selected' : ''}>${o.name}</option>`).join('');
+
+  const techSel = document.getElementById('editHdrTech');
+  techSel.innerHTML = technicians.map(t => `<option value="${t.id}" ${t.id == hdr.technician_id ? 'selected' : ''}>${t.name}</option>`).join('');
+
+  document.getElementById('editHdrDate').value = hdr.date || '';
+  document.getElementById('editHdrKm').value = hdr.km || '';
+  document.getElementById('editHdrComment').value = hdr.comment || '';
+  document.getElementById('editOpModal').style.display = 'flex';
+}
+
+function addEditLine_unused() {
+  const tempId = 'new-' + Date.now();
+  newEditLines.push(tempId);
+  const linesEl = document.getElementById('editOpLines');
+  const addBtn = linesEl.querySelector('button');
+  const div = document.createElement('div');
+  div.className = 'added-line';
+  div.id = `edit-line-${tempId}`;
+  div.dataset.id = tempId;
+  div.innerHTML = `
+    <div class="al-icon">📦</div>
+    <div style="flex:1; min-width:0;">
+      <select class="edit-line-prod" data-line="${tempId}"
+        style="background:var(--bg3); border:1px solid var(--border); border-radius:7px; padding:6px 8px; color:var(--text); font-size:13px; width:100%; margin-bottom:4px; appearance:none; outline:none;">
+        ${products.map(p => `<option value="${p.id}">${p.icon} ${p.name}</option>`).join('')}
+      </select>
+    </div>
+    <div class="qty-inline" style="flex-shrink:0;">
+      <div class="qty-inline-btn" onclick="changeEditLineQty('${tempId}', -1)">−</div>
+      <input type="number" value="1" min="0.5" step="0.5" class="edit-line-qty" data-line="${tempId}"
+        style="width:46px; text-align:center; background:var(--bg2); border:1px solid var(--border); border-radius:7px; padding:5px 2px; color:var(--text); font-family:var(--mono); font-size:14px; font-weight:700; outline:none;">
+      <div class="qty-inline-btn" onclick="changeEditLineQty('${tempId}', 1)">＋</div>
+    </div>
+    <div class="al-remove" onclick="removeEditLine('${tempId}')">✕</div>
+  `;
+  linesEl.insertBefore(div, addBtn);
+}
+
+async function deleteHeader(id) {
+  if (!confirm('Изтриване на цялото зареждане и всички продукти?')) return;
+  // Изтрий свързания cashflow
+  await db.from('cashflow').delete().eq('operation_id', id);
+  // Изтрий редовете
+  await db.from('operations').delete().eq('header_id', id);
+  // Изтрий хедъра
+  const { error } = await db.from('operation_headers').delete().eq('id', id);
+  if (error) { showToast('❌ ' + error.message, 'error'); return; }
+  showToast('🗑 Изтрито!', 'success');
+  loadHistory();
+}
+
+async function openEditOpModal(id) {
+  await openEditHeaderModal(id);
+}
+
+function closeEditOpModal() {
+  document.getElementById('editOpModal').style.display = 'none';
+  currentEditOpId = null;
+}
+
+async function saveEditOp() {
+  if (!currentEditOpId) return;
+  const objId = parseInt(document.getElementById('editHdrObject').value);
+  const techId = parseInt(document.getElementById('editHdrTech').value);
+  const obj = objects.find(o => o.id == objId);
+  const tech = technicians.find(t => t.id == techId);
+  const date = document.getElementById('editHdrDate').value;
+  const km = parseFloat(document.getElementById('editHdrKm').value) || 0;
+  const comment = document.getElementById('editHdrComment').value;
+
+  const { error } = await db.from('operation_headers').update({
+    object_id: objId, object_name: obj?.name,
+    technician_id: techId, technician_name: tech?.name,
+    date, km, comment
+  }).eq('id', currentEditOpId);
+
+  if (error) { showToast('❌ ' + error.message, 'error'); return; }
+  closeEditOpModal();
+  showToast('✅ Хедърът е обновен!', 'success');
+  loadHistory();
+}
+
+// ── LINE EDIT ──
+let currentEditLineId = null;
+
+async function openEditLineModal(id) {
+  const { data } = await db.from('operations').select('*').eq('id', id).single();
+  if (!data) return;
+  currentEditLineId = id;
+  document.getElementById('editLineTitle').textContent = `✏️ ${getProductIcon(data.product_name)} ${data.product_name}`;
+  document.getElementById('editLineSub').textContent = `${data.object_name || ''} · ${data.technician_name || ''}`;
+  document.getElementById('editLineQty').value = data.quantity || 1;
+  document.getElementById('editLineModal').style.display = 'flex';
+  setTimeout(() => document.getElementById('editLineQty').focus(), 100);
+}
+
+function closeEditLineModal() {
+  document.getElementById('editLineModal').style.display = 'none';
+  currentEditLineId = null;
+}
+
+function changeEditQty(delta) {
+  const inp = document.getElementById('editLineQty');
+  inp.value = Math.max(0.5, (parseFloat(inp.value) || 0) + delta);
+}
+
+async function saveEditLine() {
+  if (!currentEditLineId) return;
+  const qty = parseFloat(document.getElementById('editLineQty').value) || 1;
+
+  // Вземи продукта за да изчислим cost_value
+  const { data: op } = await db.from('operations').select('product_id, header_id').eq('id', currentEditLineId).single();
+  const prod = products.find(p => p.id == op?.product_id);
+  const costValue = prod ? parseFloat((prod.price_with_vat * qty).toFixed(2)) : null;
+
+  const update = { quantity: qty };
+  if (costValue) update.cost_value = costValue;
+
+  const { error } = await db.from('operations').update(update).eq('id', currentEditLineId);
+  if (error) { showToast('❌ ' + error.message, 'error'); return; }
+
+  // Обнови total_cost в хедъра
+  if (op?.header_id) {
+    const { data: allLines } = await db.from('operations').select('cost_value').eq('header_id', op.header_id);
+    const newTotal = (allLines || []).reduce((s, r) => s + (r.cost_value || 0), 0);
+    await db.from('operation_headers').update({ total_cost: parseFloat(newTotal.toFixed(2)) }).eq('id', op.header_id);
+  }
+
+  closeEditLineModal();
+  showToast('✅ Редът е обновен!', 'success');
+  loadHistory();
+}
+
+async function deleteLine(id) {
+  if (!confirm('Изтриване на реда?')) return;
+  // Вземи header_id преди изтриване
+  const { data: op } = await db.from('operations').select('header_id').eq('id', id).single();
+  const { error } = await db.from('operations').delete().eq('id', id);
+  if (error) { showToast('❌ ' + error.message, 'error'); return; }
+
+  // Обнови total_cost
+  if (op?.header_id) {
+    const { data: allLines } = await db.from('operations').select('cost_value').eq('header_id', op.header_id);
+    const newTotal = (allLines || []).reduce((s, r) => s + (r.cost_value || 0), 0);
+    await db.from('operation_headers').update({ total_cost: parseFloat(newTotal.toFixed(2)) }).eq('id', op.header_id);
+  }
+
+  showToast('🗑 Редът е изтрит!', 'success');
+  loadHistory();
+}
+
+async function deleteOp(id) {
+  if (!confirm('Изтриване на записа и свързаното отчитане?')) return;
+  // Изтрий свързания cashflow запис ако съществува
+  await db.from('cashflow').delete().eq('operation_id', id);
+  // Изтрий операцията
+  const { error } = await db.from('operations').delete().eq('id', id);
+  if (error) { showToast('❌ ' + error.message, 'error'); return; }
+  showToast('🗑 Изтрито!', 'success');
+  loadHistory();
+}
+
+// ── STATS ──
+async function loadStats() {
+  const grid = document.getElementById('statsGrid');
+  grid.innerHTML = '<div class="loading" style="grid-column:1/-1"><div class="spinner"></div></div>';
+  const weekStart = getWeekStart();
+  const [{ data: headersData }, { data: cashData }] = await Promise.all([
+    db.from('operation_headers').select('*, operations(cost_value)').gte('date', weekStart),
+    db.from('cashflow').select('*').gte('date', weekStart).eq('status', 'completed')
+  ]);
+  if (!headersData) return;
+  const totalCash = (cashData || []).reduce((s,r) => s+(r.cash||0), 0);
+  const totalCost = headersData.reduce((s,h) => s+(h.total_cost||0), 0);
+  const uniqueObjs = new Set(headersData.map(h=>h.object_id)).size;
+  const totalRestocks = headersData.length;
+  grid.innerHTML = `
+    <div class="stat-card"><div class="stat-label">Cash тази седм.</div><div class="stat-value green">${totalCash.toFixed(0)} лв</div></div>
+    <div class="stat-card"><div class="stat-label">Стойност заредено</div><div class="stat-value amber">${totalCost.toFixed(0)} лв</div></div>
+    <div class="stat-card"><div class="stat-label">Зареждания</div><div class="stat-value blue">${totalRestocks}</div></div>
+    <div class="stat-card"><div class="stat-label">Обекти</div><div class="stat-value">${uniqueObjs}</div></div>`;
+  const byObj = {};
+  headersData.forEach(h => {
+    if(!byObj[h.object_name]) byObj[h.object_name]={cash:0,cost:0,ops:0};
+    byObj[h.object_name].cost+=h.total_cost||0;
+    byObj[h.object_name].ops++;
+  });
+  (cashData||[]).forEach(r => {
+    if(!byObj[r.object_name]) byObj[r.object_name]={cash:0,cost:0,ops:0};
+    byObj[r.object_name].cash+=r.cash||0;
+  });
+  document.getElementById('objectStats').innerHTML = Object.entries(byObj).sort((a,b)=>b[1].cash-a[1].cash).map(([name,s])=>`
+    <div class="card">
+      <div class="info-row" style="padding-top:0"><span style="font-weight:700">${name}</span><span class="badge green">${s.cash.toFixed(0)} лв</span></div>
+      <div class="info-row"><span class="key">Заредено</span><span class="val" style="color:var(--amber)">${s.cost.toFixed(0)} лв</span></div>
+      <div class="info-row" style="padding-bottom:0"><span class="key">Зареждания</span><span class="val">${s.ops}</span></div>
+    </div>`).join('') || '<div class="empty"><div class="empty-icon">📊</div><p>Няма данни</p></div>';
+}
+
+// ── TECH DEFAULT ──
+function saveDefaultTech() { const v = document.getElementById('defaultTechSelect').value; if(v) localStorage.setItem('defaultTech',v); }
+function loadDefaultTech() { const v = localStorage.getItem('defaultTech'); if(v) { document.getElementById('techSelect').value=v; document.getElementById('defaultTechSelect').value=v; } }
+
+// ── NAV ──
+function switchTab(tab) {
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById(`page-${tab}`).classList.add('active');
+  document.getElementById(`nav-${tab}`).classList.add('active');
+  const tabMap = ['restock','cashflow','history','stats','settings'];
+  document.querySelectorAll('.tab')[tabMap.indexOf(tab)]?.classList.add('active');
+  if(tab==='cashflow') loadCashflow();
+  if(tab==='history') loadHistory();
+  if(tab==='stats') loadStats();
+}
+
+// ── HELPERS ──
+function showConfirm(message) {
+  return new Promise(resolve => {
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:300;display:flex;align-items:flex-end;justify-content:center;';
+    overlay.innerHTML = `
+      <div style="background:var(--bg2);border-radius:20px 20px 0 0;padding:24px;width:100%;max-width:480px;">
+        <div style="font-size:15px;font-weight:700;margin-bottom:20px;text-align:center;">${message}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <button id="confirmNo" style="padding:14px;border-radius:12px;border:1px solid var(--border);background:var(--bg3);color:var(--text2);font-size:15px;font-weight:700;cursor:pointer;font-family:var(--font);">Не</button>
+          <button id="confirmYes" style="padding:14px;border-radius:12px;border:none;background:var(--accent);color:#fff;font-size:15px;font-weight:700;cursor:pointer;font-family:var(--font);">Да</button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+    overlay.querySelector('#confirmYes').onclick = () => { document.body.removeChild(overlay); resolve(true); };
+    overlay.querySelector('#confirmNo').onclick = () => { document.body.removeChild(overlay); resolve(false); };
+  });
+}
+
+function showToast(msg, type='success') {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = `toast ${type} show`;
+  setTimeout(()=>t.classList.remove('show'), 3000);
+}
+function formatDateBG(d) { return d.toLocaleDateString('bg-BG',{weekday:'long',day:'numeric',month:'long'}); }
+function getWeekNumber(d) { const j=new Date(d.getFullYear(),0,1); return Math.ceil((((d-j)/86400000)+j.getDay()+1)/7); }
+function getWeekStart() { const n=new Date(); const day=n.getDay()||7; const m=new Date(n); m.setDate(n.getDate()-day+1); return m.toISOString().split('T')[0]; }
+function getProductIcon(name) { const p=products.find(x=>x.name===name); return p?p.icon:'📦'; }
+function getProductUnit(name) { const p=products.find(x=>x.name===name); return p?p.unit:''; }
+</script>
+</body>
+</html>
