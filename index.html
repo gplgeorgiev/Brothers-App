@@ -810,7 +810,10 @@ async function submitRestock() {
 
   if (!techId) { showToast('Избери техник!', 'error'); return; }
   if (!objectId) { showToast('Избери обект!', 'error'); return; }
-  if (!lines.length) { showToast('Добави поне един продукт!', 'error'); return; }
+  if (!lines.length) {
+    const confirmed = await showConfirm('Не сте избрали продукти, желаете ли запис?');
+    if (!confirmed) return;
+  }
 
   // Валидация на брояч и дата
   const counterVal2 = parseInt(document.getElementById('counterInput').value) || null;
@@ -1373,6 +1376,24 @@ function switchTab(tab) {
 }
 
 // ── HELPERS ──
+function showConfirm(message) {
+  return new Promise(resolve => {
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:300;display:flex;align-items:flex-end;justify-content:center;';
+    overlay.innerHTML = `
+      <div style="background:var(--bg2);border-radius:20px 20px 0 0;padding:24px;width:100%;max-width:480px;">
+        <div style="font-size:15px;font-weight:700;margin-bottom:20px;text-align:center;">${message}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <button id="confirmNo" style="padding:14px;border-radius:12px;border:1px solid var(--border);background:var(--bg3);color:var(--text2);font-size:15px;font-weight:700;cursor:pointer;font-family:var(--font);">Не</button>
+          <button id="confirmYes" style="padding:14px;border-radius:12px;border:none;background:var(--accent);color:#fff;font-size:15px;font-weight:700;cursor:pointer;font-family:var(--font);">Да</button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+    overlay.querySelector('#confirmYes').onclick = () => { document.body.removeChild(overlay); resolve(true); };
+    overlay.querySelector('#confirmNo').onclick = () => { document.body.removeChild(overlay); resolve(false); };
+  });
+}
+
 function showToast(msg, type='success') {
   const t = document.getElementById('toast');
   t.textContent = msg; t.className = `toast ${type} show`;
