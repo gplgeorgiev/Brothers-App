@@ -1049,17 +1049,100 @@ async function saveEditCf() {
   if (!currentEditCfId) return;
   const cash = parseFloat(document.getElementById('editCfCash').value) || null;
   const counter = parseInt(document.getElementById('editCfCounter').value) || null;
+
+  // Вземи текущия запис за да преизчислим
+  const { data: cf } = await db.from('cashflow').select('*').eq('id', currentEditCfId).single();
+  if (!cf) return;
+
   const update = { counter };
+
+  // Преизчисли drinks_sold ако има брояч и предишен брояч
+  if (counter && cf.prev_counter != null) {
+    update.drinks_sold = counter - cf.prev_counter;
+
+    // Преизчисли check_value
+    const obj = objects.find(o => o.id === cf.object_id);
+    if (obj) {
+      update.check_value = parseFloat((update.drinks_sold * (obj.k_percent || 0)).toFixed(2));
+    }
+  }
+
+  // Преизчисли target ако имаме дни
+  if (cf.days_since_last != null) {
+    const obj = objects.find(o => o.id === cf.object_id);
+    if (obj) {
+      update.target = parseFloat(((obj.target_weekly / 7) * cf.days_since_last).toFixed(2));
+    }
+  }
+
   if (cash) {
     update.cash = cash;
     update.status = 'completed';
     update.completed_at = new Date().toISOString();
   }
+
   const { error } = await db.from('cashflow').update(update).eq('id', currentEditCfId);
   if (error) { showToast('❌ ' + error.message, 'error'); return; }
+
+  // Каскадно обнови следващите записи за същия обект
+  if (counter) {
+    await recalcNextCashflow(cf.object_id, cf.date, counter);
+  }
+
   closeEditCfModal();
   showToast('✅ Записът е обновен!', 'success');
   loadCashflow();
+}
+
+async function recalcNextCashflow(objectId, fromDate, newPrevCounter) {
+  // Вземи текущия запис (fromDate) за да имаме prev_date за следващия
+  const { data: current } = await db.from('cashflow')
+    .select('date')
+    .eq('object_id', objectId)
+    .eq('date', fromDate)
+    .order('id', { ascending: false })
+    .limit(1);
+
+  const obj = objects.find(o => o.id === objectId);
+
+  // Вземи всички следващи записи сортирани по дата
+  const { data: nextEntries } = await db.from('cashflow')
+    .select('*')
+    .eq('object_id', objectId)
+    .gt('date', fromDate)
+    .order('date', { ascending: true });
+
+  if (!nextEntries?.length) return;
+
+  let prevCounter = newPrevCounter;
+  let prevDate = fromDate;
+
+  for (const entry of nextEntries) {
+    const drinksSold = entry.counter != null ? entry.counter - prevCounter : null;
+    const checkValue = drinksSold != null && obj
+      ? parseFloat((drinksSold * (obj.k_percent || 0)).toFixed(2))
+      : null;
+
+    // Преизчисли days_since_last и target
+    const d1 = new Date(entry.date);
+    const d2 = new Date(prevDate);
+    const daysSinceLast = Math.round((d1 - d2) / (1000 * 60 * 60 * 24));
+    const target = obj
+      ? parseFloat(((obj.target_weekly / 7) * daysSinceLast).toFixed(2))
+      : null;
+
+    await db.from('cashflow').update({
+      prev_counter: prevCounter,
+      prev_date: prevDate,
+      drinks_sold: drinksSold,
+      check_value: checkValue,
+      days_since_last: daysSinceLast,
+      target
+    }).eq('id', entry.id);
+
+    if (entry.counter != null) prevCounter = entry.counter;
+    prevDate = entry.date;
+  }
 }
 
 function openCashModal(id, objectName, expectedCash) {
