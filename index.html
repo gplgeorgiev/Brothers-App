@@ -1376,12 +1376,23 @@ async function saveEditCf() {
 async function recalcNextCashflow(objectId, fromDate, newPrevCounter) {
   const obj = objects.find(o => o.id === objectId);
 
-  // Вземи всички следващи записи сортирани по дата и id
+  // Вземи само записите СЛЕД текущия (по-голям id в същия ден или следващи дни)
+  // Намери id-то на текущия запис
+  const { data: currentEntry } = await db.from('cashflow')
+    .select('id')
+    .eq('object_id', objectId)
+    .eq('date', fromDate)
+    .not('counter', 'is', null)
+    .order('id', { ascending: false })
+    .limit(1);
+
+  const currentId = currentEntry?.[0]?.id ?? 0;
+
   const { data: nextEntries } = await db.from('cashflow')
     .select('*')
     .eq('object_id', objectId)
-    .gte('date', fromDate)          // включи същия ден
-    .not('counter', 'is', null)     // само записи с брояч
+    .not('counter', 'is', null)
+    .or(`date.gt.${fromDate},and(date.eq.${fromDate},id.gt.${currentId})`)
     .order('date', { ascending: true })
     .order('id', { ascending: true });
 
