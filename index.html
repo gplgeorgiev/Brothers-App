@@ -1294,6 +1294,50 @@ async function saveEditCf() {
     await recalcNextCashflow(cf.object_id, cf.date, counter);
   }
 
+  // Обнови operations ако има cash (записи 701 и 501)
+  if (cash && cf.operation_id) {
+    // Намери header-а свързан с cashflow-а
+    const { data: ops } = await db.from('operations')
+      .select('id, account_code')
+      .eq('header_id', cf.operation_id)
+      .in('account_code', ['701', '501']);
+
+    if (ops?.length) {
+      for (const op of ops) {
+        await db.from('operations').update({ amount: cash, cost_value: cash }).eq('id', op.id);
+      }
+      // Обнови total_cost в хедъра
+      await db.from('operation_headers').update({ total_cost: cash }).eq('id', cf.operation_id);
+    } else {
+      // Няма записи — създай ги (при първа редакция след запис без автоматични редове)
+      await db.from('operations').insert([
+        {
+          header_id: cf.operation_id,
+          date: cf.date,
+          object_name: cf.object_name,
+          technician_name: cf.technician_name,
+          account_code: '701',
+          amount: cash,
+          product_name: 'Вендинг приход',
+          quantity: 1,
+          cost_value: cash
+        },
+        {
+          header_id: cf.operation_id,
+          date: cf.date,
+          object_name: cf.object_name,
+          technician_name: cf.technician_name,
+          account_code: '501',
+          amount: cash,
+          product_name: 'Каса',
+          quantity: 1,
+          cost_value: cash
+        }
+      ]);
+      await db.from('operation_headers').update({ total_cost: cash }).eq('id', cf.operation_id);
+    }
+  }
+
   closeEditCfModal();
   showToast('✅ Записът е обновен!', 'success');
   loadCashflow();
