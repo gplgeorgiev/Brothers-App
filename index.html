@@ -1295,46 +1295,46 @@ async function saveEditCf() {
   }
 
   // Обнови operations ако има cash (записи 701 и 501)
-  if (cash && cf.operation_id) {
-    // Намери header-а свързан с cashflow-а
-    const { data: ops } = await db.from('operations')
-      .select('id, account_code')
-      .eq('header_id', cf.operation_id)
-      .in('account_code', ['701', '501']);
+  if (cash) {
+    // Намери cash_income хедър по cashflow_id — уникална връзка
+    const { data: cashHeaders } = await db.from('operation_headers')
+      .select('id')
+      .eq('cashflow_id', currentEditCfId)
+      .limit(1);
 
-    if (ops?.length) {
-      for (const op of ops) {
-        await db.from('operations').update({ amount: cash, cost_value: cash }).eq('id', op.id);
-      }
-      // Обнови total_cost в хедъра
-      await db.from('operation_headers').update({ total_cost: cash }).eq('id', cf.operation_id);
+    const cashHeaderId = cashHeaders?.[0]?.id;
+
+    if (cashHeaderId) {
+      // Обнови съществуващите редове
+      await db.from('operations')
+        .update({ amount: cash, cost_value: cash })
+        .eq('header_id', cashHeaderId)
+        .in('account_code', ['701', '501']);
+      await db.from('operation_headers')
+        .update({ total_cost: cash })
+        .eq('id', cashHeaderId);
     } else {
-      // Няма записи — създай ги (при първа редакция след запис без автоматични редове)
-      await db.from('operations').insert([
-        {
-          header_id: cf.operation_id,
-          date: cf.date,
-          object_name: cf.object_name,
-          technician_name: cf.technician_name,
-          account_code: '701',
-          amount: cash,
-          product_name: 'Вендинг приход',
-          quantity: 1,
-          cost_value: cash
-        },
-        {
-          header_id: cf.operation_id,
-          date: cf.date,
-          object_name: cf.object_name,
-          technician_name: cf.technician_name,
-          account_code: '501',
-          amount: cash,
-          product_name: 'Каса',
-          quantity: 1,
-          cost_value: cash
-        }
-      ]);
-      await db.from('operation_headers').update({ total_cost: cash }).eq('id', cf.operation_id);
+      // Създай нов хедър и редове
+      const { data: newHeader } = await db.from('operation_headers').insert({
+        date: cf.date,
+        object_id: cf.object_id,
+        object_name: cf.object_name,
+        technician_id: cf.technician_id,
+        technician_name: cf.technician_name,
+        op_type: 'cash_income',
+        payment_method: 'cash',
+        total_cost: cash,
+        week_number: getWeekNumber(new Date(cf.date)),
+        period: new Date(cf.date).getFullYear() + '.' + String(new Date(cf.date).getMonth()+1).padStart(2,'0'),
+        comment: `Вендинг cash — ${cf.object_name}`
+      }).select().single();
+
+      if (newHeader?.data) {
+        await db.from('operations').insert([
+          { header_id: newHeader.data.id, date: cf.date, object_name: cf.object_name, technician_name: cf.technician_name, account_code: '701', amount: cash, product_name: 'Вендинг приход', quantity: 1, cost_value: cash },
+          { header_id: newHeader.data.id, date: cf.date, object_name: cf.object_name, technician_name: cf.technician_name, account_code: '501', amount: cash, product_name: 'Каса', quantity: 1, cost_value: cash }
+        ]);
+      }
     }
   }
 
@@ -1440,7 +1440,8 @@ async function saveCash() {
     total_cost: cash,
     week_number: getWeekNumber(new Date(cf.date)),
     period: new Date(cf.date).getFullYear() + '.' + String(new Date(cf.date).getMonth()+1).padStart(2,'0'),
-    comment: `Вендинг cash — ${cf.object_name}`
+    comment: `Вендинг cash — ${cf.object_name}`,
+    cashflow_id: currentCashflowId
   }).select().single();
 
   if (!hdrErr && header) {
