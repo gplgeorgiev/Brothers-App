@@ -1371,6 +1371,11 @@ async function saveCash() {
   if (!cash || cash <= 0) { showToast('Въведи сума!', 'error'); return; }
   if (!currentCashflowId) return;
 
+  // Вземи cashflow записа за да знаем обекта и техника
+  const { data: cf } = await db.from('cashflow').select('*').eq('id', currentCashflowId).single();
+  if (!cf) return;
+
+  // 1. Обнови cashflow
   const { error } = await db.from('cashflow').update({
     cash,
     status: 'completed',
@@ -1378,6 +1383,49 @@ async function saveCash() {
   }).eq('id', currentCashflowId);
 
   if (error) { showToast('❌ ' + error.message, 'error'); return; }
+
+  // 2. Създай operation_header за финансовия запис
+  const { data: header, error: hdrErr } = await db.from('operation_headers').insert({
+    date: cf.date,
+    object_id: cf.object_id,
+    object_name: cf.object_name,
+    technician_id: cf.technician_id,
+    technician_name: cf.technician_name,
+    op_type: 'cash_income',
+    payment_method: 'cash',
+    total_cost: cash,
+    week_number: getWeekNumber(new Date(cf.date)),
+    period: new Date(cf.date).getFullYear() + '.' + String(new Date(cf.date).getMonth()+1).padStart(2,'0'),
+    comment: `Вендинг cash — ${cf.object_name}`
+  }).select().single();
+
+  if (!hdrErr && header) {
+    // 3. Два реда: 701 Приход и 501 Каса
+    await db.from('operations').insert([
+      {
+        header_id: header.id,
+        date: cf.date,
+        object_name: cf.object_name,
+        technician_name: cf.technician_name,
+        account_code: '701',
+        amount: cash,
+        product_name: 'Вендинг приход',
+        quantity: 1,
+        cost_value: cash
+      },
+      {
+        header_id: header.id,
+        date: cf.date,
+        object_name: cf.object_name,
+        technician_name: cf.technician_name,
+        account_code: '501',
+        amount: cash,
+        product_name: 'Каса',
+        quantity: 1,
+        cost_value: cash
+      }
+    ]);
+  }
 
   closeCashModal();
   showToast('✅ Cash записан!', 'success');
