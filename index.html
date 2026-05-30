@@ -1125,17 +1125,36 @@ async function submitRestock() {
 let currentCashflowId = null;
 
 async function createCashflowEntry(counter, obj, tech, date, operationId) {
-  // Намери последния cashflow запис за обекта
-  const { data: lastEntry } = await db
+  // Намери предишния запис за обекта — максималния брояч преди текущия
+  // Сортираме по date DESC, после по id DESC за да вземем последния в деня
+  const { data: prevEntries } = await db
     .from('cashflow')
-    .select('counter, date')
+    .select('id, counter, date')
     .eq('object_id', obj.id)
+    .lt('date', date)           // строго преди текущата дата
+    .not('counter', 'is', null) // само записи с брояч
     .order('date', { ascending: false })
+    .order('id', { ascending: false })
     .limit(1);
 
-  const prevCounter = lastEntry?.[0]?.counter ?? null;
-  const prevDate = lastEntry?.[0]?.date ?? null;
-  const drinksSold = prevCounter ? counter - prevCounter : null;
+  // Ако няма запис от предишен ден, провери в същия ден с по-малък id
+  let prevEntry = prevEntries?.[0] || null;
+  if (!prevEntry) {
+    const { data: sameDay } = await db
+      .from('cashflow')
+      .select('id, counter, date')
+      .eq('object_id', obj.id)
+      .eq('date', date)
+      .not('counter', 'is', null)
+      .lt('operation_id', operationId) // по-ранен запис в същия ден
+      .order('id', { ascending: false })
+      .limit(1);
+    prevEntry = sameDay?.[0] || null;
+  }
+
+  const prevCounter = prevEntry?.counter ?? null;
+  const prevDate = prevEntry?.date ?? null;
+  const drinksSold = prevCounter != null ? counter - prevCounter : null;
 
   // Изчисли дни между посещенията
   let daysSinceLast = null;
@@ -1355,22 +1374,16 @@ async function saveEditCf() {
 }
 
 async function recalcNextCashflow(objectId, fromDate, newPrevCounter) {
-  // Вземи текущия запис (fromDate) за да имаме prev_date за следващия
-  const { data: current } = await db.from('cashflow')
-    .select('date')
-    .eq('object_id', objectId)
-    .eq('date', fromDate)
-    .order('id', { ascending: false })
-    .limit(1);
-
   const obj = objects.find(o => o.id === objectId);
 
-  // Вземи всички следващи записи сортирани по дата
+  // Вземи всички следващи записи сортирани по дата и id
   const { data: nextEntries } = await db.from('cashflow')
     .select('*')
     .eq('object_id', objectId)
-    .gt('date', fromDate)
-    .order('date', { ascending: true });
+    .gte('date', fromDate)          // включи същия ден
+    .not('counter', 'is', null)     // само записи с брояч
+    .order('date', { ascending: true })
+    .order('id', { ascending: true });
 
   if (!nextEntries?.length) return;
 
@@ -1387,7 +1400,7 @@ async function recalcNextCashflow(objectId, fromDate, newPrevCounter) {
     const d1 = new Date(entry.date);
     const d2 = new Date(prevDate);
     const daysSinceLast = Math.round((d1 - d2) / (1000 * 60 * 60 * 24));
-    const target = obj
+    const target = obj && daysSinceLast > 0
       ? parseFloat(((obj.target_weekly / 7) * daysSinceLast).toFixed(2))
       : null;
 
@@ -1400,6 +1413,7 @@ async function recalcNextCashflow(objectId, fromDate, newPrevCounter) {
       target
     }).eq('id', entry.id);
 
+    // Следващия запис ползва текущия брояч и дата
     if (entry.counter != null) prevCounter = entry.counter;
     prevDate = entry.date;
   }
