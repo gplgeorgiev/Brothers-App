@@ -1255,28 +1255,38 @@ async function saveEditCf() {
   const cash = parseFloat(document.getElementById('editCfCash').value) || null;
   const counter = parseInt(document.getElementById('editCfCounter').value) || null;
 
-  // Вземи текущия запис за да преизчислим
+  // Вземи текущия запис
   const { data: cf } = await db.from('cashflow').select('*').eq('id', currentEditCfId).single();
   if (!cf) return;
 
-  const update = { counter };
+  const obj = objects.find(o => o.id === cf.object_id);
+  const update = {};
 
-  // Преизчисли drinks_sold ако има брояч и предишен брояч
-  if (counter && cf.prev_counter != null) {
-    update.drinks_sold = counter - cf.prev_counter;
+  // Валидация на брояча
+  if (counter) {
+    if (cf.prev_counter != null && counter <= cf.prev_counter) {
+      showToast(`❌ Броячът (${counter}) трябва да е по-голям от предишния (${cf.prev_counter})!`, 'error');
+      return;
+    }
+    update.counter = counter;
 
-    // Преизчисли check_value
-    const obj = objects.find(o => o.id === cf.object_id);
-    if (obj) {
-      update.check_value = parseFloat((update.drinks_sold * (obj.k_percent || 0)).toFixed(2));
+    // Преизчисли drinks_sold и check_value
+    if (cf.prev_counter != null) {
+      update.drinks_sold = counter - cf.prev_counter;
+      if (obj) {
+        update.check_value = parseFloat((update.drinks_sold * (obj.k_percent || 0)).toFixed(2));
+      }
     }
   }
 
-  // Преизчисли target ако имаме дни
-  if (cf.days_since_last != null) {
-    const obj = objects.find(o => o.id === cf.object_id);
+  // Преизчисли days_since_last и target
+  if (cf.prev_date) {
+    const d1 = new Date(cf.date);
+    const d2 = new Date(cf.prev_date);
+    const days = Math.round((d1 - d2) / (1000 * 60 * 60 * 24));
+    update.days_since_last = days;
     if (obj) {
-      update.target = parseFloat(((obj.target_weekly / 7) * cf.days_since_last).toFixed(2));
+      update.target = parseFloat(((obj.target_weekly / 7) * days).toFixed(2));
     }
   }
 
@@ -1289,9 +1299,10 @@ async function saveEditCf() {
   const { error } = await db.from('cashflow').update(update).eq('id', currentEditCfId);
   if (error) { showToast('❌ ' + error.message, 'error'); return; }
 
-  // Каскадно обнови следващите записи за същия обект
-  if (counter) {
-    await recalcNextCashflow(cf.object_id, cf.date, counter);
+  // Каскадно обнови следващите записи само ако брояча е променен
+  const newCounter = counter || cf.counter;
+  if (counter && counter !== cf.counter && newCounter) {
+    await recalcNextCashflow(cf.object_id, cf.date, newCounter);
   }
 
   // Обнови operations ако има cash (записи 701 и 501)
@@ -1329,10 +1340,10 @@ async function saveEditCf() {
         comment: `Вендинг cash — ${cf.object_name}`
       }).select().single();
 
-      if (newHeader?.data) {
+      if (newHeader?.id) {
         await db.from('operations').insert([
-          { header_id: newHeader.data.id, date: cf.date, object_name: cf.object_name, technician_name: cf.technician_name, account_code: '701', amount: cash, product_name: 'Вендинг приход', quantity: 1, cost_value: cash },
-          { header_id: newHeader.data.id, date: cf.date, object_name: cf.object_name, technician_name: cf.technician_name, account_code: '501', amount: cash, product_name: 'Каса', quantity: 1, cost_value: cash }
+          { header_id: newHeader.id, date: cf.date, object_name: cf.object_name, technician_name: cf.technician_name, account_code: '701', amount: cash, product_name: 'Вендинг приход', quantity: 1, cost_value: cash },
+          { header_id: newHeader.id, date: cf.date, object_name: cf.object_name, technician_name: cf.technician_name, account_code: '501', amount: cash, product_name: 'Каса', quantity: 1, cost_value: cash }
         ]);
       }
     }
