@@ -728,12 +728,14 @@ let lineCounter = 0;
 // ── INIT ──
 document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('dateInput').value = new Date().toISOString().split('T')[0];
-  document.getElementById('finDateInput').value = new Date().toISOString().split('T')[0];
+  const finDateEl = document.getElementById('finDateInput');
+  if (finDateEl) finDateEl.value = new Date().toISOString().split('T')[0];
   document.getElementById('soDate').value = new Date().toISOString().split('T')[0];
   document.getElementById('headerDate').textContent = formatDateBG(new Date());
   await Promise.all([loadObjects(), loadProducts(), loadTechnicians()]);
   loadDefaultTech();
   renderProductCards();
+  if (document.getElementById('finCategoryScroll')) renderFinCategories();
 });
 
 // ── LOAD DATA ──
@@ -757,6 +759,16 @@ async function loadObjects() {
       opt.value = o.id; opt.textContent = o.name; sel.appendChild(opt);
     });
   });
+  // Попълни обектите в Финанси
+  const finObjSel = document.getElementById('finObjectSelect');
+  if (finObjSel) {
+    finObjSel.innerHTML = '<option value="">— избери —</option>' +
+      data.map(o => `<option value="${o.id}">${o.name}</option>`).join('');
+    const admin = data.find(o => o.type === 'admin');
+    if (admin) finObjSel.value = admin.id;
+  }
+  ['_dummy'].forEach(() => {
+  });
 }
 
 async function loadProducts() {
@@ -772,11 +784,20 @@ async function loadTechnicians() {
   if (!data) return;
   technicians = data;
   [document.getElementById('techSelect'), document.getElementById('defaultTechSelect')].forEach(sel => {
+    if (!sel) return;
     data.forEach(t => {
       const opt = document.createElement('option');
       opt.value = t.id; opt.textContent = t.name; sel.appendChild(opt);
     });
   });
+  // Попълни техници в Финанси
+  const finTechSel = document.getElementById('finTechSelect');
+  if (finTechSel) {
+    finTechSel.innerHTML = '<option value="">— избери —</option>' +
+      data.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
+    const savedTech = localStorage.getItem('defaultTech');
+    if (savedTech) finTechSel.value = savedTech;
+  }
   document.getElementById('techCount').textContent = data.length;
   // Добави техниците към финанси и сервиз селектите
   ['txTech', 'soTech'].forEach(selId => {
@@ -1166,7 +1187,8 @@ async function submitRestock() {
   renderProductCards();
   document.getElementById('qtyPopup').classList.remove('visible');
   document.getElementById('dateInput').value = new Date().toISOString().split('T')[0];
-  document.getElementById('finDateInput').value = new Date().toISOString().split('T')[0];
+  const finDateEl = document.getElementById('finDateInput');
+  if (finDateEl) finDateEl.value = new Date().toISOString().split('T')[0];
   document.getElementById('soDate').value = new Date().toISOString().split('T')[0];
   document.getElementById('page-restock').scrollTop = 0;
   window.scrollTo(0, 0);
@@ -2135,7 +2157,8 @@ async function saveFinance() {
   document.getElementById('finDocRef').value = '';
   document.getElementById('finContractor').value = '';
   document.getElementById('finComment').value = '';
-  document.getElementById('finDateInput').value = new Date().toISOString().split('T')[0];
+  const finDateEl = document.getElementById('finDateInput');
+  if (finDateEl) finDateEl.value = new Date().toISOString().split('T')[0];
   loadBalanceSummary();
   loadTxHistory();
   window.scrollTo(0, 0);
