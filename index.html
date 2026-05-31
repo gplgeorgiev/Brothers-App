@@ -1388,13 +1388,28 @@ async function recalcNextCashflow(objectId, fromDate, newPrevCounter) {
 
   const currentId = currentEntry?.[0]?.id ?? 0;
 
-  const { data: nextEntries } = await db.from('cashflow')
+  // Вземи записите след текущия: следващи дни ИЛИ същия ден с по-голям id
+  const { data: nextByDate } = await db.from('cashflow')
     .select('*')
     .eq('object_id', objectId)
     .not('counter', 'is', null)
-    .or(`date.gt.${fromDate},and(date.eq.${fromDate},id.gt.${currentId})`)
+    .gt('date', fromDate)
     .order('date', { ascending: true })
     .order('id', { ascending: true });
+
+  const { data: nextSameDay } = await db.from('cashflow')
+    .select('*')
+    .eq('object_id', objectId)
+    .not('counter', 'is', null)
+    .eq('date', fromDate)
+    .gt('id', currentId)
+    .order('id', { ascending: true });
+
+  // Обедини и сортирай
+  const nextEntries = [
+    ...(nextSameDay || []),
+    ...(nextByDate || [])
+  ];
 
   if (!nextEntries?.length) return;
 
