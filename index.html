@@ -61,6 +61,10 @@
   .gps-btn:active { border-color:var(--accent); color:var(--accent); }
   .gps-status { font-size:11px; color:var(--text3); margin-top:5px; font-family:var(--mono); }
 
+  /* TYPE BUTTONS */
+  .type-btn { padding:14px; border-radius:10px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:14px; font-weight:700; cursor:pointer; transition:all 0.15s; font-family:var(--font); }
+  .type-btn.active { background:var(--accent); border-color:var(--accent); color:#fff; }
+
   /* OCR */
   .ocr-btn { flex-shrink:0; width:48px; height:48px; background:var(--bg3); border:1px solid var(--border); border-radius:10px; font-size:20px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all 0.2s; }
   .ocr-btn:active { border-color:var(--accent); transform:scale(0.92); }
@@ -441,59 +445,106 @@
 <!-- PAGE: ФИНАНСИ -->
 <div class="page" id="page-finance">
 
-  <!-- Салдо -->
+  <!-- Касова наличност -->
   <div class="section-label">Касова наличност</div>
   <div id="balanceSummary"><div class="loading"><div class="spinner"></div></div></div>
 
-  <!-- Нова транзакция -->
-  <div class="section-label">Нова транзакция</div>
+  <!-- 1. ОБЕКТ -->
+  <div class="section-label">Обект</div>
   <div class="card">
-    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
-      <div class="field" style="margin-bottom:10px;">
-        <label>ТИП</label>
-        <select id="txType" onchange="updateTxCategories()" style="background:var(--bg3); border:1px solid var(--border); border-radius:10px; padding:10px 12px; color:var(--text); font-size:14px; width:100%; outline:none; appearance:none; font-family:var(--font);">
-          <option value="expense">📤 Разход</option>
-          <option value="income">📥 Приход</option>
-        </select>
+    <div class="gps-row">
+      <div class="field">
+        <label>ОБЕКТ</label>
+        <select id="finObjectSelect"><option value="">— избери обект —</option></select>
       </div>
-      <div class="field" style="margin-bottom:10px;">
-        <label>НАЧИН</label>
-        <select id="txMethod" style="background:var(--bg3); border:1px solid var(--border); border-radius:10px; padding:10px 12px; color:var(--text); font-size:14px; width:100%; outline:none; appearance:none; font-family:var(--font);">
-          <option value="cash">💵 Брой</option>
-          <option value="bank">🏦 Банка</option>
-        </select>
-      </div>
+      <button class="gps-btn" onclick="getGPSFinance()">📍</button>
     </div>
-    <div class="field">
-      <label>КАТЕГОРИЯ</label>
-      <select id="txCategory" style="background:var(--bg3); border:1px solid var(--border); border-radius:10px; padding:10px 12px; color:var(--text); font-size:14px; width:100%; outline:none; appearance:none; font-family:var(--font);"></select>
-    </div>
-    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
-      <div class="field" style="margin-bottom:10px;">
-        <label>СУМА (лв)</label>
-        <input type="number" id="txAmount" placeholder="0.00" step="0.01" min="0">
-      </div>
-      <div class="field" style="margin-bottom:10px;">
-        <label>ДАТА</label>
-        <input type="date" id="txDate">
-      </div>
-    </div>
-    <div class="field">
-      <label>ТЕХНИК</label>
-      <select id="txTech" style="background:var(--bg3); border:1px solid var(--border); border-radius:10px; padding:10px 12px; color:var(--text); font-size:14px; width:100%; outline:none; appearance:none; font-family:var(--font);">
-        <option value="">— избери —</option>
-      </select>
-    </div>
-    <div class="field">
-      <label>ОПИСАНИЕ</label>
-      <input type="text" id="txDescription" placeholder="напр. Доставка кафе Ч">
-    </div>
-    <div class="field" style="margin-bottom:0">
-      <label>ДОКУМЕНТ / ФАКТУРА</label>
-      <input type="text" id="txDocRef" placeholder="напр. Фактура №123">
+    <div class="gps-status" id="finGpsStatus"></div>
+  </div>
+
+  <!-- 2. ТИП -->
+  <div class="section-label">Тип</div>
+  <div class="card">
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+      <button id="finTypeExpense" class="type-btn active" onclick="setFinType('expense')">📤 Разход</button>
+      <button id="finTypeIncome" class="type-btn" onclick="setFinType('income')">📥 Приход</button>
     </div>
   </div>
-  <button onclick="saveTx()" class="submit-btn">💾 Запиши транзакцията</button>
+
+  <!-- 3. КАТЕГОРИИ (редове) -->
+  <div class="section-label">Категории</div>
+  <div class="card">
+    <div class="product-scroll-wrap" id="finCategoryScroll"></div>
+    <div class="qty-popup" id="finCategoryPopup">
+      <div class="prod-label"><span id="finCatIcon">📦</span><span id="finCatName">Категория</span></div>
+      <div class="qty-controls">
+        <div class="qty-big-btn" onclick="changeFinAmount(-10)">−</div>
+        <input class="qty-big-input" id="finAmountInput" type="number" value="0" min="0" step="0.01" placeholder="0.00">
+        <div class="qty-big-btn" onclick="changeFinAmount(10)">＋</div>
+      </div>
+      <button class="qty-add-btn" onclick="addFinLine()">✓ Добави</button>
+    </div>
+    <div class="added-lines" id="finLines"></div>
+  </div>
+
+  <!-- Резюме -->
+  <div id="finSummary"></div>
+
+  <!-- 4. НАЧИН НА ПЛАЩАНЕ -->
+  <div class="section-label">Начин на плащане</div>
+  <div class="card">
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+      <button id="finMethodCash" class="type-btn active" onclick="setFinMethod('cash')">💵 Брой</button>
+      <button id="finMethodBank" class="type-btn" onclick="setFinMethod('bank')">🏦 Банка</button>
+    </div>
+  </div>
+
+  <!-- 5. ТЕХНИК -->
+  <div class="section-label">Техник</div>
+  <div class="card">
+    <div class="field" style="margin-bottom:0">
+      <label>КОЙ ВЪВЕЖДА</label>
+      <select id="finTechSelect"><option value="">— избери —</option></select>
+    </div>
+  </div>
+
+  <!-- 6. ДАТА -->
+  <div class="section-label">Дата</div>
+  <div class="card">
+    <div class="field" style="margin-bottom:0">
+      <label>ДАТА</label>
+      <input type="date" id="finDateInput">
+    </div>
+  </div>
+
+  <!-- 7. ДОКУМЕНТ -->
+  <div class="section-label">Документ</div>
+  <div class="card">
+    <div class="field" style="margin-bottom:0">
+      <label>ФАКТУРА / ДОКУМЕНТ</label>
+      <input type="text" id="finDocRef" placeholder="напр. Фактура №123">
+    </div>
+  </div>
+
+  <!-- 8. КОНТРАГЕНТ -->
+  <div class="section-label">Контрагент</div>
+  <div class="card">
+    <div class="field" style="margin-bottom:0">
+      <label>ИМЕ НА КОНТРАГЕНТ</label>
+      <input type="text" id="finContractor" placeholder="напр. Лавазза АД">
+    </div>
+  </div>
+
+  <!-- 9. БЕЛЕЖКА -->
+  <div class="section-label">Бележка</div>
+  <div class="card">
+    <div class="field" style="margin-bottom:0">
+      <label>КОМЕНТАР</label>
+      <textarea id="finComment" rows="2" style="resize:none; background:var(--bg3); border:1px solid var(--border); border-radius:10px; padding:12px 14px; color:var(--text); font-family:var(--font); font-size:14px; width:100%; outline:none;" placeholder="допълнителна информация..."></textarea>
+    </div>
+  </div>
+
+  <button onclick="saveFinance()" class="submit-btn" id="finSubmitBtn">💾 Запиши транзакцията</button>
 
   <!-- История -->
   <div class="section-label" style="margin-top:20px">Последни транзакции</div>
@@ -677,9 +728,8 @@ let lineCounter = 0;
 // ── INIT ──
 document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('dateInput').value = new Date().toISOString().split('T')[0];
-  document.getElementById('txDate').value = new Date().toISOString().split('T')[0];
+  document.getElementById('finDateInput').value = new Date().toISOString().split('T')[0];
   document.getElementById('soDate').value = new Date().toISOString().split('T')[0];
-  updateTxCategories();
   document.getElementById('headerDate').textContent = formatDateBG(new Date());
   await Promise.all([loadObjects(), loadProducts(), loadTechnicians()]);
   loadDefaultTech();
@@ -1084,7 +1134,9 @@ async function submitRestock() {
     product_id: l.product.id,
     product_name: l.product.name,
     quantity: l.qty,
-    cost_value: parseFloat((l.product.price_with_vat * l.qty).toFixed(2))
+    cost_value: parseFloat((l.product.price_with_vat * l.qty).toFixed(2)),
+    amount: parseFloat((l.product.price_with_vat * l.qty).toFixed(2)),
+    account_code: '60101'
   }));
 
   const { error: rowsError } = await db.from('operations').insert(rows);
@@ -1114,9 +1166,8 @@ async function submitRestock() {
   renderProductCards();
   document.getElementById('qtyPopup').classList.remove('visible');
   document.getElementById('dateInput').value = new Date().toISOString().split('T')[0];
-  document.getElementById('txDate').value = new Date().toISOString().split('T')[0];
+  document.getElementById('finDateInput').value = new Date().toISOString().split('T')[0];
   document.getElementById('soDate').value = new Date().toISOString().split('T')[0];
-  updateTxCategories();
   document.getElementById('page-restock').scrollTop = 0;
   window.scrollTo(0, 0);
 }
@@ -1362,8 +1413,8 @@ async function saveEditCf() {
 
       if (newHeader?.id) {
         await db.from('operations').insert([
-          { header_id: newHeader.id, date: cf.date, object_name: cf.object_name, technician_name: cf.technician_name, account_code: '701', amount: cash, product_name: 'Вендинг приход', quantity: 1, cost_value: cash },
-          { header_id: newHeader.id, date: cf.date, object_name: cf.object_name, technician_name: cf.technician_name, account_code: '501', amount: cash, product_name: 'Каса', quantity: 1, cost_value: cash }
+          { header_id: newHeader.id, date: cf.date, object_name: cf.object_name, technician_name: cf.technician_name, account_code: '70101', amount: cash, product_name: 'Вендинг приход', quantity: 1, cost_value: cash },
+          { header_id: newHeader.id, date: cf.date, object_name: cf.object_name, technician_name: cf.technician_name, account_code: '50101', amount: cash, product_name: 'Каса', quantity: 1, cost_value: cash }
         ]);
       }
     }
@@ -1486,7 +1537,7 @@ async function saveCash() {
         date: cf.date,
         object_name: cf.object_name,
         technician_name: cf.technician_name,
-        account_code: '701',
+        account_code: '70101',
         amount: cash,
         product_name: 'Вендинг приход',
         quantity: 1,
@@ -1497,7 +1548,7 @@ async function saveCash() {
         date: cf.date,
         object_name: cf.object_name,
         technician_name: cf.technician_name,
-        account_code: '501',
+        account_code: '50101',
         amount: cash,
         product_name: 'Каса',
         quantity: 1,
@@ -1799,23 +1850,23 @@ function switchTab(tab) {
 // ── КАТЕГОРИИ ТРАНЗАКЦИИ ──
 const TX_CATEGORIES = {
   expense: [
-    { value: 'supplier_goods',     label: '📦 Доставчик — суровини' },
-    { value: 'supplier_services',  label: '🛠️ Доставчик — услуги' },
-    { value: 'fuel',               label: '⛽ Гориво' },
-    { value: 'rent_fixed',         label: '🏠 Наем — фиксиран' },
-    { value: 'rent_electricity',   label: '⚡ Наем — ел. енергия' },
-    { value: 'service_parts',      label: '🔧 Сервиз — части' },
-    { value: 'salaries',           label: '👥 Заплати' },
-    { value: 'insurance',          label: '📋 Осигуровки' },
-    { value: 'vehicles',           label: '🚗 Автомобили' },
-    { value: 'other_expense',      label: '📋 Друг разход' },
+    { value: '30201', label: '📦 Доставка суровини' },
+    { value: '60101', label: '📦 Суровини' },
+    { value: '60102', label: '⛽ Гориво' },
+    { value: '60103', label: '🔧 Сервиз — части' },
+    { value: '60201', label: '🏠 Наем' },
+    { value: '60202', label: '⚡ Ел. енергия' },
+    { value: '60401', label: '👥 Заплати' },
+    { value: '60501', label: '📋 Осигуровки' },
+    { value: '60701', label: '🚗 Автомобили' },
+    { value: '60901', label: '📋 Други разходи' },
   ],
   income: [
-    { value: 'vending_cash',       label: '💰 Вендинг cash' },
-    { value: 'service_repair',     label: '🔧 Сервиз — ремонт' },
-    { value: 'service_parts',      label: '🔩 Сервиз — части' },
-    { value: 'service_coinmech',   label: '🤖 Сервиз — монетник' },
-    { value: 'other_income',       label: '📋 Друг приход' },
+    { value: '70101', label: '💰 Вендинг приход' },
+    { value: '70301', label: '🪙 Сервиз — монетник' },
+    { value: '70302', label: '☕ Сервиз — вендинг' },
+    { value: '70601', label: '🔩 Приход части' },
+    { value: '70901', label: '📋 Друг приход' },
   ]
 };
 
@@ -1826,36 +1877,304 @@ function updateTxCategories() {
 }
 
 // ── FINANCE ──
+let finType = 'expense';
+let finMethod = 'cash';
+let finSelectedCat = null;
+let finAmount = 0;
+let finBasket = [];  // [{category, amount}]
+
+// Категории за всеки тип
+const FIN_CATEGORIES = {
+  expense: [
+    { code: '30201', icon: '📦', label: 'Доставка суровини' },
+    { code: '60102', icon: '⛽', label: 'Гориво' },
+    { code: '60103', icon: '🔧', label: 'Сервиз части' },
+    { code: '60201', icon: '🏠', label: 'Наем' },
+    { code: '60202', icon: '⚡', label: 'Ел. енергия' },
+    { code: '60401', icon: '👥', label: 'Заплати' },
+    { code: '60501', icon: '📋', label: 'Осигуровки' },
+    { code: '60701', icon: '🚗', label: 'Автомобили' },
+    { code: '60901', icon: '📋', label: 'Други' }
+  ],
+  income: [
+    { code: '70101', icon: '💰', label: 'Вендинг' },
+    { code: '70301', icon: '🪙', label: 'Сервиз монетник' },
+    { code: '70302', icon: '☕', label: 'Сервиз вендинг' },
+    { code: '70601', icon: '🔩', label: 'Приход части' },
+    { code: '70901', icon: '📋', label: 'Друг приход' }
+  ]
+};
+
+function setFinType(type) {
+  finType = type;
+  document.getElementById('finTypeExpense').classList.toggle('active', type === 'expense');
+  document.getElementById('finTypeIncome').classList.toggle('active', type === 'income');
+  finBasket = [];
+  finSelectedCat = null;
+  document.getElementById('finCategoryPopup').classList.remove('visible');
+  renderFinCategories();
+  renderFinBasket();
+  updateFinSummary();
+}
+
+function setFinMethod(method) {
+  finMethod = method;
+  document.getElementById('finMethodCash').classList.toggle('active', method === 'cash');
+  document.getElementById('finMethodBank').classList.toggle('active', method === 'bank');
+}
+
+function renderFinCategories() {
+  const wrap = document.getElementById('finCategoryScroll');
+  wrap.innerHTML = FIN_CATEGORIES[finType].map(c => `
+    <div class="prod-card" id="fincat-${c.code}" onclick="selectFinCat('${c.code}')">
+      <div class="pc-icon">${c.icon}</div>
+      <div class="pc-name">${c.label}</div>
+    </div>
+  `).join('');
+}
+
+function selectFinCat(code) {
+  finSelectedCat = code;
+  finAmount = 0;
+  document.querySelectorAll('#finCategoryScroll .prod-card').forEach(c => c.classList.remove('selected'));
+  document.getElementById(`fincat-${code}`)?.classList.add('selected');
+  const cat = FIN_CATEGORIES[finType].find(c => c.code === code);
+  document.getElementById('finCatIcon').textContent = cat.icon;
+  document.getElementById('finCatName').textContent = cat.label;
+  document.getElementById('finAmountInput').value = '';
+  document.getElementById('finCategoryPopup').classList.add('visible');
+  setTimeout(() => document.getElementById('finAmountInput').focus(), 100);
+}
+
+function changeFinAmount(delta) {
+  const inp = document.getElementById('finAmountInput');
+  let val = parseFloat(inp.value) || 0;
+  val = Math.max(0, val + delta);
+  inp.value = val.toFixed(2);
+}
+
+function addFinLine() {
+  if (!finSelectedCat) return;
+  const amount = parseFloat(document.getElementById('finAmountInput').value) || 0;
+  if (amount <= 0) { showToast('Въведи сума!', 'error'); return; }
+  const cat = FIN_CATEGORIES[finType].find(c => c.code === finSelectedCat);
+  const existing = finBasket.find(b => b.code === finSelectedCat);
+  if (existing) { existing.amount += amount; } 
+  else { finBasket.push({ code: finSelectedCat, icon: cat.icon, label: cat.label, amount }); }
+  document.getElementById('finCategoryPopup').classList.remove('visible');
+  document.querySelectorAll('#finCategoryScroll .prod-card').forEach(c => c.classList.remove('selected'));
+  finSelectedCat = null;
+  renderFinBasket();
+  updateFinSummary();
+}
+
+function removeFinLine(idx) {
+  finBasket.splice(idx, 1);
+  renderFinBasket();
+  updateFinSummary();
+}
+
+function renderFinBasket() {
+  const el = document.getElementById('finLines');
+  if (!finBasket.length) { el.innerHTML = ''; return; }
+  el.innerHTML = finBasket.map((b, i) => `
+    <div class="added-line">
+      <div class="al-icon">${b.icon}</div>
+      <div class="al-name">${b.label}</div>
+      <div class="al-qty">${b.amount.toFixed(2)} лв</div>
+      <div class="al-remove" onclick="removeFinLine(${i})">✕</div>
+    </div>
+  `).join('');
+}
+
+function updateFinSummary() {
+  const el = document.getElementById('finSummary');
+  if (!finBasket.length) { el.innerHTML = ''; return; }
+  const total = finBasket.reduce((s, b) => s + b.amount, 0);
+  el.innerHTML = `
+    <div class="section-label">Резюме</div>
+    <div class="summary-card">
+      <div class="summary-total">
+        <span class="key">Общо ${finType === 'income' ? 'приход' : 'разход'}</span>
+        <span class="val">${total.toFixed(2)} лв</span>
+      </div>
+    </div>`;
+}
+
+function getGPSFinance() {
+  const status = document.getElementById('finGpsStatus');
+  status.textContent = '⏳ търсим GPS...';
+  if (!navigator.geolocation) { status.textContent = '❌ GPS не се поддържа'; return; }
+  navigator.geolocation.getCurrentPosition(pos => {
+    const lat = pos.coords.latitude, lng = pos.coords.longitude;
+    const R = 6371000;
+    const withDist = objects.filter(o => o.lat && o.lng && o.type === 'vending').map(o => {
+      const dLat = (o.lat - lat) * Math.PI / 180;
+      const dLng = (o.lng - lng) * Math.PI / 180;
+      const a = Math.sin(dLat/2)**2 + Math.cos(lat*Math.PI/180) * Math.cos(o.lat*Math.PI/180) * Math.sin(dLng/2)**2;
+      return { ...o, dist: Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))) };
+    }).sort((a, b) => a.dist - b.dist);
+    if (!withDist.length) return;
+    const nearest = withDist[0];
+    if (nearest.dist <= 50) {
+      document.getElementById('finObjectSelect').value = nearest.id;
+      status.textContent = `📍 ${nearest.name} (${nearest.dist}м)`;
+    } else {
+      const top3 = withDist.slice(0, 3);
+      status.innerHTML = `📍 Избери:<br>` + top3.map(o =>
+        `<button onclick="document.getElementById('finObjectSelect').value=${o.id}; document.getElementById('finGpsStatus').textContent='📍 ${o.name}'" style="display:inline-block; margin:4px 4px 0 0; padding:6px 12px; background:var(--bg2); border:1px solid var(--border); border-radius:8px; color:var(--text); font-size:12px; font-weight:600; cursor:pointer; font-family:var(--font);">${o.name} <span style="color:var(--text3)">${o.dist}м</span></button>`
+      ).join('');
+    }
+  }, () => { status.textContent = '❌ Грешка при GPS'; }, { enableHighAccuracy: true, timeout: 8000 });
+}
+
 async function loadFinance() {
-  await Promise.all([loadBalanceSummary(), loadTxHistory()]);
+  await Promise.all([loadBalanceSummary(), loadTxHistory(), populateFinanceSelects()]);
+  renderFinCategories();
+}
+
+function populateFinanceSelects() {
+  const objSel = document.getElementById('finObjectSelect');
+  if (objSel && !objSel.dataset.filled) {
+    objSel.innerHTML = '<option value="">— избери —</option>' +
+      objects.filter(o => o.active).map(o => `<option value="${o.id}">${o.name}</option>`).join('');
+    // По подразбиране Администрация
+    const admin = objects.find(o => o.type === 'admin');
+    if (admin) objSel.value = admin.id;
+    objSel.dataset.filled = '1';
+  }
+  const techSel = document.getElementById('finTechSelect');
+  if (techSel && !techSel.dataset.filled) {
+    techSel.innerHTML = '<option value="">— избери —</option>' +
+      technicians.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
+    // По подразбиране от localStorage (Настройки)
+    const savedTech = localStorage.getItem('defaultTech');
+    if (savedTech) techSel.value = savedTech;
+    techSel.dataset.filled = '1';
+  }
+}
+
+async function saveFinance() {
+  const objId = document.getElementById('finObjectSelect').value;
+  const techId = document.getElementById('finTechSelect').value;
+  const date = document.getElementById('finDateInput').value;
+  const docRef = document.getElementById('finDocRef').value;
+  const contractor = document.getElementById('finContractor').value;
+  const comment = document.getElementById('finComment').value;
+
+  if (!objId) { showToast('Избери обект!', 'error'); return; }
+  if (!techId) { showToast('Избери техник!', 'error'); return; }
+  if (!finBasket.length) { showToast('Добави поне една категория!', 'error'); return; }
+  if (!date) { showToast('Избери дата!', 'error'); return; }
+
+  const obj = objects.find(o => o.id == objId);
+  const tech = technicians.find(t => t.id == techId);
+  const totalAmount = finBasket.reduce((s, b) => s + b.amount, 0);
+  const dateObj = new Date(date);
+  const weekNum = getWeekNumber(dateObj);
+  const period = dateObj.getFullYear() + '.' + String(dateObj.getMonth()+1).padStart(2,'0');
+
+  const btn = document.getElementById('finSubmitBtn');
+  btn.disabled = true; btn.textContent = '⏳ Записва...';
+
+  // 1. Запиши хедър
+  const { data: header, error: hdrErr } = await db.from('operation_headers').insert({
+    date,
+    object_id: parseInt(objId), object_name: obj?.name,
+    technician_id: parseInt(techId), technician_name: tech?.name,
+    op_type: finType === 'income' ? 'finance_income' : 'finance_expense',
+    payment_method: finMethod,
+    total_cost: totalAmount,
+    week_number: weekNum, period,
+    document_ref: docRef,
+    contractor: contractor || null,
+    comment
+  }).select().single();
+
+  if (hdrErr) {
+    btn.disabled = false; btn.textContent = '💾 Запиши транзакцията';
+    showToast('❌ ' + hdrErr.message, 'error');
+    return;
+  }
+
+  // 2. Запиши редовете - всяка категория + насрещна сметка каса/банка
+  const cashAccount = finMethod === 'cash' ? '50101' : '50301';
+  const rows = [];
+  finBasket.forEach(b => {
+    rows.push({
+      header_id: header.id, date,
+      object_name: obj?.name, technician_name: tech?.name,
+      account_code: b.code,
+      amount: b.amount, cost_value: b.amount, quantity: 1,
+      product_name: b.label
+    });
+  });
+  // Един обобщен ред за каса/банка
+  rows.push({
+    header_id: header.id, date,
+    object_name: obj?.name, technician_name: tech?.name,
+    account_code: cashAccount,
+    amount: totalAmount, cost_value: totalAmount, quantity: 1,
+    product_name: finMethod === 'cash' ? 'Каса' : 'Банка'
+  });
+
+  const { error: rowsErr } = await db.from('operations').insert(rows);
+  btn.disabled = false; btn.textContent = '💾 Запиши транзакцията';
+
+  if (rowsErr) { showToast('❌ ' + rowsErr.message, 'error'); return; }
+
+  showToast('✅ Записано!', 'success');
+
+  // Изчисти формата
+  finBasket = [];
+  finSelectedCat = null;
+  renderFinBasket();
+  updateFinSummary();
+  document.getElementById('finCategoryPopup').classList.remove('visible');
+  document.querySelectorAll('#finCategoryScroll .prod-card').forEach(c => c.classList.remove('selected'));
+  document.getElementById('finDocRef').value = '';
+  document.getElementById('finContractor').value = '';
+  document.getElementById('finComment').value = '';
+  document.getElementById('finDateInput').value = new Date().toISOString().split('T')[0];
+  loadBalanceSummary();
+  loadTxHistory();
+  window.scrollTo(0, 0);
 }
 
 async function loadBalanceSummary() {
   const el = document.getElementById('balanceSummary');
-  const { data } = await db.from('transactions').select('type, amount, payment_method, technician_name');
+  const { data } = await db.from('operations')
+    .select('account_code, amount, technician_name, header_id, operation_headers!inner(payment_method, op_type)')
+    .in('account_code', ['50101', '50301']);
   if (!data) return;
 
-  // Общо салдо
-  const totalCash = data.filter(t => t.payment_method === 'cash').reduce((s, t) => s + (t.type === 'income' ? t.amount : -t.amount), 0);
-  const totalBank = data.filter(t => t.payment_method === 'bank').reduce((s, t) => s + (t.type === 'income' ? t.amount : -t.amount), 0);
+  const cashOps = data.filter(o => o.account_code === '50101');
+  const bankOps = data.filter(o => o.account_code === '50301');
 
-  // По техник (само cash)
+  const getSign = (op) => {
+    const opType = op.operation_headers?.op_type || '';
+    return ['finance_income', 'cash_income', 'service_income'].includes(opType) ? 1 : -1;
+  };
+
+  const totalCash = cashOps.reduce((s, o) => s + (o.amount || 0) * getSign(o), 0);
+  const totalBank = bankOps.reduce((s, o) => s + (o.amount || 0) * getSign(o), 0);
+
   const byTech = {};
-  data.filter(t => t.payment_method === 'cash').forEach(t => {
-    const name = t.technician_name || 'Неизвестен';
+  cashOps.forEach(o => {
+    const name = o.technician_name || 'Неизвестен';
     if (!byTech[name]) byTech[name] = 0;
-    byTech[name] += t.type === 'income' ? t.amount : -t.amount;
+    byTech[name] += (o.amount || 0) * getSign(o);
   });
 
   el.innerHTML = `
     <div class="stats-grid" style="margin-bottom:12px;">
       <div class="stat-card">
         <div class="stat-label">💵 Каса общо</div>
-        <div class="stat-value ${totalCash >= 0 ? 'green' : 'red'}">${totalCash.toFixed(0)} лв</div>
+        <div class="stat-value ${totalCash >= 0 ? 'green' : ''}" style="${totalCash < 0 ? 'color:var(--red)' : ''}">${totalCash.toFixed(0)} лв</div>
       </div>
       <div class="stat-card">
         <div class="stat-label">🏦 Банка общо</div>
-        <div class="stat-value ${totalBank >= 0 ? 'green' : 'red'}">${totalBank.toFixed(0)} лв</div>
+        <div class="stat-value ${totalBank >= 0 ? 'green' : ''}" style="${totalBank < 0 ? 'color:var(--red)' : ''}">${totalBank.toFixed(0)} лв</div>
       </div>
     </div>
     <div class="card">
@@ -1866,75 +2185,6 @@ async function loadBalanceSummary() {
           <span class="val" style="color:${bal >= 0 ? 'var(--green)' : 'var(--red)'}">${bal.toFixed(2)} лв</span>
         </div>`).join('') || '<div style="color:var(--text3); font-size:13px;">Няма данни</div>'}
     </div>`;
-}
-
-async function loadTxHistory() {
-  const el = document.getElementById('txHistory');
-  el.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
-  const typeFilter = document.getElementById('txFilterType')?.value || '';
-  const dateFilter = document.getElementById('txFilterDate')?.value || '';
-
-  let q = db.from('transactions').select('*').order('date', { ascending: false }).order('created_at', { ascending: false }).limit(40);
-  if (typeFilter) q = q.eq('type', typeFilter);
-  if (dateFilter) q = q.gte('date', dateFilter);
-
-  const { data } = await q;
-  if (!data?.length) { el.innerHTML = '<div class="empty"><div class="empty-icon">📭</div><p>Няма транзакции</p></div>'; return; }
-
-  el.innerHTML = data.map(t => `
-    <div class="op-item">
-      <div class="op-icon">${t.type === 'income' ? '📥' : '📤'}</div>
-      <div class="op-info">
-        <div class="op-title">${TX_CATEGORIES[t.type]?.find(c => c.value === t.category)?.label || t.category}</div>
-        <div class="op-sub">${formatDateBG(new Date(t.date))} · ${t.technician_name || '—'} · ${t.payment_method === 'cash' ? '💵' : '🏦'}</div>
-        ${t.description ? `<div style="font-size:11px; color:var(--text3);">💬 ${t.description}</div>` : ''}
-        ${t.document_ref ? `<div style="font-size:11px; color:var(--text3);">📄 ${t.document_ref}</div>` : ''}
-      </div>
-      <div style="display:flex; flex-direction:column; align-items:flex-end; gap:4px;">
-        <div style="font-size:15px; font-weight:800; font-family:var(--mono); color:${t.type === 'income' ? 'var(--green)' : 'var(--red)'};">${t.type === 'income' ? '+' : '-'}${t.amount.toFixed(2)} лв</div>
-        <button onclick="deleteTx(${t.id})" style="padding:3px 8px; border-radius:6px; border:1px solid var(--red); background:transparent; color:var(--red); font-size:11px; cursor:pointer;">🗑</button>
-      </div>
-    </div>`).join('');
-}
-
-async function saveTx() {
-  const type = document.getElementById('txType').value;
-  const category = document.getElementById('txCategory').value;
-  const amount = parseFloat(document.getElementById('txAmount').value) || 0;
-  const method = document.getElementById('txMethod').value;
-  const date = document.getElementById('txDate').value;
-  const techId = document.getElementById('txTech').value;
-  const description = document.getElementById('txDescription').value;
-  const docRef = document.getElementById('txDocRef').value;
-
-  if (!amount) { showToast('Въведи сума!', 'error'); return; }
-  if (!date) { showToast('Избери дата!', 'error'); return; }
-
-  const tech = technicians.find(t => t.id == techId);
-
-  const { error } = await db.from('transactions').insert({
-    date, type, category, amount,
-    payment_method: method,
-    technician_id: techId ? parseInt(techId) : null,
-    technician_name: tech?.name || null,
-    description, document_ref: docRef
-  });
-
-  if (error) { showToast('❌ ' + error.message, 'error'); return; }
-
-  showToast('✅ Транзакцията е записана!', 'success');
-  document.getElementById('txAmount').value = '';
-  document.getElementById('txDescription').value = '';
-  document.getElementById('txDocRef').value = '';
-  loadFinance();
-}
-
-async function deleteTx(id) {
-  if (!confirm('Изтриване на транзакцията?')) return;
-  const { error } = await db.from('transactions').delete().eq('id', id);
-  if (error) { showToast('❌ ' + error.message, 'error'); return; }
-  showToast('🗑 Изтрито!', 'success');
-  loadFinance();
 }
 
 // ── SERVICE ──
