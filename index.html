@@ -1217,28 +1217,29 @@ async function submitRestock() {
   }
 
   // СТЪПКА 2: Запиши редовете с header_id
-  // За всеки продукт - два реда: 60101 разход (дебит) и 30201 материали (кредит)
+  // 30201 — по един ред за всеки продукт (аналитичност на склада)
+  // 60101 — един обобщен ред с общата сума
   const rows = [];
   lines.forEach(l => {
     const amount = parseFloat((l.product.price_with_vat * l.qty).toFixed(2));
-    // Дебит 60101 — разход
+    // Кредит 30201 — намаление на материали (по продукт)
     rows.push({
       header_id: header.id, date,
       object_name: obj?.name, technician_name: tech?.name,
       product_id: l.product.id, product_name: l.product.name,
       quantity: l.qty,
       cost_value: amount, amount,
-      account_code: '60101'
+      account_code: '30201', entry_type: 'C'
     });
-    // Кредит 30201 — намаление на материали
-    rows.push({
-      header_id: header.id, date,
-      object_name: obj?.name, technician_name: tech?.name,
-      product_id: l.product.id, product_name: l.product.name + ' (склад)',
-      quantity: l.qty,
-      cost_value: amount, amount,
-      account_code: '30201'
-    });
+  });
+  // Дебит 60101 — общ разход
+  rows.push({
+    header_id: header.id, date,
+    object_name: obj?.name, technician_name: tech?.name,
+    product_name: 'Изписани суровини',
+    quantity: 1,
+    cost_value: totalCostValue, amount: totalCostValue,
+    account_code: '60101', entry_type: 'D'
   });
 
   const { error: rowsError } = await db.from('operations').insert(rows);
@@ -1516,8 +1517,8 @@ async function saveEditCf() {
 
       if (newHeader?.id) {
         await db.from('operations').insert([
-          { header_id: newHeader.id, date: cf.date, object_name: cf.object_name, technician_name: cf.technician_name, account_code: '70101', amount: cash, product_name: 'Вендинг приход', quantity: 1, cost_value: cash },
-          { header_id: newHeader.id, date: cf.date, object_name: cf.object_name, technician_name: cf.technician_name, account_code: '50101', amount: cash, product_name: 'Каса', quantity: 1, cost_value: cash }
+          { header_id: newHeader.id, date: cf.date, object_name: cf.object_name, technician_name: cf.technician_name, account_code: '50101', amount: cash, product_name: 'Каса', quantity: 1, cost_value: cash, entry_type: 'D' },
+          { header_id: newHeader.id, date: cf.date, object_name: cf.object_name, technician_name: cf.technician_name, account_code: '70101', amount: cash, product_name: 'Вендинг приход', quantity: 1, cost_value: cash, entry_type: 'C' }
         ]);
       }
     }
@@ -1640,22 +1641,24 @@ async function saveCash() {
         date: cf.date,
         object_name: cf.object_name,
         technician_name: cf.technician_name,
-        account_code: '70101',
+        account_code: '50101',
         amount: cash,
-        product_name: 'Вендинг приход',
+        product_name: 'Каса',
         quantity: 1,
-        cost_value: cash
+        cost_value: cash,
+        entry_type: 'D'
       },
       {
         header_id: header.id,
         date: cf.date,
         object_name: cf.object_name,
         technician_name: cf.technician_name,
-        account_code: '50101',
+        account_code: '70101',
         amount: cash,
-        product_name: 'Каса',
+        product_name: 'Вендинг приход',
         quantity: 1,
-        cost_value: cash
+        cost_value: cash,
+        entry_type: 'C'
       }
     ]);
   }
@@ -2256,22 +2259,27 @@ async function saveFinance() {
   // 2. Запиши редовете - всяка категория + насрещна сметка каса/банка
   const cashAccount = finMethod === 'cash' ? '50101' : '50301';
   const rows = [];
+  // Разход: категория е Дебит, каса/банка е Кредит
+  // Приход: категория е Кредит, каса/банка е Дебит
+  const categoryEntry = finType === 'expense' ? 'D' : 'C';
+  const cashEntry = finType === 'expense' ? 'C' : 'D';
   finBasket.forEach(b => {
     rows.push({
       header_id: header.id, date,
       object_name: obj?.name, technician_name: tech?.name,
       account_code: b.code,
       amount: b.amount, cost_value: b.amount, quantity: 1,
-      product_name: b.label
+      product_name: b.label,
+      entry_type: categoryEntry
     });
   });
-  // Един обобщен ред за каса/банка
   rows.push({
     header_id: header.id, date,
     object_name: obj?.name, technician_name: tech?.name,
     account_code: cashAccount,
     amount: totalAmount, cost_value: totalAmount, quantity: 1,
-    product_name: finMethod === 'cash' ? 'Каса' : 'Банка'
+    product_name: finMethod === 'cash' ? 'Каса' : 'Банка',
+    entry_type: cashEntry
   });
 
   const { error: rowsErr } = await db.from('operations').insert(rows);
@@ -2499,17 +2507,15 @@ async function saveEditFin() {
 async function loadBalanceSummary() {
   const el = document.getElementById('balanceSummary');
   const { data } = await db.from('operations')
-    .select('account_code, amount, technician_name, header_id, operation_headers!inner(payment_method, op_type)')
+    .select('account_code, amount, technician_name, entry_type, header_id, operation_headers!inner(payment_method, op_type)')
     .in('account_code', ['50101', '50301']);
   if (!data) return;
 
   const cashOps = data.filter(o => o.account_code === '50101');
   const bankOps = data.filter(o => o.account_code === '50301');
 
-  const getSign = (op) => {
-    const opType = op.operation_headers?.op_type || '';
-    return ['finance_income', 'cash_income', 'service_income'].includes(opType) ? 1 : -1;
-  };
+  // За активи (каса, банка): Дебит увеличава, Кредит намалява
+  const getSign = (op) => op.entry_type === 'D' ? 1 : -1;
 
   const totalCash = cashOps.reduce((s, o) => s + (o.amount || 0) * getSign(o), 0);
   const totalBank = bankOps.reduce((s, o) => s + (o.amount || 0) * getSign(o), 0);
