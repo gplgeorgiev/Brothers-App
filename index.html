@@ -2311,17 +2311,33 @@ async function openEditFinModal(id) {
 
   // Покажи редовете (без каса/банка)
   const mainOps = ops.filter(o => o.account_code !== '50101' && o.account_code !== '50301');
+  const finType = hdr.op_type === 'finance_income' ? 'income' : 'expense';
+  const categories = FIN_CATEGORIES[finType];
   const linesEl = document.getElementById('editFinLines');
   linesEl.innerHTML = mainOps.map(o => `
-    <div class="added-line" data-id="${o.id}">
-      <div class="al-name">${o.product_name || '—'}</div>
-      <input type="number" class="edit-fin-amount" value="${o.amount}" step="0.01" min="0"
-        style="width:90px; text-align:center; background:var(--bg2); border:1px solid var(--border); border-radius:7px; padding:6px; color:var(--text); font-family:var(--mono); font-size:13px; font-weight:700; outline:none;">
-      <span style="font-size:12px; color:var(--text3);">лв</span>
+    <div class="added-line" data-id="${o.id}" style="display:grid; grid-template-columns:1fr auto auto; gap:6px; align-items:center;">
+      <select class="edit-fin-cat" data-line="${o.id}"
+        style="background:var(--bg2); border:1px solid var(--border); border-radius:7px; padding:6px 8px; color:var(--text); font-size:12px; outline:none; appearance:none; width:100%;">
+        ${categories.map(c => `<option value="${c.code}" ${c.code === o.account_code ? 'selected' : ''}>${c.icon} ${c.label}</option>`).join('')}
+      </select>
+      <input type="number" class="edit-fin-amount" data-line="${o.id}" value="${o.amount}" step="0.01" min="0"
+        style="width:80px; text-align:center; background:var(--bg2); border:1px solid var(--border); border-radius:7px; padding:6px; color:var(--text); font-family:var(--mono); font-size:13px; font-weight:700; outline:none;">
+      <button onclick="removeEditFinLine(${o.id})" style="width:28px; height:28px; border-radius:6px; background:transparent; border:1px solid var(--border); color:var(--text3); font-size:14px; cursor:pointer; display:flex; align-items:center; justify-content:center;">✕</button>
     </div>
   `).join('');
 
   document.getElementById('editFinModal').style.display = 'flex';
+}
+
+function removeEditFinLine(opId) {
+  if (!confirm('Изтриване на този ред?')) return;
+  const el = document.querySelector(`#editFinLines .added-line[data-id="${opId}"]`);
+  if (el) {
+    el.style.opacity = '0';
+    el.style.transition = 'all 0.15s';
+    el.dataset.deleted = '1';
+    setTimeout(() => el.style.display = 'none', 150);
+  }
 }
 
 function closeEditFinModal() {
@@ -2341,14 +2357,27 @@ async function saveEditFin() {
   const contractor = document.getElementById('editFinContractor').value;
   const comment = document.getElementById('editFinComment').value;
 
-  // Обнови сумите на редовете
+  // Обработи редовете - изтриване, актуализация на категория и сума
   const lines = document.querySelectorAll('#editFinLines .added-line');
+  const finType = document.getElementById('editFinType').textContent.includes('Приход') ? 'income' : 'expense';
   let total = 0;
   for (const line of lines) {
     const opId = parseInt(line.dataset.id);
+    if (line.dataset.deleted === '1') {
+      // Изтрий реда
+      await db.from('operations').delete().eq('id', opId);
+      continue;
+    }
     const amount = parseFloat(line.querySelector('.edit-fin-amount').value) || 0;
+    const accountCode = line.querySelector('.edit-fin-cat').value;
+    const category = FIN_CATEGORIES[finType].find(c => c.code === accountCode);
     total += amount;
-    await db.from('operations').update({ amount, cost_value: amount, date, object_name: obj?.name, technician_name: tech?.name }).eq('id', opId);
+    await db.from('operations').update({
+      amount, cost_value: amount,
+      account_code: accountCode,
+      product_name: category?.label || '—',
+      date, object_name: obj?.name, technician_name: tech?.name
+    }).eq('id', opId);
   }
 
   // Обнови насрещната сметка (каса/банка)
