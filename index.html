@@ -301,6 +301,24 @@
 
   <!-- 8. ЗАПИШИ -->
   <button class="submit-btn" id="submitBtn" onclick="submitRestock()">💾 Запиши зареждането</button>
+
+  <!-- История на зарежданията -->
+  <div class="section-label" style="margin-top:20px">Последни зареждания</div>
+  <div class="card" style="margin-bottom:8px; padding:10px 14px;">
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+      <div class="field" style="margin-bottom:0;">
+        <label>ОБЕКТ</label>
+        <select id="restockFilterObject" onchange="loadRestockHistory()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; appearance:none; font-family:var(--font);">
+          <option value="">Всички</option>
+        </select>
+      </div>
+      <div class="field" style="margin-bottom:0;">
+        <label>ДАТА ОТ</label>
+        <input type="date" id="restockFilterDate" onchange="loadRestockHistory()">
+      </div>
+    </div>
+  </div>
+  <div id="restockHistory"><div class="loading"><div class="spinner"></div></div></div>
 </div>
 
 <!-- PAGE: ОТЧИТАНЕ -->
@@ -789,6 +807,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   loadDefaultTech();
   renderProductCards();
   if (document.getElementById('finCategoryScroll')) renderFinCategories();
+  loadRestockHistory();
 });
 
 // ── LOAD DATA ──
@@ -803,7 +822,7 @@ async function loadObjects() {
   });
   document.getElementById('objCount').textContent = data.length;
   // Попълни филтрите с обектите
-  ['cfFilterObject','histFilterObject'].forEach(selId => {
+  ['cfFilterObject','histFilterObject','restockFilterObject'].forEach(selId => {
     const sel = document.getElementById(selId);
     if (!sel) return;
     sel.innerHTML = '<option value="">Всички</option>';
@@ -1198,18 +1217,29 @@ async function submitRestock() {
   }
 
   // СТЪПКА 2: Запиши редовете с header_id
-  const rows = lines.map(l => ({
-    header_id: header.id,
-    date,
-    object_name: obj?.name,
-    technician_name: tech?.name,
-    product_id: l.product.id,
-    product_name: l.product.name,
-    quantity: l.qty,
-    cost_value: parseFloat((l.product.price_with_vat * l.qty).toFixed(2)),
-    amount: parseFloat((l.product.price_with_vat * l.qty).toFixed(2)),
-    account_code: '60101'
-  }));
+  // За всеки продукт - два реда: 60101 разход (дебит) и 30201 материали (кредит)
+  const rows = [];
+  lines.forEach(l => {
+    const amount = parseFloat((l.product.price_with_vat * l.qty).toFixed(2));
+    // Дебит 60101 — разход
+    rows.push({
+      header_id: header.id, date,
+      object_name: obj?.name, technician_name: tech?.name,
+      product_id: l.product.id, product_name: l.product.name,
+      quantity: l.qty,
+      cost_value: amount, amount,
+      account_code: '60101'
+    });
+    // Кредит 30201 — намаление на материали
+    rows.push({
+      header_id: header.id, date,
+      object_name: obj?.name, technician_name: tech?.name,
+      product_id: l.product.id, product_name: l.product.name + ' (склад)',
+      quantity: l.qty,
+      cost_value: amount, amount,
+      account_code: '30201'
+    });
+  });
 
   const { error: rowsError } = await db.from('operations').insert(rows);
 
@@ -1637,6 +1667,59 @@ async function saveCash() {
 
 // ── HISTORY ──
 let currentEditOpId = null;
+
+async function loadRestockHistory() {
+  const el = document.getElementById('restockHistory');
+  if (!el) return;
+  el.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  const objFilter = document.getElementById('restockFilterObject')?.value || '';
+  const dateFilter = document.getElementById('restockFilterDate')?.value || '';
+
+  let q = db.from('operation_headers')
+    .select('*, operations(id, product_name, product_id, quantity, cost_value, account_code, amount)')
+    .eq('op_type', 'restock')
+    .order('date', { ascending: false })
+    .order('created_at', { ascending: false })
+    .limit(20);
+  if (objFilter) q = q.eq('object_id', parseInt(objFilter));
+  if (dateFilter) q = q.gte('date', dateFilter);
+
+  const { data, error } = await q;
+  if (error) { el.innerHTML = `<div class="empty"><div class="empty-icon">❌</div><p>${error.message}</p></div>`; return; }
+  if (!data?.length) { el.innerHTML = '<div class="empty"><div class="empty-icon">📭</div><p>Няма записи</p></div>'; return; }
+
+  el.innerHTML = data.map(h => `
+    <div class="card" style="margin-bottom:10px;">
+      <div style="display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:8px;">
+        <div>
+          <div style="font-size:15px; font-weight:800;">${h.object_name || '—'}</div>
+          <div style="font-size:12px; color:var(--text2);">${formatDateBG(new Date(h.date))} · ${h.technician_name || '—'}</div>
+          ${h.comment ? `<div style="font-size:11px; color:var(--text3); margin-top:2px;">💬 ${h.comment}</div>` : ''}
+        </div>
+        <div style="display:flex; gap:5px;">
+          <button onclick="openEditHeaderModal(${h.id})" style="padding:5px 10px; border-radius:7px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:11px; font-weight:700; cursor:pointer;">✏️</button>
+          <button onclick="deleteHeader(${h.id})" style="padding:5px 10px; border-radius:7px; border:1px solid var(--red); background:transparent; color:var(--red); font-size:11px; font-weight:700; cursor:pointer;">🗑</button>
+        </div>
+      </div>
+      ${(h.operations || []).filter(op => op.product_id).map(op => `
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-top:1px solid var(--border);">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-size:18px;">${getProductIcon(op.product_name)}</span>
+            <span style="font-size:13px; font-weight:600;">${op.product_name}</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-size:12px; color:var(--text2);">${op.quantity} ${getProductUnit(op.product_name)}</span>
+            <span style="font-size:13px; font-weight:700; color:var(--amber);">${op.cost_value?.toFixed(2)} лв</span>
+            <button onclick="openEditLineModal(${op.id})" style="padding:3px 8px; border-radius:6px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:11px; cursor:pointer;">✏️</button>
+            <button onclick="deleteLine(${op.id})" style="padding:3px 8px; border-radius:6px; border:1px solid var(--red); background:transparent; color:var(--red); font-size:11px; cursor:pointer;">🗑</button>
+          </div>
+        </div>`).join('')}
+      <div style="display:flex; justify-content:space-between; padding-top:8px; border-top:2px solid var(--border); margin-top:4px;">
+        <span style="font-size:12px; color:var(--text2);">${h.duration_minutes ? `⏱ ${h.duration_minutes} мин` : ''} ${h.km ? `· 🚗 ${h.km} км` : ''}</span>
+        <span style="font-size:14px; font-weight:800; color:var(--accent);">${h.total_cost?.toFixed(2)} лв</span>
+      </div>
+    </div>`).join('');
+}
 
 async function loadHistory() {
   const list = document.getElementById('historyList');
