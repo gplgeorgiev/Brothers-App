@@ -1413,9 +1413,10 @@ async function recalcNextCashflow(objectId, fromDate, newPrevCounter) {
   ];
 
   console.log('recalcNextCashflow:', { objectId, fromDate, currentId, newPrevCounter });
-  console.log('nextSameDay:', nextSameDay);
-  console.log('nextByDate:', nextByDate);
-  console.log('nextEntries:', nextEntries);
+  console.log('nextSameDay:', JSON.stringify(nextSameDay));
+  console.log('nextByDate:', JSON.stringify(nextByDate));
+  console.log('nextEntries count:', nextEntries?.length);
+  console.log('nextEntries:', JSON.stringify(nextEntries?.map(e => ({id: e.id, date: e.date, counter: e.counter, prev_counter: e.prev_counter}))));
 
   if (!nextEntries?.length) return;
 
