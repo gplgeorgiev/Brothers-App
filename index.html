@@ -445,10 +445,6 @@
 <!-- PAGE: ФИНАНСИ -->
 <div class="page" id="page-finance">
 
-  <!-- Касова наличност -->
-  <div class="section-label">Касова наличност</div>
-  <div id="balanceSummary"><div class="loading"><div class="spinner"></div></div></div>
-
   <!-- 1. ОБЕКТ -->
   <div class="section-label">Обект</div>
   <div class="card">
@@ -545,6 +541,10 @@
   </div>
 
   <button onclick="saveFinance()" class="submit-btn" id="finSubmitBtn">💾 Запиши транзакцията</button>
+
+  <!-- Касова наличност -->
+  <div class="section-label" style="margin-top:20px">Касова наличност</div>
+  <div id="balanceSummary"><div class="loading"><div class="spinner"></div></div></div>
 
   <!-- История -->
   <div class="section-label" style="margin-top:20px">Последни транзакции</div>
@@ -727,9 +727,9 @@ let lineCounter = 0;
 
 // ── INIT ──
 document.addEventListener('DOMContentLoaded', async () => {
-  document.getElementById('dateInput').value = new Date().toISOString().split('T')[0];
+  document.getElementById('dateInput').value = getLocalDateString();
   const finDateEl = document.getElementById('finDateInput');
-  if (finDateEl) finDateEl.value = new Date().toISOString().split('T')[0];
+  if (finDateEl) finDateEl.value = getLocalDateString();
   document.getElementById('soDate').value = new Date().toISOString().split('T')[0];
   document.getElementById('headerDate').textContent = formatDateBG(new Date());
   await Promise.all([loadObjects(), loadProducts(), loadTechnicians()]);
@@ -1186,9 +1186,9 @@ async function submitRestock() {
   renderBasket();
   renderProductCards();
   document.getElementById('qtyPopup').classList.remove('visible');
-  document.getElementById('dateInput').value = new Date().toISOString().split('T')[0];
+  document.getElementById('dateInput').value = getLocalDateString();
   const finDateEl = document.getElementById('finDateInput');
-  if (finDateEl) finDateEl.value = new Date().toISOString().split('T')[0];
+  if (finDateEl) finDateEl.value = getLocalDateString();
   document.getElementById('soDate').value = new Date().toISOString().split('T')[0];
   document.getElementById('page-restock').scrollTop = 0;
   window.scrollTo(0, 0);
@@ -2158,7 +2158,7 @@ async function saveFinance() {
   document.getElementById('finContractor').value = '';
   document.getElementById('finComment').value = '';
   const finDateEl = document.getElementById('finDateInput');
-  if (finDateEl) finDateEl.value = new Date().toISOString().split('T')[0];
+  if (finDateEl) finDateEl.value = getLocalDateString();
   loadBalanceSummary();
   loadTxHistory();
   window.scrollTo(0, 0);
@@ -2390,6 +2390,14 @@ function showToast(msg, type='success') {
   t.textContent = msg; t.className = `toast ${type} show`;
   setTimeout(()=>t.classList.remove('show'), 3000);
 }
+function getLocalDateString() {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 function formatDateBG(d) { return d.toLocaleDateString('bg-BG',{weekday:'long',day:'numeric',month:'long'}); }
 function getWeekNumber(d) { const j=new Date(d.getFullYear(),0,1); return Math.ceil((((d-j)/86400000)+j.getDay()+1)/7); }
 function getWeekStart() { const n=new Date(); const day=n.getDay()||7; const m=new Date(n); m.setDate(n.getDate()-day+1); return m.toISOString().split('T')[0]; }
