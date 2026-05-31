@@ -1318,9 +1318,10 @@ async function saveEditCf() {
   const { error } = await db.from('cashflow').update(update).eq('id', currentEditCfId);
   if (error) { showToast('❌ ' + error.message, 'error'); return; }
 
-  // Каскадно обнови следващите записи само ако брояча е променен
+  // Каскадно обнови следващите записи ако има брояч
   const newCounter = counter || cf.counter;
-  if (counter && counter !== cf.counter && newCounter) {
+  console.log('Cascade check - counter:', counter, 'cf.counter:', cf.counter, 'newCounter:', newCounter);
+  if (newCounter) {
     await recalcNextCashflow(cf.object_id, cf.date, newCounter);
   }
 
