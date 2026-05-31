@@ -678,6 +678,59 @@
   </div>
 </div>
 
+<!-- EDIT FINANCE MODAL -->
+<div id="editFinModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:200; align-items:flex-end; justify-content:center;">
+  <div style="background:var(--bg2); border-radius:20px 20px 0 0; padding:20px; width:100%; max-width:480px; max-height:90vh; overflow-y:auto;">
+    <div style="font-size:16px; font-weight:800; margin-bottom:4px;">✏️ Редакция</div>
+    <div style="font-size:13px; color:var(--text2); margin-bottom:16px;" id="editFinType">📤 Разход</div>
+
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+      <div class="field" style="margin-bottom:10px;">
+        <label>ОБЕКТ</label>
+        <select id="editFinObject" style="background:var(--bg3); border:1px solid var(--border); border-radius:10px; padding:10px 12px; color:var(--text); font-size:14px; width:100%; outline:none; appearance:none; font-family:var(--font);"></select>
+      </div>
+      <div class="field" style="margin-bottom:10px;">
+        <label>ТЕХНИК</label>
+        <select id="editFinTech" style="background:var(--bg3); border:1px solid var(--border); border-radius:10px; padding:10px 12px; color:var(--text); font-size:14px; width:100%; outline:none; appearance:none; font-family:var(--font);"></select>
+      </div>
+    </div>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+      <div class="field" style="margin-bottom:10px;">
+        <label>ДАТА</label>
+        <input type="date" id="editFinDate">
+      </div>
+      <div class="field" style="margin-bottom:10px;">
+        <label>МЕТОД</label>
+        <select id="editFinMethod" style="background:var(--bg3); border:1px solid var(--border); border-radius:10px; padding:10px 12px; color:var(--text); font-size:14px; width:100%; outline:none; appearance:none; font-family:var(--font);">
+          <option value="cash">💵 Брой</option>
+          <option value="bank">🏦 Банка</option>
+        </select>
+      </div>
+    </div>
+
+    <div style="font-size:11px; font-weight:700; letter-spacing:1px; color:var(--text3); text-transform:uppercase; margin-bottom:8px;">Редове</div>
+    <div id="editFinLines" style="display:flex; flex-direction:column; gap:6px; margin-bottom:14px;"></div>
+
+    <div class="field" style="margin-bottom:10px;">
+      <label>ДОКУМЕНТ</label>
+      <input type="text" id="editFinDocRef">
+    </div>
+    <div class="field" style="margin-bottom:10px;">
+      <label>КОНТРАГЕНТ</label>
+      <input type="text" id="editFinContractor">
+    </div>
+    <div class="field" style="margin-bottom:14px;">
+      <label>БЕЛЕЖКА</label>
+      <input type="text" id="editFinComment">
+    </div>
+
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+      <button onclick="closeEditFinModal()" style="padding:14px; border-radius:12px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:15px; font-weight:700; cursor:pointer; font-family:var(--font);">Отказ</button>
+      <button onclick="saveEditFin()" style="padding:14px; border-radius:12px; border:none; background:var(--accent); color:#fff; font-size:15px; font-weight:700; cursor:pointer; font-family:var(--font);">✓ Запази</button>
+    </div>
+  </div>
+</div>
+
 <!-- PAGE: СТАТИСТИКА -->
 <div class="page" id="page-stats">
   <div class="section-label">Тази седмица</div>
@@ -2162,6 +2215,175 @@ async function saveFinance() {
   loadBalanceSummary();
   loadTxHistory();
   window.scrollTo(0, 0);
+}
+
+async function loadTxHistory() {
+  const el = document.getElementById('txHistory');
+  if (!el) return;
+  el.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  const typeFilter = document.getElementById('txFilterType')?.value || '';
+  const dateFilter = document.getElementById('txFilterDate')?.value || '';
+
+  let q = db.from('operation_headers')
+    .select('*, operations(account_code, amount, product_name)')
+    .in('op_type', ['finance_income', 'finance_expense'])
+    .order('date', { ascending: false })
+    .order('created_at', { ascending: false })
+    .limit(40);
+  if (typeFilter === 'income') q = q.eq('op_type', 'finance_income');
+  if (typeFilter === 'expense') q = q.eq('op_type', 'finance_expense');
+  if (dateFilter) q = q.gte('date', dateFilter);
+
+  const { data, error } = await q;
+  if (error) { el.innerHTML = `<div class="empty"><div class="empty-icon">❌</div><p>${error.message}</p></div>`; return; }
+  if (!data?.length) { el.innerHTML = '<div class="empty"><div class="empty-icon">📭</div><p>Няма транзакции</p></div>'; return; }
+
+  el.innerHTML = data.map(h => {
+    const isIncome = h.op_type === 'finance_income';
+    // Намери основната категория (не каса/банка)
+    const mainOps = (h.operations || []).filter(o => o.account_code !== '50101' && o.account_code !== '50301');
+    const labels = mainOps.map(o => o.product_name).join(', ');
+    return `
+    <div class="card" style="margin-bottom:8px; padding:12px 14px;">
+      <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:8px;">
+        <div style="flex:1; min-width:0;">
+          <div style="font-size:14px; font-weight:700; display:flex; align-items:center; gap:6px;">
+            <span style="font-size:18px;">${isIncome ? '📥' : '📤'}</span>
+            <span>${labels || h.comment || '—'}</span>
+          </div>
+          <div style="font-size:12px; color:var(--text2); margin-top:3px;">
+            ${formatDateBG(new Date(h.date))} · ${h.technician_name || '—'} · ${h.payment_method === 'cash' ? '💵 Брой' : '🏦 Банка'}
+          </div>
+          ${h.object_name ? `<div style="font-size:11px; color:var(--text3); margin-top:2px;">📍 ${h.object_name}</div>` : ''}
+          ${h.contractor ? `<div style="font-size:11px; color:var(--text3);">👤 ${h.contractor}</div>` : ''}
+          ${h.document_ref ? `<div style="font-size:11px; color:var(--text3);">📄 ${h.document_ref}</div>` : ''}
+          ${h.comment && labels ? `<div style="font-size:11px; color:var(--text3);">💬 ${h.comment}</div>` : ''}
+        </div>
+        <div style="display:flex; flex-direction:column; align-items:flex-end; gap:6px; flex-shrink:0;">
+          <div style="font-size:15px; font-weight:800; font-family:var(--mono); color:${isIncome ? 'var(--green)' : 'var(--red)'};">
+            ${isIncome ? '+' : '-'}${h.total_cost?.toFixed(2)} лв
+          </div>
+          <div style="display:flex; gap:4px;">
+            <button onclick="openEditFinModal(${h.id})" style="padding:4px 10px; border-radius:6px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:11px; cursor:pointer;">✏️</button>
+            <button onclick="deleteFinanceHeader(${h.id})" style="padding:4px 10px; border-radius:6px; border:1px solid var(--red); background:transparent; color:var(--red); font-size:11px; cursor:pointer;">🗑</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function deleteFinanceHeader(id) {
+  if (!confirm('Изтриване на транзакцията?')) return;
+  await db.from('operations').delete().eq('header_id', id);
+  const { error } = await db.from('operation_headers').delete().eq('id', id);
+  if (error) { showToast('❌ ' + error.message, 'error'); return; }
+  showToast('🗑 Изтрито!', 'success');
+  loadFinance();
+}
+
+// Edit Finance modal
+let currentEditFinId = null;
+async function openEditFinModal(id) {
+  const { data: hdr } = await db.from('operation_headers').select('*').eq('id', id).single();
+  if (!hdr) { showToast('❌ Не намерих запис', 'error'); return; }
+
+  const { data: ops } = await db.from('operations').select('*').eq('header_id', id);
+
+  currentEditFinId = id;
+
+  // Попълни обекти
+  const objSel = document.getElementById('editFinObject');
+  objSel.innerHTML = objects.map(o => `<option value="${o.id}" ${o.id == hdr.object_id ? 'selected' : ''}>${o.name}</option>`).join('');
+
+  // Попълни техници
+  const techSel = document.getElementById('editFinTech');
+  techSel.innerHTML = technicians.map(t => `<option value="${t.id}" ${t.id == hdr.technician_id ? 'selected' : ''}>${t.name}</option>`).join('');
+
+  document.getElementById('editFinDate').value = hdr.date || '';
+  document.getElementById('editFinDocRef').value = hdr.document_ref || '';
+  document.getElementById('editFinContractor').value = hdr.contractor || '';
+  document.getElementById('editFinComment').value = hdr.comment || '';
+
+  // Метод
+  document.getElementById('editFinMethod').value = hdr.payment_method || 'cash';
+  document.getElementById('editFinType').textContent = hdr.op_type === 'finance_income' ? '📥 Приход' : '📤 Разход';
+
+  // Покажи редовете (без каса/банка)
+  const mainOps = ops.filter(o => o.account_code !== '50101' && o.account_code !== '50301');
+  const linesEl = document.getElementById('editFinLines');
+  linesEl.innerHTML = mainOps.map(o => `
+    <div class="added-line" data-id="${o.id}">
+      <div class="al-name">${o.product_name || '—'}</div>
+      <input type="number" class="edit-fin-amount" value="${o.amount}" step="0.01" min="0"
+        style="width:90px; text-align:center; background:var(--bg2); border:1px solid var(--border); border-radius:7px; padding:6px; color:var(--text); font-family:var(--mono); font-size:13px; font-weight:700; outline:none;">
+      <span style="font-size:12px; color:var(--text3);">лв</span>
+    </div>
+  `).join('');
+
+  document.getElementById('editFinModal').style.display = 'flex';
+}
+
+function closeEditFinModal() {
+  document.getElementById('editFinModal').style.display = 'none';
+  currentEditFinId = null;
+}
+
+async function saveEditFin() {
+  if (!currentEditFinId) return;
+  const objId = parseInt(document.getElementById('editFinObject').value);
+  const techId = parseInt(document.getElementById('editFinTech').value);
+  const obj = objects.find(o => o.id == objId);
+  const tech = technicians.find(t => t.id == techId);
+  const date = document.getElementById('editFinDate').value;
+  const method = document.getElementById('editFinMethod').value;
+  const docRef = document.getElementById('editFinDocRef').value;
+  const contractor = document.getElementById('editFinContractor').value;
+  const comment = document.getElementById('editFinComment').value;
+
+  // Обнови сумите на редовете
+  const lines = document.querySelectorAll('#editFinLines .added-line');
+  let total = 0;
+  for (const line of lines) {
+    const opId = parseInt(line.dataset.id);
+    const amount = parseFloat(line.querySelector('.edit-fin-amount').value) || 0;
+    total += amount;
+    await db.from('operations').update({ amount, cost_value: amount, date, object_name: obj?.name, technician_name: tech?.name }).eq('id', opId);
+  }
+
+  // Обнови насрещната сметка (каса/банка)
+  const cashAccount = method === 'cash' ? '50101' : '50301';
+  // Намери стария ред за каса/банка
+  const { data: cashOps } = await db.from('operations')
+    .select('id, account_code')
+    .eq('header_id', currentEditFinId)
+    .in('account_code', ['50101', '50301']);
+
+  if (cashOps?.length) {
+    // Обнови съществуващия ред
+    await db.from('operations').update({
+      amount: total, cost_value: total,
+      account_code: cashAccount,
+      product_name: method === 'cash' ? 'Каса' : 'Банка',
+      date, object_name: obj?.name, technician_name: tech?.name
+    }).eq('id', cashOps[0].id);
+  }
+
+  // Обнови хедъра
+  await db.from('operation_headers').update({
+    date,
+    object_id: objId, object_name: obj?.name,
+    technician_id: techId, technician_name: tech?.name,
+    payment_method: method,
+    total_cost: total,
+    document_ref: docRef,
+    contractor,
+    comment
+  }).eq('id', currentEditFinId);
+
+  closeEditFinModal();
+  showToast('✅ Записът е обновен!', 'success');
+  loadFinance();
 }
 
 async function loadBalanceSummary() {
