@@ -536,7 +536,19 @@
   <div class="card">
     <div class="field" style="margin-bottom:0">
       <label>ФАКТУРА / ДОКУМЕНТ</label>
-      <input type="text" id="finDocRef" placeholder="напр. Фактура №123">
+      <div style="display:flex; gap:8px;">
+        <input type="text" id="finDocRef" placeholder="напр. Фактура №123" style="flex:1">
+        <button class="ocr-btn" onclick="document.getElementById('invoiceCameraInput').click()" title="Снимай фактура">📷</button>
+        <button class="ocr-btn" onclick="document.getElementById('invoiceGalleryInput').click()" title="От галерия">🖼️</button>
+      </div>
+    </div>
+    <input type="file" id="invoiceCameraInput" accept="image/*" capture="environment" style="display:none" onchange="processInvoiceOCR(this)">
+    <input type="file" id="invoiceGalleryInput" accept="image/*" style="display:none" onchange="processInvoiceOCR(this)">
+    <div id="invoiceOcrPreview" style="display:none; margin-top:12px;">
+      <div style="border-radius:10px; overflow:hidden; margin-bottom:8px; max-height:180px; display:flex; align-items:center; justify-content:center; background:var(--bg3);">
+        <img id="invoiceOcrImg" style="max-width:100%; max-height:180px; object-fit:contain;">
+      </div>
+      <div id="invoiceOcrStatus" class="ocr-status"></div>
     </div>
   </div>
 
@@ -2703,6 +2715,92 @@ async function saveNewCustomer() {
   document.getElementById('soCustomer').value = data.id;
   // Изчисти полетата
   ['ncName','ncPhone','ncEmail','ncAddress'].forEach(id => document.getElementById(id).value = '');
+}
+
+async function processInvoiceOCR(input) {
+  const file = input.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    const originalBase64 = e.target.result;
+    const preview = document.getElementById('invoiceOcrPreview');
+    const img = document.getElementById('invoiceOcrImg');
+    const status = document.getElementById('invoiceOcrStatus');
+
+    img.src = originalBase64;
+    preview.style.display = 'block';
+    status.className = 'ocr-status loading';
+    status.textContent = '⏳ Обработвам фактурата...';
+
+    try {
+      const canvas = await resizeImage(originalBase64, 1600);
+      const base64Data = canvas.toDataURL('image/jpeg', 0.85).split(',')[1];
+      status.textContent = '⏳ Разпознавам текста...';
+
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/ocr-invoice`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${SUPABASE_KEY}`
+        },
+        body: JSON.stringify({ image_base64: base64Data })
+      });
+
+      const data = await response.json();
+      console.log('Invoice OCR:', data);
+
+      if (data.error) {
+        status.className = 'ocr-status error';
+        status.textContent = '❌ ' + data.error;
+        return;
+      }
+
+      const p = data.parsed || {};
+      let filled = [];
+
+      // Попълни полетата
+      if (p.document_ref) {
+        document.getElementById('finDocRef').value = p.document_ref;
+        filled.push('документ');
+      }
+      if (p.contractor) {
+        document.getElementById('finContractor').value = p.contractor;
+        filled.push('контрагент');
+      }
+      if (p.date) {
+        document.getElementById('finDateInput').value = p.date;
+        filled.push('дата');
+      }
+      if (p.amount) {
+        // Добави като нов ред в кошницата с първата категория за разход
+        const firstCat = FIN_CATEGORIES.expense[0];
+        finBasket.push({
+          code: firstCat.code,
+          icon: firstCat.icon,
+          label: firstCat.label,
+          amount: p.amount
+        });
+        renderFinBasket();
+        updateFinSummary();
+        filled.push('сума');
+      }
+
+      if (filled.length) {
+        status.className = 'ocr-status success';
+        status.textContent = `✅ Попълнени: ${filled.join(', ')} — провери и коригирай`;
+      } else {
+        status.className = 'ocr-status error';
+        status.textContent = '⚠️ Не успях да разпозная полетата — въведи ръчно';
+      }
+    } catch (err) {
+      status.className = 'ocr-status error';
+      status.textContent = '❌ Грешка: ' + err.message;
+    }
+
+    input.value = '';
+  };
+  reader.readAsDataURL(file);
 }
 
 function showConfirm(message) {
