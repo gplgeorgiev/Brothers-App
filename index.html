@@ -1322,7 +1322,7 @@ async function saveEditCf() {
   const newCounter = counter || cf.counter;
   console.log('Cascade check - counter:', counter, 'cf.counter:', cf.counter, 'newCounter:', newCounter);
   if (newCounter) {
-    await recalcNextCashflow(cf.object_id, cf.date, newCounter);
+    await recalcNextCashflow(cf.object_id, cf.date, newCounter, currentEditCfId);
   }
 
   // Обнови operations ако има cash (записи 701 и 501)
@@ -1374,20 +1374,13 @@ async function saveEditCf() {
   loadCashflow();
 }
 
-async function recalcNextCashflow(objectId, fromDate, newPrevCounter) {
+async function recalcNextCashflow(objectId, fromDate, newPrevCounter, fromId) {
   const obj = objects.find(o => o.id === objectId);
 
   // Вземи само записите СЛЕД текущия (по-голям id в същия ден или следващи дни)
-  // Намери id-то на текущия запис
-  const { data: currentEntry } = await db.from('cashflow')
-    .select('id')
-    .eq('object_id', objectId)
-    .eq('date', fromDate)
-    .not('counter', 'is', null)
-    .order('id', { ascending: false })
-    .limit(1);
-
-  const currentId = currentEntry?.[0]?.id ?? 0;
+  // Ползваме директно подадения id
+  const currentId = fromId || 0;
+  console.log('currentId used:', currentId);
 
   // Вземи записите след текущия: следващи дни ИЛИ същия ден с по-голям id
   const { data: nextByDate } = await db.from('cashflow')
@@ -1437,6 +1430,8 @@ async function recalcNextCashflow(objectId, fromDate, newPrevCounter) {
       ? parseFloat(((obj.target_weekly / 7) * daysSinceLast).toFixed(2))
       : null;
 
+    if (!entry.id) { console.warn('Skipping entry with null id'); continue; }
+    console.log('Updating cashflow id:', entry.id, 'prev_counter:', prevCounter, 'drinks_sold:', drinksSold);
     await db.from('cashflow').update({
       prev_counter: prevCounter,
       prev_date: prevDate,
