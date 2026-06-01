@@ -1888,15 +1888,13 @@ function addEditLine_unused() {
 
 async function deleteHeader(id) {
   if (!confirm('Изтриване на цялото зареждане и всички продукти?')) return;
-  // Изтрий свързания cashflow
   await db.from('cashflow').delete().eq('operation_id', id);
-  // Изтрий редовете
   await db.from('operations').delete().eq('header_id', id);
-  // Изтрий хедъра
   const { error } = await db.from('operation_headers').delete().eq('id', id);
   if (error) { showToast('❌ ' + error.message, 'error'); return; }
   showToast('🗑 Изтрито!', 'success');
-  loadHistory();
+  await loadRestockHistory();
+  await loadHistory();
 }
 
 async function openEditOpModal(id) {
@@ -1927,6 +1925,7 @@ async function saveEditOp() {
   if (error) { showToast('❌ ' + error.message, 'error'); return; }
   closeEditOpModal();
   showToast('✅ Хедърът е обновен!', 'success');
+  await loadRestockHistory();
   loadHistory();
 }
 
@@ -1978,25 +1977,23 @@ async function saveEditLine() {
 
   closeEditLineModal();
   showToast('✅ Редът е обновен!', 'success');
+  await loadRestockHistory();
   loadHistory();
 }
 
 async function deleteLine(id) {
   if (!confirm('Изтриване на реда?')) return;
-  // Вземи header_id преди изтриване
   const { data: op } = await db.from('operations').select('header_id').eq('id', id).single();
   const { error } = await db.from('operations').delete().eq('id', id);
   if (error) { showToast('❌ ' + error.message, 'error'); return; }
-
-  // Обнови total_cost
   if (op?.header_id) {
     const { data: allLines } = await db.from('operations').select('cost_value').eq('header_id', op.header_id);
     const newTotal = (allLines || []).reduce((s, r) => s + (r.cost_value || 0), 0);
     await db.from('operation_headers').update({ total_cost: parseFloat(newTotal.toFixed(2)) }).eq('id', op.header_id);
   }
-
   showToast('🗑 Редът е изтрит!', 'success');
-  loadHistory();
+  await loadRestockHistory();
+  await loadHistory();
 }
 
 async function deleteOp(id) {
