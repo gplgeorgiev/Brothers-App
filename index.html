@@ -61,6 +61,16 @@
   .gps-btn:active { border-color:var(--accent); color:var(--accent); }
   .gps-status { font-size:11px; color:var(--text3); margin-top:5px; font-family:var(--mono); }
 
+  /* COLLAPSIBLE SECTIONS */
+  .coll-header { display:flex; align-items:center; justify-content:space-between; padding:14px 16px; background:var(--bg2); border:1px solid var(--border); border-radius:10px; cursor:pointer; user-select:none; }
+  .coll-header:hover { background:var(--bg3); }
+  .coll-title { font-size:13px; font-weight:700; color:var(--text); display:flex; align-items:center; gap:8px; }
+  .coll-summary { font-size:12px; color:var(--text2); font-weight:500; }
+  .coll-arrow { font-size:14px; color:var(--text3); transition:transform 0.2s; }
+  .coll-section.expanded .coll-arrow { transform:rotate(90deg); }
+  .coll-body { display:none; margin-top:8px; }
+  .coll-section.expanded .coll-body { display:block; }
+
   /* TYPE BUTTONS */
   .type-btn { padding:14px; border-radius:10px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:14px; font-weight:700; cursor:pointer; transition:all 0.15s; font-family:var(--font); }
   .type-btn.active { background:var(--accent); border-color:var(--accent); color:#fff; }
@@ -262,34 +272,72 @@
   </div>
 
   <!-- 4. ТЕХНИК -->
-  <div class="section-label">Техник</div>
-  <div class="card">
-    <div class="field" style="margin-bottom:0">
-      <label>КОЙ ЗАРЕЖДА</label>
-      <select id="techSelect"><option value="">— избери техник —</option></select>
+  <div class="coll-section" id="collTech" style="margin-bottom:14px;">
+    <div class="coll-header" onclick="toggleCollapsible('collTech')">
+      <div class="coll-title">👤 Техник</div>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <span class="coll-summary" id="collTechSummary">—</span>
+        <span class="coll-arrow">▶</span>
+      </div>
+    </div>
+    <div class="coll-body">
+      <div class="card" style="margin-top:8px;">
+        <div class="field" style="margin-bottom:0">
+          <label>КОЙ ЗАРЕЖДА</label>
+          <select id="techSelect" onchange="updateCollSummary('collTechSummary', this.options[this.selectedIndex]?.text)"><option value="">— избери техник —</option></select>
+        </div>
+      </div>
     </div>
   </div>
 
   <!-- 5. ДАТА -->
-  <div class="section-label">Дата</div>
-  <div class="card">
-    <div class="field" style="margin-bottom:0">
-      <label>ДАТА</label>
-      <input type="date" id="dateInput">
+  <div class="coll-section" id="collDate" style="margin-bottom:14px;">
+    <div class="coll-header" onclick="toggleCollapsible('collDate')">
+      <div class="coll-title">📅 Дата</div>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <span class="coll-summary" id="collDateSummary">днес</span>
+        <span class="coll-arrow">▶</span>
+      </div>
+    </div>
+    <div class="coll-body">
+      <div class="card" style="margin-top:8px;">
+        <div class="field" style="margin-bottom:0">
+          <label>ДАТА</label>
+          <input type="date" id="dateInput" onchange="updateCollSummary('collDateSummary', this.value)">
+        </div>
+      </div>
     </div>
   </div>
 
   <!-- 6. БЕЛЕЖКА -->
-  <div class="section-label">Бележка</div>
-  <div class="card">
-    <div class="field" style="margin-bottom:0">
-      <label>КОМЕНТАР (незадължително)</label>
-      <textarea id="commentInput" rows="2" style="resize:none; background:var(--bg3); border:1px solid var(--border); border-radius:10px; padding:12px 14px; color:var(--text); font-family:var(--font); font-size:14px; width:100%; outline:none;" placeholder="напр. почистена филтър лента..."></textarea>
+  <div class="coll-section" id="collNote" style="margin-bottom:14px;">
+    <div class="coll-header" onclick="toggleCollapsible('collNote')">
+      <div class="coll-title">💬 Бележка</div>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <span class="coll-summary" id="collNoteSummary">—</span>
+        <span class="coll-arrow">▶</span>
+      </div>
+    </div>
+    <div class="coll-body">
+      <div class="card" style="margin-top:8px;">
+        <div class="field" style="margin-bottom:0">
+          <label>КОМЕНТАР (незадължително)</label>
+          <textarea id="commentInput" rows="2" oninput="updateCollSummary('collNoteSummary', this.value ? '✓' : '—')" style="resize:none; background:var(--bg3); border:1px solid var(--border); border-radius:10px; padding:12px 14px; color:var(--text); font-family:var(--font); font-size:14px; width:100%; outline:none;" placeholder="напр. почистена филтър лента..."></textarea>
+        </div>
+      </div>
     </div>
   </div>
 
   <!-- 7. ПРЕСТОЙ -->
-  <div class="section-label">Престой</div>
+  <div class="coll-section" id="collTimer" style="margin-bottom:14px;">
+    <div class="coll-header" onclick="toggleCollapsible('collTimer')">
+      <div class="coll-title">⏱ Престой</div>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <span class="coll-summary" id="collTimerSummary">00:00</span>
+        <span class="coll-arrow">▶</span>
+      </div>
+    </div>
+    <div class="coll-body">
   <div class="card">
     <div class="timer-row">
       <div class="timer-display" id="timerDisplay">00:00:00</div>
@@ -297,6 +345,8 @@
       <button class="timer-btn stop" id="timerStopBtn" onclick="timerStop()" style="display:none">⏹ Стоп</button>
       <button class="timer-btn reset" onclick="timerReset()">↺</button>
     </div>
+  </div>
+  </div>
   </div>
 
   <!-- 8. ЗАПИШИ -->
@@ -2830,6 +2880,22 @@ function showToast(msg, type='success') {
   t.textContent = msg; t.className = `toast ${type} show`;
   setTimeout(()=>t.classList.remove('show'), 3000);
 }
+function toggleCollapsible(id) {
+  const el = document.getElementById(id);
+  if (el) el.classList.toggle('expanded');
+}
+
+function updateCollSummary(id, text) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (id === 'collDateSummary' && text) {
+    const d = new Date(text);
+    el.textContent = isNaN(d) ? text : d.toLocaleDateString('bg-BG', {day:'numeric', month:'short'});
+  } else {
+    el.textContent = text || '—';
+  }
+}
+
 function getLocalDateString() {
   const d = new Date();
   const year = d.getFullYear();
