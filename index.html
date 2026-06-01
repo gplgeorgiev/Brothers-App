@@ -1286,6 +1286,8 @@ async function submitRestock() {
   document.getElementById('soDate').value = new Date().toISOString().split('T')[0];
   document.getElementById('page-restock').scrollTop = 0;
   window.scrollTo(0, 0);
+  console.log('Calling loadRestockHistory after submit');
+  await loadRestockHistory();
 }
 
 // ── CASHFLOW ──
