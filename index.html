@@ -2877,22 +2877,22 @@ function showToast(msg, type='success') {
   setTimeout(()=>t.classList.remove('show'), 3000);
 }
 function toggleSideMenu() {
-  console.log('toggleSideMenu called');
   const menu = document.getElementById('sideMenu');
   const overlay = document.getElementById('sideMenuOverlay');
-  console.log('menu:', menu, 'overlay:', overlay);
   if (!menu || !overlay) return;
   if (menu.classList.contains('open')) {
     closeSideMenu();
   } else {
     menu.classList.add('open');
+    menu.style.transform = 'translateX(0)';
     overlay.style.display = 'block';
-    console.log('Menu opened, classes:', menu.className);
   }
 }
 
 function closeSideMenu() {
-  document.getElementById('sideMenu').classList.remove('open');
+  const menu = document.getElementById('sideMenu');
+  menu.classList.remove('open');
+  menu.style.transform = 'translateX(-100%)';
   document.getElementById('sideMenuOverlay').style.display = 'none';
 }
 
