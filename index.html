@@ -1684,8 +1684,9 @@ async function saveCash() {
 let currentEditOpId = null;
 
 async function loadRestockHistory() {
+  console.log('loadRestockHistory START');
   const el = document.getElementById('restockHistory');
-  if (!el) return;
+  if (!el) { console.log('No restockHistory element'); return; }
   el.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
   const objFilter = document.getElementById('restockFilterObject')?.value || '';
   const dateFilter = document.getElementById('restockFilterDate')?.value || '';
@@ -1701,6 +1702,7 @@ async function loadRestockHistory() {
 
   const { data, error } = await q;
   if (error) { el.innerHTML = `<div class="empty"><div class="empty-icon">❌</div><p>${error.message}</p></div>`; return; }
+  console.log('loadRestockHistory got', data?.length, 'records');
   if (!data?.length) { el.innerHTML = '<div class="empty"><div class="empty-icon">📭</div><p>Няма записи</p></div>'; return; }
 
   el.innerHTML = data.map(h => `
