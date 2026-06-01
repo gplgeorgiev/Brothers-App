@@ -1732,9 +1732,10 @@ async function saveCash() {
 let currentEditOpId = null;
 
 async function loadRestockHistory() {
-  console.log('loadRestockHistory START');
+  console.log('loadRestockHistory START at', new Date().toLocaleTimeString());
   const el = document.getElementById('restockHistory');
-  if (!el) { console.log('No restockHistory element'); return; }
+  if (!el) { console.warn('No restockHistory element in DOM'); return; }
+  console.log('Element exists, fetching data...');
   el.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
   const objFilter = document.getElementById('restockFilterObject')?.value || '';
   const dateFilter = document.getElementById('restockFilterDate')?.value || '';
