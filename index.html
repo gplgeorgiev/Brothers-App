@@ -1110,8 +1110,10 @@ function timerStart() {
 }
 function timerStop() {
   timerRunning = false; clearInterval(timerInterval);
-  document.getElementById('timerStartBtn').style.display = 'inline-flex';
-  document.getElementById('timerStopBtn').style.display = 'none';
+  const sb = document.getElementById('timerStartBtn');
+  const eb = document.getElementById('timerStopBtn');
+  if (sb) sb.style.display = 'inline-flex';
+  if (eb) eb.style.display = 'none';
 }
 function timerReset() { timerStop(); timerSeconds = 0; updateTimerDisplay(); }
 function updateTimerDisplay() {
