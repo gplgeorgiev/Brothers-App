@@ -71,6 +71,15 @@
   .coll-body { display:none; margin-top:8px; }
   .coll-section.expanded .coll-body { display:block; }
 
+  /* SIDE MENU */
+  .menu-btn { transition:transform 0.15s; }
+  .menu-btn:active { transform:scale(0.92); }
+  .menu-item { display:block; width:100%; text-align:left; padding:14px 24px; background:transparent; border:none; color:var(--text); font-size:15px; font-weight:600; cursor:pointer; font-family:var(--font); transition:background 0.15s; }
+  .menu-item:hover { background:var(--bg3); }
+  .menu-item.active { background:var(--bg3); color:var(--accent); border-left:3px solid var(--accent); padding-left:21px; }
+  #sideMenu.open { transform:translateX(0); }
+  body { padding-bottom:90px !important; }
+
   /* TYPE BUTTONS */
   .type-btn { padding:14px; border-radius:10px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:14px; font-weight:700; cursor:pointer; transition:all 0.15s; font-family:var(--font); }
   .type-btn.active { background:var(--accent); border-color:var(--accent); color:#fff; }
@@ -201,15 +210,7 @@
   <div class="header-avatar" id="avatarBtn">?</div>
 </div>
 
-<div class="tabs">
-  <div class="tab active" onclick="switchTab('restock')">⬆ Зареждане</div>
-  <div class="tab" onclick="switchTab('cashflow')">💰 Отчитане</div>
-  <div class="tab" onclick="switchTab('history')">📋 История</div>
-  <div class="tab" onclick="switchTab('finance')">💳 Финанси</div>
-  <div class="tab" onclick="switchTab('service')">🔧 Сервиз</div>
-  <div class="tab" onclick="switchTab('stats')">📊 Статистика</div>
-  <div class="tab" onclick="switchTab('settings')">⚙️ Настройки</div>
-</div>
+
 
 <!-- PAGE: ЗАРЕЖДАНЕ -->
 <div class="page active" id="page-restock">
@@ -271,82 +272,56 @@
     <input type="file" id="galleryInput" accept="image/*" style="display:none" onchange="processOCR(this)">
   </div>
 
-  <!-- 4. ТЕХНИК -->
-  <div class="coll-section" id="collTech" style="margin-bottom:14px;">
-    <div class="coll-header" onclick="toggleCollapsible('collTech')">
-      <div class="coll-title">👤 Техник</div>
+  <!-- 4-7. ДОПЪЛНИТЕЛНИ -->
+  <div class="coll-section" id="collExtra" style="margin-bottom:14px;">
+    <div class="coll-header" onclick="toggleCollapsible('collExtra')">
+      <div class="coll-title">⚙️ Допълнителни</div>
       <div style="display:flex; align-items:center; gap:8px;">
-        <span class="coll-summary" id="collTechSummary">—</span>
+        <span class="coll-summary" id="collExtraSummary">—</span>
         <span class="coll-arrow">▶</span>
       </div>
     </div>
     <div class="coll-body">
-      <div class="card" style="margin-top:8px;">
+
+      <!-- Техник -->
+      <div class="section-label" style="margin-top:8px">Техник</div>
+      <div class="card">
         <div class="field" style="margin-bottom:0">
           <label>КОЙ ЗАРЕЖДА</label>
-          <select id="techSelect" onchange="updateCollSummary('collTechSummary', this.options[this.selectedIndex]?.text)"><option value="">— избери техник —</option></select>
+          <select id="techSelect" onchange="updateExtraSummary()"><option value="">— избери техник —</option></select>
         </div>
       </div>
-    </div>
-  </div>
 
-  <!-- 5. ДАТА -->
-  <div class="coll-section" id="collDate" style="margin-bottom:14px;">
-    <div class="coll-header" onclick="toggleCollapsible('collDate')">
-      <div class="coll-title">📅 Дата</div>
-      <div style="display:flex; align-items:center; gap:8px;">
-        <span class="coll-summary" id="collDateSummary">днес</span>
-        <span class="coll-arrow">▶</span>
-      </div>
-    </div>
-    <div class="coll-body">
-      <div class="card" style="margin-top:8px;">
+      <!-- Дата -->
+      <div class="section-label">Дата</div>
+      <div class="card">
         <div class="field" style="margin-bottom:0">
           <label>ДАТА</label>
-          <input type="date" id="dateInput" onchange="updateCollSummary('collDateSummary', this.value)">
+          <input type="date" id="dateInput" onchange="updateExtraSummary()">
         </div>
       </div>
-    </div>
-  </div>
 
-  <!-- 6. БЕЛЕЖКА -->
-  <div class="coll-section" id="collNote" style="margin-bottom:14px;">
-    <div class="coll-header" onclick="toggleCollapsible('collNote')">
-      <div class="coll-title">💬 Бележка</div>
-      <div style="display:flex; align-items:center; gap:8px;">
-        <span class="coll-summary" id="collNoteSummary">—</span>
-        <span class="coll-arrow">▶</span>
-      </div>
-    </div>
-    <div class="coll-body">
-      <div class="card" style="margin-top:8px;">
+      <!-- Бележка -->
+      <div class="section-label">Бележка</div>
+      <div class="card">
         <div class="field" style="margin-bottom:0">
           <label>КОМЕНТАР (незадължително)</label>
-          <textarea id="commentInput" rows="2" oninput="updateCollSummary('collNoteSummary', this.value ? '✓' : '—')" style="resize:none; background:var(--bg3); border:1px solid var(--border); border-radius:10px; padding:12px 14px; color:var(--text); font-family:var(--font); font-size:14px; width:100%; outline:none;" placeholder="напр. почистена филтър лента..."></textarea>
+          <textarea id="commentInput" rows="2" oninput="updateExtraSummary()" style="resize:none; background:var(--bg3); border:1px solid var(--border); border-radius:10px; padding:12px 14px; color:var(--text); font-family:var(--font); font-size:14px; width:100%; outline:none;" placeholder="напр. почистена филтър лента..."></textarea>
+        </div>
+      </div>
+
+      <!-- Престой -->
+      <div class="section-label">Престой</div>
+      <div class="card">
+        <div class="timer-row">
+          <div class="timer-display" id="timerDisplay">00:00:00</div>
+          <div class="timer-buttons">
+            <button class="timer-btn timer-start" id="timerBtn" onclick="timerToggle()">▶ Старт</button>
+            <button class="timer-btn timer-reset" onclick="timerReset()">⟲</button>
+          </div>
         </div>
       </div>
     </div>
-  </div>
-
-  <!-- 7. ПРЕСТОЙ -->
-  <div class="coll-section" id="collTimer" style="margin-bottom:14px;">
-    <div class="coll-header" onclick="toggleCollapsible('collTimer')">
-      <div class="coll-title">⏱ Престой</div>
-      <div style="display:flex; align-items:center; gap:8px;">
-        <span class="coll-summary" id="collTimerSummary">00:00</span>
-        <span class="coll-arrow">▶</span>
-      </div>
-    </div>
-    <div class="coll-body">
-  <div class="card">
-    <div class="timer-row">
-      <div class="timer-display" id="timerDisplay">00:00:00</div>
-      <button class="timer-btn start" id="timerStartBtn" onclick="timerStart()">▶ Старт</button>
-      <button class="timer-btn stop" id="timerStopBtn" onclick="timerStop()" style="display:none">⏹ Стоп</button>
-      <button class="timer-btn reset" onclick="timerReset()">↺</button>
-    </div>
-  </div>
-  </div>
   </div>
 
   <!-- 8. ЗАПИШИ -->
@@ -839,14 +814,7 @@
 
 <div class="toast" id="toast"></div>
 
-<div class="bottom-nav">
-  <button class="nav-btn active" onclick="switchTab('restock')" id="nav-restock"><span class="nav-icon">⬆️</span><span class="nav-label">Зареждане</span></button>
-  <button class="nav-btn" onclick="switchTab('cashflow')" id="nav-cashflow"><span class="nav-icon">💰</span><span class="nav-label">Отчитане</span></button>
-  <button class="nav-btn" onclick="switchTab('finance')" id="nav-finance"><span class="nav-icon">💳</span><span class="nav-label">Финанси</span></button>
-  <button class="nav-btn" onclick="switchTab('service')" id="nav-service"><span class="nav-icon">🔧</span><span class="nav-label">Сервиз</span></button>
-  <button class="nav-btn" onclick="switchTab('stats')" id="nav-stats"><span class="nav-icon">📊</span><span class="nav-label">Статистика</span></button>
-  <button class="nav-btn" onclick="switchTab('settings')" id="nav-settings"><span class="nav-icon">⚙️</span><span class="nav-label">Настройки</span></button>
-</div>
+
 
 <script>
 const SUPABASE_URL = 'https://yqbfrncncserfpcdikxy.supabase.co';
@@ -2880,20 +2848,53 @@ function showToast(msg, type='success') {
   t.textContent = msg; t.className = `toast ${type} show`;
   setTimeout(()=>t.classList.remove('show'), 3000);
 }
+function toggleSideMenu() {
+  const menu = document.getElementById('sideMenu');
+  const overlay = document.getElementById('sideMenuOverlay');
+  if (menu.classList.contains('open')) {
+    closeSideMenu();
+  } else {
+    menu.classList.add('open');
+    overlay.style.display = 'block';
+  }
+}
+
+function closeSideMenu() {
+  document.getElementById('sideMenu').classList.remove('open');
+  document.getElementById('sideMenuOverlay').style.display = 'none';
+}
+
+function selectMenu(tab) {
+  document.querySelectorAll('.menu-item').forEach(b => b.classList.remove('active'));
+  document.querySelector(`.menu-item[data-tab="${tab}"]`)?.classList.add('active');
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(`nav-${tab}`)?.classList.add('active');
+  switchTab(tab);
+  closeSideMenu();
+}
+
 function toggleCollapsible(id) {
   const el = document.getElementById(id);
   if (el) el.classList.toggle('expanded');
 }
 
-function updateCollSummary(id, text) {
-  const el = document.getElementById(id);
-  if (!el) return;
-  if (id === 'collDateSummary' && text) {
-    const d = new Date(text);
-    el.textContent = isNaN(d) ? text : d.toLocaleDateString('bg-BG', {day:'numeric', month:'short'});
-  } else {
-    el.textContent = text || '—';
-  }
+function updateExtraSummary() {
+  const sum = document.getElementById('collExtraSummary');
+  if (!sum) return;
+  const techSel = document.getElementById('techSelect');
+  const techName = techSel?.options[techSel.selectedIndex]?.text || '';
+  const date = document.getElementById('dateInput')?.value;
+  const dateStr = date ? new Date(date).toLocaleDateString('bg-BG', {day:'numeric', month:'short'}) : '';
+  const hasComment = document.getElementById('commentInput')?.value?.trim();
+  const timerStr = document.getElementById('timerDisplay')?.textContent;
+  const hasTimer = timerStr && timerStr !== '00:00:00';
+
+  const parts = [];
+  if (techName && techName !== '— избери техник —') parts.push(techName);
+  if (dateStr) parts.push(dateStr);
+  if (hasComment) parts.push('💬');
+  if (hasTimer) parts.push('⏱ ' + timerStr);
+  sum.textContent = parts.length ? parts.join(' · ') : '—';
 }
 
 function getLocalDateString() {
@@ -2910,5 +2911,14 @@ function getWeekStart() { const n=new Date(); const day=n.getDay()||7; const m=n
 function getProductIcon(name) { const p=products.find(x=>x.name===name); return p?p.icon:'📦'; }
 function getProductUnit(name) { const p=products.find(x=>x.name===name); return p?p.unit:''; }
 </script>
+<!-- BOTTOM NAV - shortcuts -->
+<div class="bottom-nav">
+  <button class="nav-btn active" onclick="selectMenu('restock')" id="nav-restock"><span class="nav-icon">⬆️</span><span class="nav-label">Зареждане</span></button>
+  <button class="nav-btn" onclick="selectMenu('cashflow')" id="nav-cashflow"><span class="nav-icon">💰</span><span class="nav-label">Отчитане</span></button>
+  <button class="nav-btn" onclick="selectMenu('finance')" id="nav-finance"><span class="nav-icon">💳</span><span class="nav-label">Финанси</span></button>
+  <button class="nav-btn" onclick="selectMenu('service')" id="nav-service"><span class="nav-icon">🔧</span><span class="nav-label">Сервиз</span></button>
+  <button class="nav-btn" onclick="selectMenu('stats')" id="nav-stats"><span class="nav-icon">📊</span><span class="nav-label">Статистика</span></button>
+</div>
+
 </body>
 </html>
