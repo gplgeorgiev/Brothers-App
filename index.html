@@ -2835,16 +2835,24 @@ async function processInvoiceOCR(input) {
         filled.push('дата');
       }
       if (p.amount) {
-        // Добави като нов ред в кошницата с първата категория за разход
-        const firstCat = FIN_CATEGORIES.expense[0];
+        // Използвай избраната категория ако има, иначе първата
+        let cat = null;
+        if (finSelectedCat) {
+          cat = FIN_CATEGORIES[finType].find(c => c.code === finSelectedCat);
+        }
+        if (!cat) cat = FIN_CATEGORIES[finType][0];
+
         finBasket.push({
-          code: firstCat.code,
-          icon: firstCat.icon,
-          label: firstCat.label,
+          code: cat.code,
+          icon: cat.icon,
+          label: cat.label,
           amount: p.amount
         });
         renderFinBasket();
         updateFinSummary();
+        document.getElementById('finCategoryPopup').classList.remove('visible');
+        document.querySelectorAll('#finCategoryScroll .prod-card').forEach(c => c.classList.remove('selected'));
+        finSelectedCat = null;
         filled.push('сума');
       }
 
