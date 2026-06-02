@@ -404,7 +404,7 @@
     <div style="font-size:16px; font-weight:800; margin-bottom:4px;" id="modalTitle">Въведи Cash</div>
     <div style="font-size:13px; color:var(--text2); margin-bottom:20px;" id="modalSub"></div>
     <div class="field">
-      <label>CASH (лв)</label>
+      <label>CASH (EUR)</label>
       <input type="number" id="modalCashInput" placeholder="0.00" step="0.01" min="0"
         style="font-size:24px; font-weight:700; text-align:center; padding:16px;">
     </div>
@@ -424,7 +424,7 @@
       <input type="number" id="editCfCounter" placeholder="напр. 12450">
     </div>
     <div class="field">
-      <label>CASH (лв)</label>
+      <label>CASH (EUR)</label>
       <input type="number" id="editCfCash" placeholder="0.00" step="0.01">
     </div>
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:8px;">
@@ -705,13 +705,13 @@
         </select>
       </div>
       <div class="field" style="margin-bottom:10px;">
-        <label>ПРИХОД (лв)</label>
+        <label>ПРИХОД (EUR)</label>
         <input type="number" id="soIncome" placeholder="0.00" step="0.01" min="0">
       </div>
     </div>
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
       <div class="field" style="margin-bottom:10px;">
-        <label>РАЗХОД ЧАСТИ (лв)</label>
+        <label>РАЗХОД ЧАСТИ (EUR)</label>
         <input type="number" id="soExpense" placeholder="0.00" step="0.01" min="0">
       </div>
       <div class="field" style="margin-bottom:10px;">
@@ -1037,12 +1037,12 @@ function updateSummary() {
       ${lines.map(l => `
         <div class="summary-row">
           <span class="key">${l.product.icon || '📦'} ${l.product.name} × ${l.qty} ${l.product.unit}</span>
-          <span class="val">${(l.product.price_with_vat * l.qty).toFixed(2)} лв</span>
+          <span class="val">${(l.product.price_with_vat * l.qty).toFixed(2)} EUR</span>
         </div>
       `).join('')}
       <div class="summary-total">
         <span class="key">Общо заредено</span>
-        <span class="val">${totalCost.toFixed(2)} лв</span>
+        <span class="val">${totalCost.toFixed(2)} EUR</span>
       </div>
     </div>
   `;
@@ -1054,8 +1054,8 @@ document.getElementById('objectSelect').addEventListener('change', function() {
   if (obj) {
     document.getElementById('objectInfo').innerHTML = `
       <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap;">
-        <span class="badge">🎯 ${obj.target_weekly} лв/седм.</span>
-        <span class="badge amber">🏠 ${obj.rent} лв наем</span>
+        <span class="badge">🎯 ${obj.target_weekly} EUR/седм.</span>
+        <span class="badge amber">🏠 ${obj.rent} EUR наем</span>
         ${obj.serial_number ? `<span class="badge">${obj.serial_number}</span>` : ''}
       </div>`;
   } else { document.getElementById('objectInfo').innerHTML = ''; }
@@ -1442,8 +1442,8 @@ async function loadCashflow() {
         </div>
         <div class="info-row" style="padding-top:0"><span class="key">Брояч</span><span class="val">${cf.counter ?? '—'}</span></div>
         ${cf.drinks_sold != null ? `<div class="info-row"><span class="key">Продадени напитки</span><span class="val">${cf.drinks_sold}</span></div>` : ''}
-        ${cf.check_value != null ? `<div class="info-row"><span class="key">Очакван приход</span><span class="val" style="color:var(--accent)">${cf.check_value.toFixed(2)} лв</span></div>` : ''}
-        ${cf.target != null ? `<div class="info-row"><span class="key">Таргет (${cf.days_since_last} дни)</span><span class="val" style="color:var(--amber)">${cf.target.toFixed(2)} лв</span></div>` : ''}
+        ${cf.check_value != null ? `<div class="info-row"><span class="key">Очакван приход</span><span class="val" style="color:var(--accent)">${cf.check_value.toFixed(2)} EUR</span></div>` : ''}
+        ${cf.target != null ? `<div class="info-row"><span class="key">Таргет (${cf.days_since_last} дни)</span><span class="val" style="color:var(--amber)">${cf.target.toFixed(2)} EUR</span></div>` : ''}
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:12px;">
           <button onclick="openCashModal(${cf.id}, '${cf.object_name}', ${cf.check_value ?? 0})"
             style="padding:11px; border-radius:10px; border:none; background:var(--green); color:#fff; font-size:13px; font-weight:700; cursor:pointer;">💵 Въведи Cash</button>
@@ -1469,10 +1469,10 @@ async function loadCashflow() {
         <div class="op-info">
           <div class="op-title">${cf.object_name}</div>
           <div class="op-sub">${formatDateBG(new Date(cf.date))} · ${cf.technician_name || '—'}${cf.counter != null ? ` · 🔢 ${cf.counter}` : ''}${cf.drinks_sold != null ? ` · ${cf.drinks_sold} напитки` : ''}</div>
-          ${cf.check_value != null ? `<div style="font-size:11px; color:var(--text3);">Очакван: ${cf.check_value.toFixed(2)} лв</div>` : ''}
+          ${cf.check_value != null ? `<div style="font-size:11px; color:var(--text3);">Очакван: ${cf.check_value.toFixed(2)} EUR</div>` : ''}
         </div>
         <div style="display:flex; flex-direction:column; align-items:flex-end; gap:6px;">
-          <div class="op-cash">${cf.cash?.toFixed(2) ?? '—'} лв</div>
+          <div class="op-cash">${cf.cash?.toFixed(2) ?? '—'} EUR</div>
           <button onclick="openEditCfModal(${cf.id})" style="padding:4px 10px; border-radius:6px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:11px; font-weight:700; cursor:pointer;">✏️</button>
         </div>
       </div>`).join('');
@@ -1660,7 +1660,7 @@ function openCashModal(id, objectName, expectedCash) {
   currentCashflowId = id;
   document.getElementById('modalTitle').textContent = `💵 ${objectName}`;
   document.getElementById('modalSub').textContent = expectedCash
-    ? `Очакван приход: ${expectedCash.toFixed(2)} лв`
+    ? `Очакван приход: ${expectedCash.toFixed(2)} EUR`
     : 'Въведи събраната сума';
   document.getElementById('modalCashInput').value = '';
   document.getElementById('cashModal').style.display = 'flex';
@@ -1788,14 +1788,14 @@ async function loadRestockHistory() {
           </div>
           <div style="display:flex; align-items:center; gap:8px;">
             <span style="font-size:12px; color:var(--text2);">${op.quantity} ${getProductUnit(op.product_name)}</span>
-            <span style="font-size:13px; font-weight:700; color:var(--amber);">${op.cost_value?.toFixed(2)} лв</span>
+            <span style="font-size:13px; font-weight:700; color:var(--amber);">${op.cost_value?.toFixed(2)} EUR</span>
             <button onclick="openEditLineModal(${op.id})" style="padding:3px 8px; border-radius:6px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:11px; cursor:pointer;">✏️</button>
             <button onclick="deleteLine(${op.id})" style="padding:3px 8px; border-radius:6px; border:1px solid var(--red); background:transparent; color:var(--red); font-size:11px; cursor:pointer;">🗑</button>
           </div>
         </div>`).join('')}
       <div style="display:flex; justify-content:space-between; padding-top:8px; border-top:2px solid var(--border); margin-top:4px;">
         <span style="font-size:12px; color:var(--text2);">${h.duration_minutes ? `⏱ ${h.duration_minutes} мин` : ''} ${h.km ? `· 🚗 ${h.km} км` : ''}</span>
-        <span style="font-size:14px; font-weight:800; color:var(--accent);">${h.total_cost?.toFixed(2)} лв</span>
+        <span style="font-size:14px; font-weight:800; color:var(--accent);">${h.total_cost?.toFixed(2)} EUR</span>
       </div>
     </div>`).join('');
 }
@@ -1843,14 +1843,14 @@ async function loadHistory() {
           </div>
           <div style="display:flex; align-items:center; gap:8px;">
             <span style="font-size:12px; color:var(--text2);">${op.quantity} ${getProductUnit(op.product_name)}</span>
-            <span style="font-size:13px; font-weight:700; color:var(--amber);">${op.cost_value?.toFixed(2)} лв</span>
+            <span style="font-size:13px; font-weight:700; color:var(--amber);">${op.cost_value?.toFixed(2)} EUR</span>
             <button onclick="openEditLineModal(${op.id})" style="padding:3px 8px; border-radius:6px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:11px; cursor:pointer;">✏️</button>
             <button onclick="deleteLine(${op.id})" style="padding:3px 8px; border-radius:6px; border:1px solid var(--red); background:transparent; color:var(--red); font-size:11px; cursor:pointer;">🗑</button>
           </div>
         </div>`).join('')}
       <div style="display:flex; justify-content:space-between; padding-top:8px; border-top:2px solid var(--border); margin-top:4px;">
         <span style="font-size:12px; color:var(--text2);">${h.duration_minutes ? `⏱ ${h.duration_minutes} мин` : ''} ${h.km ? `· 🚗 ${h.km} км` : ''}</span>
-        <span style="font-size:14px; font-weight:800; color:var(--accent);">${h.total_cost?.toFixed(2)} лв</span>
+        <span style="font-size:14px; font-weight:800; color:var(--accent);">${h.total_cost?.toFixed(2)} EUR</span>
       </div>
     </div>`).join('');
 }
@@ -2037,8 +2037,8 @@ async function loadStats() {
   const uniqueObjs = new Set(headersData.map(h=>h.object_id)).size;
   const totalRestocks = headersData.length;
   grid.innerHTML = `
-    <div class="stat-card"><div class="stat-label">Cash тази седм.</div><div class="stat-value green">${totalCash.toFixed(0)} лв</div></div>
-    <div class="stat-card"><div class="stat-label">Стойност заредено</div><div class="stat-value amber">${totalCost.toFixed(0)} лв</div></div>
+    <div class="stat-card"><div class="stat-label">Cash тази седм.</div><div class="stat-value green">${totalCash.toFixed(0)} EUR</div></div>
+    <div class="stat-card"><div class="stat-label">Стойност заредено</div><div class="stat-value amber">${totalCost.toFixed(0)} EUR</div></div>
     <div class="stat-card"><div class="stat-label">Зареждания</div><div class="stat-value blue">${totalRestocks}</div></div>
     <div class="stat-card"><div class="stat-label">Обекти</div><div class="stat-value">${uniqueObjs}</div></div>`;
   const byObj = {};
@@ -2053,8 +2053,8 @@ async function loadStats() {
   });
   document.getElementById('objectStats').innerHTML = Object.entries(byObj).sort((a,b)=>b[1].cash-a[1].cash).map(([name,s])=>`
     <div class="card">
-      <div class="info-row" style="padding-top:0"><span style="font-weight:700">${name}</span><span class="badge green">${s.cash.toFixed(0)} лв</span></div>
-      <div class="info-row"><span class="key">Заредено</span><span class="val" style="color:var(--amber)">${s.cost.toFixed(0)} лв</span></div>
+      <div class="info-row" style="padding-top:0"><span style="font-weight:700">${name}</span><span class="badge green">${s.cash.toFixed(0)} EUR</span></div>
+      <div class="info-row"><span class="key">Заредено</span><span class="val" style="color:var(--amber)">${s.cost.toFixed(0)} EUR</span></div>
       <div class="info-row" style="padding-bottom:0"><span class="key">Зареждания</span><span class="val">${s.ops}</span></div>
     </div>`).join('') || '<div class="empty"><div class="empty-icon">📊</div><p>Няма данни</p></div>';
 }
@@ -2215,7 +2215,7 @@ function renderFinBasket() {
     <div class="added-line">
       <div class="al-icon">${b.icon}</div>
       <div class="al-name">${b.label}</div>
-      <div class="al-qty">${b.amount.toFixed(2)} лв</div>
+      <div class="al-qty">${b.amount.toFixed(2)} EUR</div>
       <div class="al-remove" onclick="removeFinLine(${i})">✕</div>
     </div>
   `).join('');
@@ -2230,7 +2230,7 @@ function updateFinSummary() {
     <div class="summary-card">
       <div class="summary-total">
         <span class="key">Общо ${finType === 'income' ? 'приход' : 'разход'}</span>
-        <span class="val">${total.toFixed(2)} лв</span>
+        <span class="val">${total.toFixed(2)} EUR</span>
       </div>
     </div>`;
 }
@@ -2424,7 +2424,7 @@ async function loadTxHistory() {
         </div>
         <div style="display:flex; flex-direction:column; align-items:flex-end; gap:6px; flex-shrink:0;">
           <div style="font-size:15px; font-weight:800; font-family:var(--mono); color:${isIncome ? 'var(--green)' : 'var(--red)'};">
-            ${isIncome ? '+' : '-'}${h.total_cost?.toFixed(2)} лв
+            ${isIncome ? '+' : '-'}${h.total_cost?.toFixed(2)} EUR
           </div>
           <div style="display:flex; gap:4px;">
             <button onclick="openEditFinModal(${h.id})" style="padding:4px 10px; border-radius:6px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:11px; cursor:pointer;">✏️</button>
@@ -2605,11 +2605,11 @@ async function loadBalanceSummary() {
     <div class="stats-grid" style="margin-bottom:12px;">
       <div class="stat-card">
         <div class="stat-label">💵 Каса общо</div>
-        <div class="stat-value ${totalCash >= 0 ? 'green' : ''}" style="${totalCash < 0 ? 'color:var(--red)' : ''}">${totalCash.toFixed(0)} лв</div>
+        <div class="stat-value ${totalCash >= 0 ? 'green' : ''}" style="${totalCash < 0 ? 'color:var(--red)' : ''}">${totalCash.toFixed(0)} EUR</div>
       </div>
       <div class="stat-card">
         <div class="stat-label">🏦 Банка общо</div>
-        <div class="stat-value ${totalBank >= 0 ? 'green' : ''}" style="${totalBank < 0 ? 'color:var(--red)' : ''}">${totalBank.toFixed(0)} лв</div>
+        <div class="stat-value ${totalBank >= 0 ? 'green' : ''}" style="${totalBank < 0 ? 'color:var(--red)' : ''}">${totalBank.toFixed(0)} EUR</div>
       </div>
     </div>
     <div class="card">
@@ -2617,7 +2617,7 @@ async function loadBalanceSummary() {
       ${Object.entries(byTech).map(([name, bal]) => `
         <div class="info-row">
           <span class="key">👤 ${name}</span>
-          <span class="val" style="color:${bal >= 0 ? 'var(--green)' : 'var(--red)'}">${bal.toFixed(2)} лв</span>
+          <span class="val" style="color:${bal >= 0 ? 'var(--green)' : 'var(--red)'}">${bal.toFixed(2)} EUR</span>
         </div>`).join('') || '<div style="color:var(--text3); font-size:13px;">Няма данни</div>'}
     </div>`;
 }
@@ -2669,8 +2669,8 @@ async function loadServiceOrders() {
       <div style="display:flex; justify-content:space-between; padding-top:8px; border-top:1px solid var(--border);">
         <div style="font-size:13px; color:var(--text2);">Техник: ${so.technician_name || '—'}</div>
         <div style="display:flex; gap:12px;">
-          ${so.expense_amount ? `<span style="font-size:13px; color:var(--red);">-${so.expense_amount.toFixed(2)} лв</span>` : ''}
-          ${so.income_amount ? `<span style="font-size:13px; font-weight:800; color:var(--green);">+${so.income_amount.toFixed(2)} лв</span>` : ''}
+          ${so.expense_amount ? `<span style="font-size:13px; color:var(--red);">-${so.expense_amount.toFixed(2)} EUR</span>` : ''}
+          ${so.income_amount ? `<span style="font-size:13px; font-weight:800; color:var(--green);">+${so.income_amount.toFixed(2)} EUR</span>` : ''}
         </div>
       </div>
       <div style="display:flex; gap:6px; margin-top:8px;">
