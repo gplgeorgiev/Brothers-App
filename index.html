@@ -529,7 +529,7 @@
     <div class="gps-status" id="finGpsStatus"></div>
   </div>
 
-  <!-- 2. ТИП -->
+  <!-- 2. ТИП (по подразбиране Разход) -->
   <div class="section-label">Тип</div>
   <div class="card">
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
@@ -538,7 +538,7 @@
     </div>
   </div>
 
-  <!-- 3. КАТЕГОРИИ (редове) -->
+  <!-- 3. КАТЕГОРИИ -->
   <div class="section-label">Категории</div>
   <div class="card">
     <div class="product-scroll-wrap" id="finCategoryScroll"></div>
@@ -554,37 +554,9 @@
     <div class="added-lines" id="finLines"></div>
   </div>
 
-  <!-- Резюме -->
   <div id="finSummary"></div>
 
-  <!-- 4. НАЧИН НА ПЛАЩАНЕ -->
-  <div class="section-label">Начин на плащане</div>
-  <div class="card">
-    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
-      <button id="finMethodCash" class="type-btn active" onclick="setFinMethod('cash')">💵 Брой</button>
-      <button id="finMethodBank" class="type-btn" onclick="setFinMethod('bank')">🏦 Банка</button>
-    </div>
-  </div>
-
-  <!-- 5. ТЕХНИК -->
-  <div class="section-label">Техник</div>
-  <div class="card">
-    <div class="field" style="margin-bottom:0">
-      <label>КОЙ ВЪВЕЖДА</label>
-      <select id="finTechSelect"><option value="">— избери —</option></select>
-    </div>
-  </div>
-
-  <!-- 6. ДАТА -->
-  <div class="section-label">Дата</div>
-  <div class="card">
-    <div class="field" style="margin-bottom:0">
-      <label>ДАТА</label>
-      <input type="date" id="finDateInput">
-    </div>
-  </div>
-
-  <!-- 7. ДОКУМЕНТ -->
+  <!-- 4. ДОКУМЕНТ -->
   <div class="section-label">Документ</div>
   <div class="card">
     <div class="field" style="margin-bottom:0">
@@ -605,7 +577,7 @@
     </div>
   </div>
 
-  <!-- 8. КОНТРАГЕНТ -->
+  <!-- 5. КОНТРАГЕНТ -->
   <div class="section-label">Контрагент</div>
   <div class="card">
     <div class="field" style="margin-bottom:0">
@@ -614,20 +586,52 @@
     </div>
   </div>
 
-  <!-- 9. БЕЛЕЖКА -->
-  <div class="section-label">Бележка</div>
+  <!-- 6. НАЧИН -->
+  <div class="section-label">Начин на плащане</div>
   <div class="card">
-    <div class="field" style="margin-bottom:0">
-      <label>КОМЕНТАР</label>
-      <textarea id="finComment" rows="2" style="resize:none; background:var(--bg3); border:1px solid var(--border); border-radius:10px; padding:12px 14px; color:var(--text); font-family:var(--font); font-size:14px; width:100%; outline:none;" placeholder="допълнителна информация..."></textarea>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+      <button id="finMethodCash" class="type-btn active" onclick="setFinMethod('cash')">💵 Брой</button>
+      <button id="finMethodBank" class="type-btn" onclick="setFinMethod('bank')">🏦 Банка</button>
+    </div>
+  </div>
+
+  <!-- 7. ДОПЪЛНИТЕЛНИ -->
+  <div class="coll-section" id="collFinExtra" style="margin-bottom:14px;">
+    <div class="coll-header" onclick="toggleCollapsible('collFinExtra')">
+      <div class="coll-title">⚙️ Допълнителни</div>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <span class="coll-summary" id="collFinExtraSummary">—</span>
+        <span class="coll-arrow">▶</span>
+      </div>
+    </div>
+    <div class="coll-body">
+      <div class="section-label" style="margin-top:8px">Техник</div>
+      <div class="card">
+        <div class="field" style="margin-bottom:0">
+          <label>КОЙ ВЪВЕЖДА</label>
+          <select id="finTechSelect" onchange="updateFinExtraSummary()"><option value="">— избери —</option></select>
+        </div>
+      </div>
+
+      <div class="section-label">Дата</div>
+      <div class="card">
+        <div class="field" style="margin-bottom:0">
+          <label>ДАТА</label>
+          <input type="date" id="finDateInput" onchange="updateFinExtraSummary()">
+        </div>
+      </div>
+
+      <div class="section-label">Бележка</div>
+      <div class="card">
+        <div class="field" style="margin-bottom:0">
+          <label>КОМЕНТАР</label>
+          <textarea id="finComment" rows="2" oninput="updateFinExtraSummary()" style="resize:none; background:var(--bg3); border:1px solid var(--border); border-radius:10px; padding:12px 14px; color:var(--text); font-family:var(--font); font-size:14px; width:100%; outline:none;" placeholder="допълнителна информация..."></textarea>
+        </div>
+      </div>
     </div>
   </div>
 
   <button onclick="saveFinance()" class="submit-btn" id="finSubmitBtn">💾 Запиши транзакцията</button>
-
-  <!-- Касова наличност -->
-  <div class="section-label" style="margin-top:20px">Касова наличност</div>
-  <div id="balanceSummary"><div class="loading"><div class="spinner"></div></div></div>
 
   <!-- История -->
   <div class="section-label" style="margin-top:20px">Последни транзакции</div>
@@ -816,7 +820,10 @@
 
 <!-- PAGE: СТАТИСТИКА -->
 <div class="page" id="page-stats">
-  <div class="section-label">Тази седмица</div>
+  <div class="section-label">Касова наличност</div>
+  <div id="balanceSummary"><div class="loading"><div class="spinner"></div></div></div>
+
+  <div class="section-label" style="margin-top:20px">Тази седмица</div>
   <div class="stats-grid" id="statsGrid"><div class="loading" style="grid-column:1/-1"><div class="spinner"></div></div></div>
   <div class="section-label" style="margin-top:24px">По обект</div>
   <div id="objectStats"></div>
@@ -924,6 +931,7 @@ async function loadTechnicians() {
     });
   });
   // Попълни техници в Финанси
+  if (typeof updateFinExtraSummary === 'function') setTimeout(updateFinExtraSummary, 100);
   const finTechSel = document.getElementById('finTechSelect');
   if (finTechSel) {
     finTechSel.innerHTML = '<option value="">— избери —</option>' +
@@ -1460,7 +1468,7 @@ async function loadCashflow() {
         <div class="op-icon">💰</div>
         <div class="op-info">
           <div class="op-title">${cf.object_name}</div>
-          <div class="op-sub">${formatDateBG(new Date(cf.date))} · ${cf.technician_name || '—'}${cf.drinks_sold != null ? ` · ${cf.drinks_sold} напитки` : ''}</div>
+          <div class="op-sub">${formatDateBG(new Date(cf.date))} · ${cf.technician_name || '—'}${cf.counter != null ? ` · 🔢 ${cf.counter}` : ''}${cf.drinks_sold != null ? ` · ${cf.drinks_sold} напитки` : ''}</div>
           ${cf.check_value != null ? `<div style="font-size:11px; color:var(--text3);">Очакван: ${cf.check_value.toFixed(2)} лв</div>` : ''}
         </div>
         <div style="display:flex; flex-direction:column; align-items:flex-end; gap:6px;">
@@ -2015,6 +2023,7 @@ async function deleteOp(id) {
 
 // ── STATS ──
 async function loadStats() {
+  await loadBalanceSummary();
   const grid = document.getElementById('statsGrid');
   grid.innerHTML = '<div class="loading" style="grid-column:1/-1"><div class="spinner"></div></div>';
   const weekStart = getWeekStart();
@@ -2254,7 +2263,7 @@ function getGPSFinance() {
 }
 
 async function loadFinance() {
-  await Promise.all([loadBalanceSummary(), loadTxHistory(), populateFinanceSelects()]);
+  await Promise.all([loadTxHistory(), populateFinanceSelects()]);
   renderFinCategories();
 }
 
@@ -2367,7 +2376,6 @@ async function saveFinance() {
   document.getElementById('finComment').value = '';
   const finDateEl = document.getElementById('finDateInput');
   if (finDateEl) finDateEl.value = getLocalDateString();
-  loadBalanceSummary();
   loadTxHistory();
   window.scrollTo(0, 0);
 }
@@ -2974,6 +2982,21 @@ function selectMenu(tab) {
 function toggleCollapsible(id) {
   const el = document.getElementById(id);
   if (el) el.classList.toggle('expanded');
+}
+
+function updateFinExtraSummary() {
+  const sum = document.getElementById('collFinExtraSummary');
+  if (!sum) return;
+  const techSel = document.getElementById('finTechSelect');
+  const techName = techSel?.options[techSel.selectedIndex]?.text || '';
+  const date = document.getElementById('finDateInput')?.value;
+  const dateStr = date ? new Date(date).toLocaleDateString('bg-BG', {day:'numeric', month:'short'}) : '';
+  const hasComment = document.getElementById('finComment')?.value?.trim();
+  const parts = [];
+  if (techName && !techName.startsWith('—')) parts.push(techName);
+  if (dateStr) parts.push(dateStr);
+  if (hasComment) parts.push('💬');
+  sum.textContent = parts.length ? parts.join(' · ') : '—';
 }
 
 function updateExtraSummary() {
