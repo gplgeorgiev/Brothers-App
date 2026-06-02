@@ -2812,7 +2812,7 @@ async function processInvoiceOCR(input) {
       const data = await response.json();
       console.log('=== INVOICE OCR DEBUG ===');
       console.log('Parsed:', JSON.stringify(data.parsed));
-      console.log('Raw text first 300 chars:', (data.raw_text || '').substring(0, 300));
+      console.log('Raw text:', data.raw_text);
       console.log('========================');
       // Покажи parsed на екрана за тест
       const dbgEl = document.getElementById('invoiceOcrStatus');
