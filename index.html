@@ -2810,7 +2810,10 @@ async function processInvoiceOCR(input) {
       });
 
       const data = await response.json();
-      console.log('Invoice OCR:', data);
+      console.log('=== INVOICE OCR DEBUG ===');
+      console.log('Parsed:', JSON.stringify(data.parsed));
+      console.log('Raw text:', data.raw_text);
+      console.log('========================');
 
       if (data.error) {
         status.className = 'ocr-status error';
