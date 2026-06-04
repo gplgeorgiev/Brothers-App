@@ -846,8 +846,55 @@
     </div>
   </div>
 
+  <div class="section-label" style="margin-top:20px">Начално салдо</div>
+  <div class="card">
+    <button onclick="openCapitalModal()" style="width:100%; padding:14px; border-radius:10px; border:none; background:var(--accent); color:#fff; font-size:14px; font-weight:700; cursor:pointer; font-family:var(--font);">💰 Въведи начално салдо</button>
+  </div>
+
   <div class="section-label" style="margin-top:20px">Маршрути за добавяне</div>
   <div id="unknownRoutesList"><div class="loading"><div class="spinner"></div></div></div>
+</div>
+
+<!-- CAPITAL MODAL -->
+<div id="capitalModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:200; align-items:flex-end; justify-content:center;">
+  <div style="background:var(--bg2); border-radius:20px 20px 0 0; padding:20px; width:100%; max-width:480px; max-height:90vh; overflow-y:auto;">
+    <div style="font-size:18px; font-weight:800; margin-bottom:4px;">💰 Начално салдо</div>
+    <div style="font-size:12px; color:var(--text2); margin-bottom:16px;">Откриваща операция → Капитал (10101)</div>
+
+    <div class="field" style="margin-bottom:14px;">
+      <label>ДАТА</label>
+      <input type="date" id="capitalDate">
+    </div>
+
+    <div class="section-label" style="margin-top:0">💵 Каса по техник</div>
+    <div class="card" id="capitalCashList" style="margin-bottom:14px;"></div>
+
+    <div class="section-label">🏦 Банка</div>
+    <div class="card" style="margin-bottom:14px;">
+      <div class="field" style="margin-bottom:0">
+        <input type="number" id="capitalBank" placeholder="0.00" step="0.01" min="0" style="text-align:right; font-family:var(--mono); font-weight:700;">
+      </div>
+    </div>
+
+    <div class="section-label">📦 Материали в склад (стойност)</div>
+    <div class="card" style="margin-bottom:14px;">
+      <div class="field" style="margin-bottom:0">
+        <input type="number" id="capitalMaterials" placeholder="0.00" step="0.01" min="0" style="text-align:right; font-family:var(--mono); font-weight:700;">
+      </div>
+    </div>
+
+    <div class="summary-card" style="margin:14px 0;">
+      <div class="summary-total">
+        <span class="key">Общо капитал</span>
+        <span class="val" id="capitalTotal">0.00 EUR</span>
+      </div>
+    </div>
+
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+      <button onclick="closeCapitalModal()" style="padding:14px; border-radius:12px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:15px; font-weight:700; cursor:pointer; font-family:var(--font);">Отказ</button>
+      <button onclick="saveCapital()" style="padding:14px; border-radius:12px; border:none; background:var(--accent); color:#fff; font-size:15px; font-weight:700; cursor:pointer; font-family:var(--font);">✓ Запиши</button>
+    </div>
+  </div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -2881,6 +2928,139 @@ async function processInvoiceOCR(input) {
     input.value = '';
   };
   reader.readAsDataURL(file);
+}
+
+async function openCapitalModal() {
+  document.getElementById('capitalDate').value = getLocalDateString();
+  document.getElementById('capitalBank').value = '';
+  document.getElementById('capitalMaterials').value = '';
+
+  // Build cash inputs per technician
+  const cashList = document.getElementById('capitalCashList');
+  cashList.innerHTML = technicians.map(t => `
+    <div class="field" style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
+      <label style="flex:1; margin-bottom:0;">${t.name}</label>
+      <input type="number" id="capitalCash-${t.id}" class="capital-cash" placeholder="0.00" step="0.01" min="0"
+        style="width:140px; text-align:right; background:var(--bg2); border:1px solid var(--border); border-radius:8px; padding:8px 12px; color:var(--text); font-family:var(--mono); font-size:14px; font-weight:700; outline:none;"
+        oninput="updateCapitalTotal()">
+    </div>
+  `).join('');
+
+  // Bind input listeners
+  ['capitalBank', 'capitalMaterials'].forEach(id => {
+    document.getElementById(id).oninput = updateCapitalTotal;
+  });
+
+  updateCapitalTotal();
+  document.getElementById('capitalModal').style.display = 'flex';
+}
+
+function closeCapitalModal() {
+  document.getElementById('capitalModal').style.display = 'none';
+}
+
+function updateCapitalTotal() {
+  let total = 0;
+  document.querySelectorAll('.capital-cash').forEach(el => {
+    total += parseFloat(el.value) || 0;
+  });
+  total += parseFloat(document.getElementById('capitalBank').value) || 0;
+  total += parseFloat(document.getElementById('capitalMaterials').value) || 0;
+  document.getElementById('capitalTotal').textContent = total.toFixed(2) + ' EUR';
+}
+
+async function saveCapital() {
+  const date = document.getElementById('capitalDate').value;
+  if (!date) { showToast('Избери дата!', 'error'); return; }
+
+  const bank = parseFloat(document.getElementById('capitalBank').value) || 0;
+  const materials = parseFloat(document.getElementById('capitalMaterials').value) || 0;
+
+  const cashByTech = [];
+  document.querySelectorAll('.capital-cash').forEach(el => {
+    const techId = parseInt(el.id.replace('capitalCash-', ''));
+    const amount = parseFloat(el.value) || 0;
+    if (amount > 0) {
+      const tech = technicians.find(t => t.id === techId);
+      cashByTech.push({ techId, techName: tech?.name, amount });
+    }
+  });
+
+  const total = cashByTech.reduce((s, c) => s + c.amount, 0) + bank + materials;
+  if (total <= 0) { showToast('Въведи поне една сума!', 'error'); return; }
+
+  const adminObj = objects.find(o => o.type === 'admin');
+  const dateObj = new Date(date);
+  const weekNum = getWeekNumber(dateObj);
+  const period = dateObj.getFullYear() + '.' + String(dateObj.getMonth()+1).padStart(2,'0');
+
+  // 1. Хедър
+  const { data: header, error: hdrErr } = await db.from('operation_headers').insert({
+    date,
+    object_id: adminObj?.id, object_name: adminObj?.name || 'Администрация',
+    op_type: 'opening_balance',
+    total_cost: total,
+    week_number: weekNum, period,
+    comment: 'Начално салдо'
+  }).select().single();
+
+  if (hdrErr) { showToast('❌ ' + hdrErr.message, 'error'); return; }
+
+  // 2. Редове
+  const rows = [];
+
+  // Каса по техник (Дебит)
+  for (const c of cashByTech) {
+    rows.push({
+      header_id: header.id, date,
+      object_name: adminObj?.name || 'Администрация',
+      technician_id: c.techId, technician_name: c.techName,
+      account_code: '50101',
+      amount: c.amount, cost_value: c.amount, quantity: 1,
+      product_name: 'Каса (' + c.techName + ')',
+      entry_type: 'D'
+    });
+  }
+
+  // Банка (Дебит)
+  if (bank > 0) {
+    rows.push({
+      header_id: header.id, date,
+      object_name: adminObj?.name || 'Администрация',
+      account_code: '50301',
+      amount: bank, cost_value: bank, quantity: 1,
+      product_name: 'Банка',
+      entry_type: 'D'
+    });
+  }
+
+  // Материали (Дебит)
+  if (materials > 0) {
+    rows.push({
+      header_id: header.id, date,
+      object_name: adminObj?.name || 'Администрация',
+      account_code: '30201',
+      amount: materials, cost_value: materials, quantity: 1,
+      product_name: 'Материали в склад',
+      entry_type: 'D'
+    });
+  }
+
+  // Капитал (Кредит) - насрещна сметка
+  rows.push({
+    header_id: header.id, date,
+    object_name: adminObj?.name || 'Администрация',
+    account_code: '10101',
+    amount: total, cost_value: total, quantity: 1,
+    product_name: 'Капитал',
+    entry_type: 'C'
+  });
+
+  const { error: rowsErr } = await db.from('operations').insert(rows);
+  if (rowsErr) { showToast('❌ ' + rowsErr.message, 'error'); return; }
+
+  showToast('✅ Началното салдо е записано!', 'success');
+  closeCapitalModal();
 }
 
 async function loadUnknownRoutes() {
