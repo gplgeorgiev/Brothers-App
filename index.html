@@ -2407,7 +2407,11 @@ async function saveFinance() {
   const { error: rowsErr } = await db.from('operations').insert(rows);
   btn.disabled = false; btn.textContent = '💾 Запиши транзакцията';
 
-  if (rowsErr) { showToast('❌ ' + rowsErr.message, 'error'); return; }
+  if (rowsErr) {
+    await db.from('operation_headers').delete().eq('id', header.id);
+    showToast('❌ ' + rowsErr.message, 'error');
+    return;
+  }
 
   showToast('✅ Записано!', 'success');
 
@@ -3014,7 +3018,7 @@ async function saveCapital() {
     rows.push({
       header_id: header.id, date,
       object_name: adminObj?.name || 'Администрация',
-      technician_id: c.techId, technician_name: c.techName,
+      technician_name: c.techName,
       account_code: '50101',
       amount: c.amount, cost_value: c.amount, quantity: 1,
       product_name: 'Каса (' + c.techName + ')',
@@ -3057,7 +3061,12 @@ async function saveCapital() {
   });
 
   const { error: rowsErr } = await db.from('operations').insert(rows);
-  if (rowsErr) { showToast('❌ ' + rowsErr.message, 'error'); return; }
+  if (rowsErr) {
+    // Изтрий хедъра защото редовете не се записаха
+    await db.from('operation_headers').delete().eq('id', header.id);
+    showToast('❌ ' + rowsErr.message, 'error');
+    return;
+  }
 
   showToast('✅ Началното салдо е записано!', 'success');
   closeCapitalModal();
