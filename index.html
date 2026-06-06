@@ -234,6 +234,7 @@
     <button class="menu-item" data-tab="service" onclick="selectMenu('service')">🔧 Сервиз</button>
     <button class="menu-item" data-tab="history" onclick="selectMenu('history')">📋 История</button>
     <button class="menu-item" data-tab="stats" onclick="selectMenu('stats')">📊 Статистика</button>
+    <button class="menu-item" data-tab="trash" onclick="selectMenu('trash')">🗑 Кошче</button>
     <button class="menu-item" data-tab="settings" onclick="selectMenu('settings')">⚙️ Настройки</button>
   </div>
 </div>
@@ -829,6 +830,25 @@
   <div id="objectStats"></div>
 </div>
 
+<!-- PAGE: КОШЧЕ -->
+<div class="page" id="page-trash">
+  <div class="section-label">Кошче</div>
+  <div class="card" style="padding:12px 14px;">
+    <div class="field" style="margin-bottom:0;">
+      <label>ТИП ЗАПИСИ</label>
+      <select id="trashTypeFilter" onchange="loadTrash()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; appearance:none; font-family:var(--font);">
+        <option value="all">Всички</option>
+        <option value="restock">Зареждания</option>
+        <option value="cash_income">Cash отчети</option>
+        <option value="finance_expense">Финанси - Разходи</option>
+        <option value="finance_income">Финанси - Приходи</option>
+        <option value="opening_balance">Начално салдо</option>
+      </select>
+    </div>
+  </div>
+  <div id="trashList"><div class="loading"><div class="spinner"></div></div></div>
+</div>
+
 <!-- PAGE: НАСТРОЙКИ -->
 <div class="page" id="page-settings">
   <div class="section-label">Връзка</div>
@@ -849,6 +869,18 @@
   <div class="section-label" style="margin-top:20px">Начално салдо</div>
   <div class="card">
     <button onclick="openCapitalModal()" style="width:100%; padding:14px; border-radius:10px; border:none; background:var(--accent); color:#fff; font-size:14px; font-weight:700; cursor:pointer; font-family:var(--font);">💰 Въведи начално салдо</button>
+  </div>
+
+  <div class="section-label" style="margin-top:20px">Кошче</div>
+  <div class="card">
+    <div class="field" style="margin-bottom:0">
+      <label>СЪХРАНЕНИЕ В КОШЧЕТО (ДНИ)</label>
+      <div style="display:flex; gap:8px; align-items:center;">
+        <input type="number" id="trashRetentionDays" min="1" max="365" placeholder="30" style="flex:1">
+        <button onclick="saveTrashRetention()" style="padding:10px 16px; border-radius:8px; border:none; background:var(--accent); color:#fff; font-size:13px; font-weight:700; cursor:pointer; font-family:var(--font);">Запази</button>
+      </div>
+      <div style="font-size:11px; color:var(--text3); margin-top:6px;">След този срок изтритите записи се премахват окончателно.</div>
+    </div>
   </div>
 
   <div class="section-label" style="margin-top:20px">Маршрути за добавяне</div>
@@ -927,7 +959,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 // ── LOAD DATA ──
 async function loadObjects() {
-  const { data } = await db.from('objects').select('*').eq('active', true).order('name');
+  const { data } = await db.from('objects').select('*').eq('active', true).is('deleted_at', null).order('name');
   if (!data) return;
   objects = data;
   const sel = document.getElementById('objectSelect');
@@ -1502,7 +1534,7 @@ async function loadCashflow() {
 
   // Completed
   const completedEl = document.getElementById('completedList');
-  let completedQ = db.from('cashflow').select('*').eq('status', 'completed').order('completed_at', { ascending: false }).limit(30);
+  let completedQ = db.from('cashflow').select('*').eq('status', 'completed').is('deleted_at', null).order('completed_at', { ascending: false }).limit(30);
   if (objFilter) completedQ = completedQ.eq('object_id', parseInt(objFilter));
   if (dateFilter) completedQ = completedQ.gte('date', dateFilter);
   const { data: completed } = await completedQ;
@@ -1801,8 +1833,9 @@ async function loadRestockHistory() {
   const dateFilter = document.getElementById('restockFilterDate')?.value || '';
 
   let q = db.from('operation_headers')
-    .select('*, operations(id, product_name, product_id, quantity, cost_value, account_code, amount)')
+    .select('*, operations(id, product_name, product_id, quantity, cost_value, account_code, amount, deleted_at)')
     .eq('op_type', 'restock')
+    .is('deleted_at', null)
     .order('date', { ascending: false })
     .order('created_at', { ascending: false })
     .limit(20);
@@ -1948,12 +1981,13 @@ function addEditLine_unused() {
 }
 
 async function deleteHeader(id) {
-  if (!confirm('Изтриване на цялото зареждане и всички продукти?')) return;
-  await db.from('cashflow').delete().eq('operation_id', id);
-  await db.from('operations').delete().eq('header_id', id);
-  const { error } = await db.from('operation_headers').delete().eq('id', id);
+  if (!confirm('Преместване в кошчето?')) return;
+  const now = new Date().toISOString();
+  await db.from('cashflow').update({ deleted_at: now }).eq('operation_id', id);
+  await db.from('operations').update({ deleted_at: now }).eq('header_id', id);
+  const { error } = await db.from('operation_headers').update({ deleted_at: now }).eq('id', id);
   if (error) { showToast('❌ ' + error.message, 'error'); return; }
-  showToast('🗑 Изтрито!', 'success');
+  showToast('🗑 Преместено в кошчето', 'success');
   await loadRestockHistory();
   await loadHistory();
 }
@@ -2043,16 +2077,16 @@ async function saveEditLine() {
 }
 
 async function deleteLine(id) {
-  if (!confirm('Изтриване на реда?')) return;
+  if (!confirm('Преместване на реда в кошчето?')) return;
   const { data: op } = await db.from('operations').select('header_id').eq('id', id).single();
-  const { error } = await db.from('operations').delete().eq('id', id);
+  const { error } = await db.from('operations').update({ deleted_at: new Date().toISOString() }).eq('id', id);
   if (error) { showToast('❌ ' + error.message, 'error'); return; }
   if (op?.header_id) {
-    const { data: allLines } = await db.from('operations').select('cost_value').eq('header_id', op.header_id);
+    const { data: allLines } = await db.from('operations').select('cost_value').eq('header_id', op.header_id).is('deleted_at', null);
     const newTotal = (allLines || []).reduce((s, r) => s + (r.cost_value || 0), 0);
     await db.from('operation_headers').update({ total_cost: parseFloat(newTotal.toFixed(2)) }).eq('id', op.header_id);
   }
-  showToast('🗑 Редът е изтрит!', 'success');
+  showToast('🗑 Преместено в кошчето', 'success');
   await loadRestockHistory();
   await loadHistory();
 }
@@ -2123,7 +2157,8 @@ function switchTab(tab) {
   if(tab==='history') loadHistory();
   if(tab==='finance') loadFinance();
   if(tab==='service') loadService();
-  if(tab==='settings') loadUnknownRoutes();
+  if(tab==='settings') { loadUnknownRoutes(); loadTrashRetention(); }
+  if(tab==='trash') loadTrash();
   if(tab==='stats') loadStats();
 }
 
@@ -2441,6 +2476,7 @@ async function loadTxHistory() {
   let q = db.from('operation_headers')
     .select('*, operations(account_code, amount, product_name)')
     .in('op_type', ['finance_income', 'finance_expense'])
+    .is('deleted_at', null)
     .order('date', { ascending: false })
     .order('created_at', { ascending: false })
     .limit(40);
@@ -2488,11 +2524,12 @@ async function loadTxHistory() {
 }
 
 async function deleteFinanceHeader(id) {
-  if (!confirm('Изтриване на транзакцията?')) return;
-  await db.from('operations').delete().eq('header_id', id);
-  const { error } = await db.from('operation_headers').delete().eq('id', id);
+  if (!confirm('Преместване в кошчето?')) return;
+  const now = new Date().toISOString();
+  await db.from('operations').update({ deleted_at: now }).eq('header_id', id);
+  const { error } = await db.from('operation_headers').update({ deleted_at: now }).eq('id', id);
   if (error) { showToast('❌ ' + error.message, 'error'); return; }
-  showToast('🗑 Изтрито!', 'success');
+  showToast('🗑 Преместено в кошчето', 'success');
   loadFinance();
 }
 
@@ -2632,8 +2669,9 @@ async function saveEditFin() {
 async function loadBalanceSummary() {
   const el = document.getElementById('balanceSummary');
   const { data } = await db.from('operations')
-    .select('account_code, amount, technician_name, entry_type, header_id, operation_headers!inner(payment_method, op_type)')
-    .in('account_code', ['50101', '50301']);
+    .select('account_code, amount, technician_name, entry_type, header_id, operation_headers!inner(payment_method, op_type, deleted_at)')
+    .in('account_code', ['50101', '50301'])
+    .is('deleted_at', null);
   if (!data) return;
 
   const cashOps = data.filter(o => o.account_code === '50101');
@@ -2932,6 +2970,103 @@ async function processInvoiceOCR(input) {
     input.value = '';
   };
   reader.readAsDataURL(file);
+}
+
+async function loadTrash() {
+  const el = document.getElementById('trashList');
+  if (!el) return;
+  el.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+
+  const typeFilter = document.getElementById('trashTypeFilter')?.value || 'all';
+
+  let q = db.from('operation_headers')
+    .select('*, operations(id, product_name, account_code, amount, quantity, cost_value, deleted_at)')
+    .not('deleted_at', 'is', null)
+    .order('deleted_at', { ascending: false })
+    .limit(50);
+
+  if (typeFilter !== 'all') q = q.eq('op_type', typeFilter);
+
+  const { data, error } = await q;
+  if (error) { el.innerHTML = `<div class="empty"><div class="empty-icon">❌</div><p>${error.message}</p></div>`; return; }
+  if (!data?.length) {
+    el.innerHTML = '<div class="empty"><div class="empty-icon">📭</div><p>Кошчето е празно</p></div>';
+    return;
+  }
+
+  const opLabels = {
+    'restock': '⬆️ Зареждане',
+    'cash_income': '💰 Cash отчет',
+    'finance_expense': '📤 Разход',
+    'finance_income': '📥 Приход',
+    'opening_balance': '🏁 Начално салдо',
+    'service': '🔧 Сервиз'
+  };
+
+  el.innerHTML = data.map(h => {
+    const label = opLabels[h.op_type] || h.op_type;
+    const daysAgo = h.deleted_at ? Math.floor((new Date() - new Date(h.deleted_at)) / 86400000) : 0;
+    return `
+    <div class="card" style="margin-bottom:10px; opacity:0.85;">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px;">
+        <div style="flex:1;">
+          <div style="font-size:13px; font-weight:700;">${label}</div>
+          <div style="font-size:12px; color:var(--text2); margin-top:2px;">
+            ${formatDateBG(new Date(h.date))} · ${h.object_name || '—'} · ${h.technician_name || '—'}
+          </div>
+          <div style="font-size:11px; color:var(--text3); margin-top:2px;">
+            🗑 ${daysAgo} ${daysAgo === 1 ? 'ден' : 'дни'} назад · ${h.total_cost?.toFixed(2) || '0.00'} EUR
+          </div>
+        </div>
+        <div style="display:flex; gap:4px;">
+          <button onclick="restoreHeader(${h.id})" style="padding:5px 10px; border-radius:7px; border:1px solid var(--accent); background:transparent; color:var(--accent); font-size:11px; font-weight:700; cursor:pointer;">🔄</button>
+          <button onclick="permanentDelete(${h.id})" style="padding:5px 10px; border-radius:7px; border:1px solid var(--red); background:transparent; color:var(--red); font-size:11px; font-weight:700; cursor:pointer;">✕</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function restoreHeader(id) {
+  if (!confirm('Възстановяване на записа?')) return;
+  // Restore header
+  await db.from('operation_headers').update({ deleted_at: null }).eq('id', id);
+  // Restore operations and cashflow свързани
+  await db.from('operations').update({ deleted_at: null }).eq('header_id', id);
+  await db.from('cashflow').update({ deleted_at: null }).eq('operation_id', id);
+  showToast('✅ Възстановено!', 'success');
+  loadTrash();
+}
+
+async function permanentDelete(id) {
+  if (!confirm('ОКОНЧАТЕЛНО изтриване? Това не може да се възстанови!')) return;
+  // Delete operations + cashflow + header
+  await db.from('cashflow').delete().eq('operation_id', id);
+  await db.from('operations').delete().eq('header_id', id);
+  const { error } = await db.from('operation_headers').delete().eq('id', id);
+  if (error) { showToast('❌ ' + error.message, 'error'); return; }
+  showToast('🗑 Окончателно изтрито', 'success');
+  loadTrash();
+}
+
+async function loadTrashRetention() {
+  const { data } = await db.from('app_settings').select('value').eq('key', 'trash_retention_days').maybeSingle();
+  if (data) {
+    document.getElementById('trashRetentionDays').value = data.value;
+  }
+}
+
+async function saveTrashRetention() {
+  const days = parseInt(document.getElementById('trashRetentionDays').value);
+  if (!days || days < 1 || days > 365) { showToast('Въведи между 1 и 365 дни!', 'error'); return; }
+
+  await db.from('app_settings').upsert({
+    key: 'trash_retention_days',
+    value: days.toString(),
+    updated_at: new Date().toISOString()
+  });
+
+  showToast('✅ Запазено: ' + days + ' дни', 'success');
 }
 
 async function openCapitalModal() {
