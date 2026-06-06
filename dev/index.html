@@ -1001,7 +1001,7 @@ async function loadProducts() {
 }
 
 async function loadTechnicians() {
-  const { data } = await db.from('technicians').select('*').eq('active', true).order('name');
+  const { data } = await db.from('technicians').select('*').eq('active', true).is('deleted_at', null).order('name');
   if (!data) return;
   technicians = data;
   [document.getElementById('techSelect'), document.getElementById('defaultTechSelect')].forEach(sel => {
@@ -1392,6 +1392,8 @@ async function submitRestock() {
   // Засега - вземи последния cashflow drinks_sold за обекта (преди това посещение)
   const autoProducts = allProducts.filter(p => p.auto_add);
   let autoDrinks = 0;
+  console.log('AUTO ADD - allProducts:', allProducts.length, 'autoProducts:', autoProducts.length);
+  console.log('counter:', counter, 'obj:', obj?.id);
   if (autoProducts.length && counter && obj) {
     // Намери последния cashflow запис със знаен брояч ЗА ТОЗИ обект (за пресмятане на drinks_sold)
     const { data: prevCf } = await db.from('cashflow')
