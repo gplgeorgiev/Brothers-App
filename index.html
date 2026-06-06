@@ -1438,8 +1438,9 @@ async function createCashflowEntry(counter, obj, tech, date, operationId) {
     .from('cashflow')
     .select('id, counter, date')
     .eq('object_id', obj.id)
-    .lt('date', date)           // строго преди текущата дата
-    .not('counter', 'is', null) // само записи с брояч
+    .lt('date', date)
+    .not('counter', 'is', null)
+    .is('deleted_at', null)
     .order('date', { ascending: false })
     .order('id', { ascending: false })
     .limit(1);
@@ -1453,7 +1454,8 @@ async function createCashflowEntry(counter, obj, tech, date, operationId) {
       .eq('object_id', obj.id)
       .eq('date', date)
       .not('counter', 'is', null)
-      .lt('operation_id', operationId) // по-ранен запис в същия ден
+      .is('deleted_at', null)
+      .lt('operation_id', operationId)
       .order('id', { ascending: false })
       .limit(1);
     prevEntry = sameDay?.[0] || null;
@@ -1582,7 +1584,7 @@ async function saveEditCf() {
   const counter = parseInt(document.getElementById('editCfCounter').value) || null;
 
   // Вземи текущия запис
-  const { data: cf } = await db.from('cashflow').select('*').eq('id', currentEditCfId).single();
+  const { data: cf } = await db.from('cashflow').select('*').eq('id', currentEditCfId).is('deleted_at', null).single();
   if (!cf) return;
 
   const obj = objects.find(o => o.id === cf.object_id);
@@ -1694,6 +1696,7 @@ async function recalcNextCashflow(objectId, fromDate, newPrevCounter, fromId) {
     .select('*')
     .eq('object_id', objectId)
     .not('counter', 'is', null)
+    .is('deleted_at', null)
     .gt('id', currentId)
     .order('id', { ascending: true });
 
@@ -1757,7 +1760,7 @@ async function saveCash() {
   if (!currentCashflowId) return;
 
   // Вземи cashflow записа за да знаем обекта и техника
-  const { data: cf } = await db.from('cashflow').select('*').eq('id', currentCashflowId).single();
+  const { data: cf } = await db.from('cashflow').select('*').eq('id', currentCashflowId).is('deleted_at', null).single();
   if (!cf) return;
 
   // 1. Обнови cashflow
@@ -2065,7 +2068,7 @@ async function saveEditLine() {
 
   // Обнови total_cost в хедъра
   if (op?.header_id) {
-    const { data: allLines } = await db.from('operations').select('cost_value').eq('header_id', op.header_id);
+    const { data: allLines } = await db.from('operations').select('cost_value').eq('header_id', op.header_id).is('deleted_at', null);
     const newTotal = (allLines || []).reduce((s, r) => s + (r.cost_value || 0), 0);
     await db.from('operation_headers').update({ total_cost: parseFloat(newTotal.toFixed(2)) }).eq('id', op.header_id);
   }
@@ -2078,7 +2081,7 @@ async function saveEditLine() {
 
 async function deleteLine(id) {
   if (!confirm('Преместване на реда в кошчето?')) return;
-  const { data: op } = await db.from('operations').select('header_id').eq('id', id).single();
+  const { data: op } = await db.from('operations').select('header_id').eq('id', id).is('deleted_at', null).single();
   const { error } = await db.from('operations').update({ deleted_at: new Date().toISOString() }).eq('id', id);
   if (error) { showToast('❌ ' + error.message, 'error'); return; }
   if (op?.header_id) {
@@ -2536,10 +2539,10 @@ async function deleteFinanceHeader(id) {
 // Edit Finance modal
 let currentEditFinId = null;
 async function openEditFinModal(id) {
-  const { data: hdr } = await db.from('operation_headers').select('*').eq('id', id).single();
+  const { data: hdr } = await db.from('operation_headers').select('*').eq('id', id).is('deleted_at', null).single();
   if (!hdr) { showToast('❌ Не намерих запис', 'error'); return; }
 
-  const { data: ops } = await db.from('operations').select('*').eq('header_id', id);
+  const { data: ops } = await db.from('operations').select('*').eq('header_id', id).is('deleted_at', null);
 
   currentEditFinId = id;
 
@@ -2637,7 +2640,8 @@ async function saveEditFin() {
   const { data: cashOps } = await db.from('operations')
     .select('id, account_code')
     .eq('header_id', currentEditFinId)
-    .in('account_code', ['50101', '50301']);
+    .in('account_code', ['50101', '50301'])
+    .is('deleted_at', null);
 
   if (cashOps?.length) {
     // Обнови съществуващия ред
@@ -3212,6 +3216,7 @@ async function loadUnknownRoutes() {
   if (!el) return;
   const { data, error } = await db.from('unknown_routes')
     .select('*')
+    .is('deleted_at', null)
     .order('detected_count', { ascending: false });
 
   if (error) { el.innerHTML = `<div class="empty"><div class="empty-icon">❌</div><p>${error.message}</p></div>`; return; }
