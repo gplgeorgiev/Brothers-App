@@ -2163,6 +2163,18 @@ async function saveEditOp() {
   }).eq('id', currentEditOpId);
 
   if (error) { showToast('❌ ' + error.message, 'error'); return; }
+
+  // Обнови дата/обект/техник и в свързаните operations
+  await db.from('operations').update({
+    date, object_name: obj?.name, technician_name: tech?.name
+  }).eq('header_id', currentEditOpId);
+
+  // Обнови и cashflow ако има (за restock хедъри)
+  await db.from('cashflow').update({
+    date, object_id: objId, object_name: obj?.name,
+    technician_id: techId, technician_name: tech?.name
+  }).eq('operation_id', currentEditOpId);
+
   closeEditOpModal();
   showToast('✅ Хедърът е обновен!', 'success');
   await loadRestockHistory();
