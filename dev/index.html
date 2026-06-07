@@ -1553,7 +1553,8 @@ async function loadCashflow() {
   const pendingEl = document.getElementById('pendingList');
   pendingEl.innerHTML = '<div class="loading"><div class="spinner"></div> зарежда...</div>';
 
-  let pendingQ = db.from('cashflow').select('*').eq('status', 'pending').order('date', { ascending: false });
+  console.log('loadCashflow filters:', { objFilter, dateFilter });
+  let pendingQ = db.from('cashflow').select('*').eq('status', 'pending').is('deleted_at', null).order('date', { ascending: false });
   if (objFilter) pendingQ = pendingQ.eq('object_id', parseInt(objFilter));
   if (dateFilter) pendingQ = pendingQ.gte('date', dateFilter);
   const { data: pending } = await pendingQ;
@@ -1941,6 +1942,7 @@ async function loadRestockHistory() {
   el.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
   const objFilter = document.getElementById('restockFilterObject')?.value || '';
   const dateFilter = document.getElementById('restockFilterDate')?.value || '';
+  console.log('Restock filters:', { objFilter, dateFilter });
 
   let q = db.from('operation_headers')
     .select('*, operations(id, product_name, product_id, quantity, cost_value, account_code, amount, deleted_at)')
@@ -2582,6 +2584,7 @@ async function loadTxHistory() {
   el.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
   const typeFilter = document.getElementById('txFilterType')?.value || '';
   const dateFilter = document.getElementById('txFilterDate')?.value || '';
+  console.log('Tx filters:', { typeFilter, dateFilter });
 
   let q = db.from('operation_headers')
     .select('*, operations(account_code, amount, product_name)')
