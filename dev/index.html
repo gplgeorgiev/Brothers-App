@@ -837,7 +837,22 @@
   <div class="section-label">Касова наличност</div>
   <div id="balanceSummary"><div class="loading"><div class="spinner"></div></div></div>
 
-  <div class="section-label" style="margin-top:20px">Тази седмица</div>
+  <div class="section-label" style="margin-top:20px">Период</div>
+  <div class="card" style="padding:10px 14px;">
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px;">
+      <div class="field" style="margin-bottom:0;">
+        <label>ДАТА ОТ</label>
+        <input type="date" id="statsDateFrom" onchange="loadStats()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; font-family:var(--font);">
+      </div>
+      <div class="field" style="margin-bottom:0;">
+        <label>ДО</label>
+        <input type="date" id="statsDateTo" onchange="loadStats()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; font-family:var(--font);">
+      </div>
+    </div>
+    <button onclick="statsResetMonth()" style="width:100%; padding:8px; border-radius:8px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:12px; font-weight:700; cursor:pointer; font-family:var(--font);">📅 Текущ месец</button>
+  </div>
+
+  <div class="section-label" id="statsPeriodLabel" style="margin-top:20px">Текущ месец</div>
   <div class="stats-grid" id="statsGrid"><div class="loading" style="grid-column:1/-1"><div class="spinner"></div></div></div>
   <div class="section-label" style="margin-top:24px">По обект</div>
   <div id="objectStats"></div>
@@ -2233,41 +2248,116 @@ async function deleteOp(id) {
 }
 
 // ── STATS ──
+function statsResetMonth() {
+  const now = new Date();
+  const first = new Date(now.getFullYear(), now.getMonth(), 1);
+  const firstStr = first.toISOString().split('T')[0];
+  const todayStr = getLocalDateString();
+  document.getElementById('statsDateFrom').value = firstStr;
+  document.getElementById('statsDateTo').value = todayStr;
+  document.getElementById('statsPeriodLabel').textContent = 'Текущ месец';
+  loadStats();
+}
+
 async function loadStats() {
   await loadBalanceSummary();
   const grid = document.getElementById('statsGrid');
   grid.innerHTML = '<div class="loading" style="grid-column:1/-1"><div class="spinner"></div></div>';
-  const weekStart = getWeekStart();
-  const [{ data: headersData }, { data: cashData }] = await Promise.all([
-    db.from('operation_headers').select('*, operations(cost_value)').gte('date', weekStart),
-    db.from('cashflow').select('*').gte('date', weekStart).eq('status', 'completed')
-  ]);
-  if (!headersData) return;
-  const totalCash = (cashData || []).reduce((s,r) => s+(r.cash||0), 0);
-  const totalCost = headersData.reduce((s,h) => s+(h.total_cost||0), 0);
-  const uniqueObjs = new Set(headersData.map(h=>h.object_id)).size;
-  const totalRestocks = headersData.length;
-  grid.innerHTML = `
-    <div class="stat-card"><div class="stat-label">Cash тази седм.</div><div class="stat-value green">${totalCash.toFixed(0)} EUR</div></div>
-    <div class="stat-card"><div class="stat-label">Стойност заредено</div><div class="stat-value amber">${totalCost.toFixed(0)} EUR</div></div>
-    <div class="stat-card"><div class="stat-label">Зареждания</div><div class="stat-value blue">${totalRestocks}</div></div>
-    <div class="stat-card"><div class="stat-label">Обекти</div><div class="stat-value">${uniqueObjs}</div></div>`;
+
+  // Период по подразбиране - текущ месец
+  let dateFrom = document.getElementById('statsDateFrom')?.value;
+  let dateTo = document.getElementById('statsDateTo')?.value;
+  if (!dateFrom || !dateTo) {
+    const now = new Date();
+    const first = new Date(now.getFullYear(), now.getMonth(), 1);
+    dateFrom = first.toISOString().split('T')[0];
+    dateTo = getLocalDateString();
+    if (document.getElementById('statsDateFrom')) document.getElementById('statsDateFrom').value = dateFrom;
+    if (document.getElementById('statsDateTo')) document.getElementById('statsDateTo').value = dateTo;
+  }
+
+  // Обнови label
+  const labelEl = document.getElementById('statsPeriodLabel');
+  const now = new Date();
+  const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+  const todayStr = getLocalDateString();
+  if (dateFrom === firstOfMonth && dateTo === todayStr) {
+    labelEl.textContent = 'Текущ месец';
+  } else {
+    labelEl.textContent = `${formatDateBG(new Date(dateFrom))} — ${formatDateBG(new Date(dateTo))}`;
+  }
+
+  // Взимаме operations с header data - филтрираме по период и не-изтрити
+  const { data: ops } = await db.from('operations')
+    .select('account_code, amount, entry_type, object_name, header_id, operation_headers!inner(date, op_type, deleted_at, object_name)')
+    .gte('operation_headers.date', dateFrom)
+    .lte('operation_headers.date', dateTo)
+    .is('deleted_at', null);
+
+  if (!ops) {
+    grid.innerHTML = '<div class="empty"><div class="empty-icon">📊</div><p>Няма данни</p></div>';
+    return;
+  }
+
+  // Филтрирай само не-изтрити хедъри
+  const validOps = ops.filter(o => !o.operation_headers?.deleted_at);
+
+  // Групирай по обект
   const byObj = {};
-  headersData.forEach(h => {
-    if(!byObj[h.object_name]) byObj[h.object_name]={cash:0,cost:0,ops:0};
-    byObj[h.object_name].cost+=h.total_cost||0;
-    byObj[h.object_name].ops++;
+  let totalIncome = 0, totalExpense = 0;
+
+  validOps.forEach(op => {
+    const objName = op.object_name || op.operation_headers?.object_name || '—';
+    if (!byObj[objName]) byObj[objName] = { income: 0, expense: 0 };
+
+    const acc = op.account_code || '';
+    const entry = op.entry_type;
+    const amt = op.amount || 0;
+
+    // 7xxxx сметки = Приход. Кредит увеличава.
+    if (acc.startsWith('7')) {
+      if (entry === 'C') byObj[objName].income += amt;
+      else if (entry === 'D') byObj[objName].income -= amt;
+    }
+    // 6xxxx сметки = Разход. Дебит увеличава.
+    else if (acc.startsWith('6')) {
+      if (entry === 'D') byObj[objName].expense += amt;
+      else if (entry === 'C') byObj[objName].expense -= amt;
+    }
   });
-  (cashData||[]).forEach(r => {
-    if(!byObj[r.object_name]) byObj[r.object_name]={cash:0,cost:0,ops:0};
-    byObj[r.object_name].cash+=r.cash||0;
+
+  // Общи стойности
+  Object.values(byObj).forEach(s => {
+    totalIncome += s.income;
+    totalExpense += s.expense;
   });
-  document.getElementById('objectStats').innerHTML = Object.entries(byObj).sort((a,b)=>b[1].cash-a[1].cash).map(([name,s])=>`
-    <div class="card">
-      <div class="info-row" style="padding-top:0"><span style="font-weight:700">${name}</span><span class="badge green">${s.cash.toFixed(0)} EUR</span></div>
-      <div class="info-row"><span class="key">Заредено</span><span class="val" style="color:var(--amber)">${s.cost.toFixed(0)} EUR</span></div>
-      <div class="info-row" style="padding-bottom:0"><span class="key">Зареждания</span><span class="val">${s.ops}</span></div>
-    </div>`).join('') || '<div class="empty"><div class="empty-icon">📊</div><p>Няма данни</p></div>';
+
+  const profit = totalIncome - totalExpense;
+  const objCount = Object.keys(byObj).filter(k => byObj[k].income > 0 || byObj[k].expense > 0).length;
+
+  grid.innerHTML = `
+    <div class="stat-card"><div class="stat-label">Приход</div><div class="stat-value green">${totalIncome.toFixed(0)} EUR</div></div>
+    <div class="stat-card"><div class="stat-label">Разход</div><div class="stat-value" style="color:var(--red)">${totalExpense.toFixed(0)} EUR</div></div>
+    <div class="stat-card"><div class="stat-label">Печалба</div><div class="stat-value ${profit >= 0 ? 'green' : ''}" style="${profit < 0 ? 'color:var(--red)' : ''}">${profit.toFixed(0)} EUR</div></div>
+    <div class="stat-card"><div class="stat-label">Обекти</div><div class="stat-value">${objCount}</div></div>`;
+
+  // По обект
+  const sorted = Object.entries(byObj)
+    .filter(([n, s]) => s.income > 0 || s.expense > 0)
+    .sort((a, b) => (b[1].income - b[1].expense) - (a[1].income - a[1].expense));
+
+  document.getElementById('objectStats').innerHTML = sorted.map(([name, s]) => {
+    const result = s.income - s.expense;
+    return `
+      <div class="card">
+        <div class="info-row" style="padding-top:0">
+          <span style="font-weight:700">${name}</span>
+          <span class="badge ${result >= 0 ? 'green' : ''}" style="${result < 0 ? 'background:rgba(220,38,38,0.15); color:var(--red); border-color:rgba(220,38,38,0.3);' : ''}">${result.toFixed(2)} EUR</span>
+        </div>
+        <div class="info-row"><span class="key">Приходи</span><span class="val" style="color:var(--green)">${s.income.toFixed(2)} EUR</span></div>
+        <div class="info-row" style="padding-bottom:0"><span class="key">Разходи</span><span class="val" style="color:var(--red)">${s.expense.toFixed(2)} EUR</span></div>
+      </div>`;
+  }).join('') || '<div class="empty"><div class="empty-icon">📊</div><p>Няма данни</p></div>';
 }
 
 // ── TECH DEFAULT ──
