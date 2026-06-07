@@ -1372,8 +1372,7 @@ async function submitRestock() {
   // 30201 — по един ред за всеки продукт (аналитичност на склада)
   // 60101 — един обобщен ред с общата сума
   const rows = [];
-  let totalCostFinal = totalCostValue;
-
+  
   lines.forEach(l => {
     const amount = parseFloat((l.product.price_with_vat * l.qty).toFixed(2));
     // Кредит 30201 — намаление на материали (по продукт)
@@ -1390,59 +1389,7 @@ async function submitRestock() {
   // АВТО ПРОДУКТИ - чаши, бъркалки и др. с auto_add=true
   // Изчисли drinks_sold за този хедър от cashflow при следващото посещение
   // Засега - вземи последния cashflow drinks_sold за обекта (преди това посещение)
-  const autoProducts = allProducts.filter(p => p.auto_add);
-  let autoDrinks = 0;
-  console.log('AUTO-ADD DEBUG:', { 
-    allProductsCount: allProducts?.length, 
-    autoProductsCount: autoProducts.length,
-    autoProducts: autoProducts.map(p => p.name),
-    counterVal2,
-    objId: obj?.id 
-  });
-  if (autoProducts.length && counterVal2 && obj) {
-    // Намери последния cashflow запис със знаен брояч ЗА ТОЗИ обект
-    // Вземи последния cashflow за обекта с counter (преди текущия запис)
-    const { data: prevCf } = await db.from('cashflow')
-      .select('counter, date, id')
-      .eq('object_id', obj.id)
-      .not('counter', 'is', null)
-      .is('deleted_at', null)
-      .order('id', { ascending: false })
-      .limit(2);  // вземаме 2 - текущия + предишния
-    console.log('prevCf raw:', prevCf);
-    // Намираме предишния (не току-що създадения)
-    let prevEntry = null;
-    if (prevCf?.length >= 2) {
-      prevEntry = prevCf[1];  // вторият е предишния
-    } else if (prevCf?.length === 1) {
-      // Има само 1 запис - може да е токущо създадения или истински предишен
-      // Проверка по дата
-      if (prevCf[0].date < date) prevEntry = prevCf[0];
-    }
-    console.log('prevEntry:', prevEntry);
-    const prevCounter = prevEntry?.counter;
-    console.log('Prev counter:', prevCounter, 'New:', counterVal2, 'Diff:', counterVal2 - prevCounter);
-    if (prevCounter != null && counterVal2 > prevCounter) {
-      autoDrinks = counterVal2 - prevCounter;
-    }
-  }
-  console.log('autoDrinks computed:', autoDrinks);
-
-  if (autoDrinks > 0) {
-    autoProducts.forEach(p => {
-      const amt = parseFloat((p.price_with_vat * autoDrinks).toFixed(2));
-      rows.push({
-        header_id: header.id, date,
-        object_name: obj?.name, technician_name: tech?.name,
-        product_id: p.id, product_name: p.name + ' (авто)',
-        quantity: autoDrinks,
-        cost_value: amt, amount: amt,
-        account_code: '30201', entry_type: 'C'
-      });
-      totalCostFinal += amt;
-    });
-  }
-
+  
   // Дебит 60101 — общ разход (вкл. auto-добавените)
   rows.push({
     header_id: header.id, date,
@@ -1464,8 +1411,47 @@ async function submitRestock() {
   if (rowsError) { showToast('❌ ' + rowsError.message, 'error'); return; }
 
   // СТЪПКА 3: Ако има брояч → създай cashflow запис
+  let cashflowDrinksSold = 0;
   if (counterVal2 && obj) {
     await createCashflowEntry(counterVal2, obj, tech, date, header.id);
+    // Вземи току-що създадения cashflow за да знаем drinks_sold
+    const { data: justCreated } = await db.from('cashflow')
+      .select('drinks_sold')
+      .eq('operation_id', header.id)
+      .is('deleted_at', null)
+      .order('id', { ascending: false })
+      .limit(1);
+    cashflowDrinksSold = justCreated?.[0]?.drinks_sold || 0;
+  }
+
+  // СТЪПКА 4: АВТО ПРОДУКТИ - чаши, бъркалки (auto_add=true) по drinks_sold от cashflow
+  const autoProducts = allProducts.filter(p => p.auto_add);
+  if (cashflowDrinksSold > 0 && autoProducts.length) {
+    const autoRows = [];
+    let autoTotal = 0;
+    autoProducts.forEach(p => {
+      const amt = parseFloat((p.price_with_vat * cashflowDrinksSold).toFixed(2));
+      autoTotal += amt;
+      autoRows.push({
+        header_id: header.id, date,
+        object_name: obj?.name, technician_name: tech?.name,
+        product_id: p.id, product_name: p.name + ' (авто)',
+        quantity: cashflowDrinksSold,
+        cost_value: amt, amount: amt,
+        account_code: '30201', entry_type: 'C'
+      });
+    });
+    if (autoRows.length) await db.from('operations').insert(autoRows);
+
+    // Обнови 60101 реда с новата сума
+    const newTotal = parseFloat((totalCostValue + autoTotal).toFixed(2));
+    await db.from('operations')
+      .update({ amount: newTotal, cost_value: newTotal })
+      .eq('header_id', header.id)
+      .eq('account_code', '60101');
+    await db.from('operation_headers')
+      .update({ total_cost: newTotal })
+      .eq('id', header.id);
   }
 
   showToast(`✅ Записани ${lines.length} продукта!`, 'success');
