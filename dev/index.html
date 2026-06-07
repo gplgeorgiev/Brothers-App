@@ -1396,14 +1396,11 @@ async function submitRestock() {
     object_name: obj?.name, technician_name: tech?.name,
     product_name: 'Изписани суровини',
     quantity: 1,
-    cost_value: parseFloat(totalCostFinal.toFixed(2)), amount: parseFloat(totalCostFinal.toFixed(2)),
+    cost_value: parseFloat(totalCostValue.toFixed(2)), amount: parseFloat(totalCostValue.toFixed(2)),
     account_code: '60101', entry_type: 'D'
   });
 
-  // Обнови total_cost в хедъра ако са добавени auto продукти
-  if (autoDrinks > 0) {
-    await db.from('operation_headers').update({ total_cost: parseFloat(totalCostFinal.toFixed(2)) }).eq('id', header.id);
-  }
+
 
   const { error: rowsError } = await db.from('operations').insert(rows);
 
