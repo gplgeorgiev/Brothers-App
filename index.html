@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Brothers">
-<title>Coffee Brothers</title>
+<title>Coffee Brothers DEV</title>
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="icon" type="image/png" href="icon-192.png">
 <link rel="manifest" href="manifest.json">
@@ -202,6 +202,7 @@
 </head>
 <body>
 
+<div style="background:#ff6b35; color:#fff; text-align:center; padding:6px; font-weight:800; font-size:12px; letter-spacing:1px;">⚠️ DEV ENVIRONMENT ⚠️</div>
 <div class="header" style="display:flex; align-items:center; justify-content:space-between; padding:14px 16px;">
   <button class="menu-btn" onclick="toggleSideMenu()" style="background:transparent; border:none; padding:8px; cursor:pointer; display:flex; flex-direction:column; gap:4px; color:var(--text);">
     <span style="width:22px; height:2px; background:currentColor; border-radius:2px;"></span>
@@ -359,16 +360,20 @@
   <!-- История на зарежданията -->
   <div class="section-label" style="margin-top:20px">Последни зареждания</div>
   <div class="card" style="margin-bottom:8px; padding:10px 14px;">
+    <div class="field" style="margin-bottom:10px;">
+      <label>ОБЕКТ</label>
+      <select id="restockFilterObject" onchange="loadRestockHistory()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; appearance:none; font-family:var(--font);">
+        <option value="">Всички</option>
+      </select>
+    </div>
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
       <div class="field" style="margin-bottom:0;">
-        <label>ОБЕКТ</label>
-        <select id="restockFilterObject" onchange="loadRestockHistory()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; appearance:none; font-family:var(--font);">
-          <option value="">Всички</option>
-        </select>
+        <label>ДАТА ОТ</label>
+        <input type="date" id="restockFilterDateFrom" onchange="loadRestockHistory()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; font-family:var(--font);">
       </div>
       <div class="field" style="margin-bottom:0;">
-        <label>ДАТА ОТ</label>
-        <input type="date" id="restockFilterDate" onchange="loadRestockHistory()">
+        <label>ДО</label>
+        <input type="date" id="restockFilterDateTo" onchange="loadRestockHistory()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; font-family:var(--font);">
       </div>
     </div>
   </div>
@@ -380,16 +385,20 @@
   <!-- Филтри -->
   <div class="section-label">Филтър</div>
   <div class="card">
-    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
-      <div class="field" style="margin-bottom:0">
-        <label>ОБЕКТ</label>
-        <select id="cfFilterObject" onchange="loadCashflow()">
-          <option value="">Всички</option>
-        </select>
-      </div>
+    <div class="field" style="margin-bottom:10px;">
+      <label>ОБЕКТ</label>
+      <select id="cfFilterObject" onchange="loadCashflow()">
+        <option value="">Всички</option>
+      </select>
+    </div>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
       <div class="field" style="margin-bottom:0">
         <label>ДАТА ОТ</label>
-        <input type="date" id="cfFilterDate" onchange="loadCashflow()">
+        <input type="date" id="cfFilterDateFrom" onchange="loadCashflow()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; font-family:var(--font);">
+      </div>
+      <div class="field" style="margin-bottom:0">
+        <label>ДО</label>
+        <input type="date" id="cfFilterDateTo" onchange="loadCashflow()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; font-family:var(--font);">
       </div>
     </div>
   </div>
@@ -637,18 +646,22 @@
   <!-- История -->
   <div class="section-label" style="margin-top:20px">Последни транзакции</div>
   <div class="card" style="margin-bottom:8px; padding:10px 14px;">
+    <div class="field" style="margin-bottom:10px;">
+      <label>ФИЛТЪР ТИП</label>
+      <select id="txFilterType" onchange="loadTxHistory()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; appearance:none; font-family:var(--font);">
+        <option value="">Всички</option>
+        <option value="income">Приходи</option>
+        <option value="expense">Разходи</option>
+      </select>
+    </div>
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
       <div class="field" style="margin-bottom:0;">
-        <label>ФИЛТЪР ТИП</label>
-        <select id="txFilterType" onchange="loadTxHistory()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; appearance:none; font-family:var(--font);">
-          <option value="">Всички</option>
-          <option value="income">Приходи</option>
-          <option value="expense">Разходи</option>
-        </select>
+        <label>ДАТА ОТ</label>
+        <input type="date" id="txFilterDateFrom" onchange="loadTxHistory()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; font-family:var(--font);">
       </div>
       <div class="field" style="margin-bottom:0;">
-        <label>ДАТА ОТ</label>
-        <input type="date" id="txFilterDate" onchange="loadTxHistory()">
+        <label>ДО</label>
+        <input type="date" id="txFilterDateTo" onchange="loadTxHistory()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; font-family:var(--font);">
       </div>
     </div>
   </div>
@@ -824,7 +837,22 @@
   <div class="section-label">Касова наличност</div>
   <div id="balanceSummary"><div class="loading"><div class="spinner"></div></div></div>
 
-  <div class="section-label" style="margin-top:20px">Тази седмица</div>
+  <div class="section-label" style="margin-top:20px">Период</div>
+  <div class="card" style="padding:10px 14px;">
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px;">
+      <div class="field" style="margin-bottom:0;">
+        <label>ДАТА ОТ</label>
+        <input type="date" id="statsDateFrom" onchange="loadStats()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; font-family:var(--font);">
+      </div>
+      <div class="field" style="margin-bottom:0;">
+        <label>ДО</label>
+        <input type="date" id="statsDateTo" onchange="loadStats()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; font-family:var(--font);">
+      </div>
+    </div>
+    <button onclick="statsResetMonth()" style="width:100%; padding:8px; border-radius:8px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:12px; font-weight:700; cursor:pointer; font-family:var(--font);">📅 Текущ месец</button>
+  </div>
+
+  <div class="section-label" id="statsPeriodLabel" style="margin-top:20px">Текущ месец</div>
   <div class="stats-grid" id="statsGrid"><div class="loading" style="grid-column:1/-1"><div class="spinner"></div></div></div>
   <div class="section-label" style="margin-top:24px">По обект</div>
   <div id="objectStats"></div>
@@ -934,12 +962,12 @@
 
 
 <script>
-const SUPABASE_URL = 'https://yqbfrncncserfpcdikxy.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_n4UfSazXU9vhI9fs2paVNQ_3kz_SD9L';
+const SUPABASE_URL = 'https://neqmyzoxbdedoaoqlpvq.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_EiMiF401eNLhjYa038FOJA_XnBfPQTO';
 const { createClient } = supabase;
 const db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-let objects = [], products = [], technicians = [];
+let objects = [], products = [], allProducts = [], technicians = [];
 let timerInterval = null, timerSeconds = 0, timerRunning = false;
 let lineCounter = 0;
 
@@ -993,13 +1021,14 @@ async function loadObjects() {
 async function loadProducts() {
   const { data } = await db.from('products').select('*').eq('active', true).order('sort_order', {ascending:true, nullsFirst:false}).order('name');
   if (!data) return;
-  products = data.filter(p => !p.auto_add);
+  allProducts = data;  // всички, вкл. auto_add
+  products = data.filter(p => !p.auto_add);  // само за избор в кошницата
   document.getElementById('prodCount').textContent = data.length;
   renderProductCards();
 }
 
 async function loadTechnicians() {
-  const { data } = await db.from('technicians').select('*').eq('active', true).order('name');
+  const { data } = await db.from('technicians').select('*').eq('active', true).is('deleted_at', null).order('name');
   if (!data) return;
   technicians = data;
   [document.getElementById('techSelect'), document.getElementById('defaultTechSelect')].forEach(sel => {
@@ -1370,6 +1399,7 @@ async function submitRestock() {
   // 30201 — по един ред за всеки продукт (аналитичност на склада)
   // 60101 — един обобщен ред с общата сума
   const rows = [];
+  
   lines.forEach(l => {
     const amount = parseFloat((l.product.price_with_vat * l.qty).toFixed(2));
     // Кредит 30201 — намаление на материали (по продукт)
@@ -1382,15 +1412,22 @@ async function submitRestock() {
       account_code: '30201', entry_type: 'C'
     });
   });
-  // Дебит 60101 — общ разход
+
+  // АВТО ПРОДУКТИ - чаши, бъркалки и др. с auto_add=true
+  // Изчисли drinks_sold за този хедър от cashflow при следващото посещение
+  // Засега - вземи последния cashflow drinks_sold за обекта (преди това посещение)
+  
+  // Дебит 60101 — общ разход (вкл. auto-добавените)
   rows.push({
     header_id: header.id, date,
     object_name: obj?.name, technician_name: tech?.name,
     product_name: 'Изписани суровини',
     quantity: 1,
-    cost_value: totalCostValue, amount: totalCostValue,
+    cost_value: parseFloat(totalCostValue.toFixed(2)), amount: parseFloat(totalCostValue.toFixed(2)),
     account_code: '60101', entry_type: 'D'
   });
+
+
 
   const { error: rowsError } = await db.from('operations').insert(rows);
 
@@ -1398,8 +1435,47 @@ async function submitRestock() {
   if (rowsError) { showToast('❌ ' + rowsError.message, 'error'); return; }
 
   // СТЪПКА 3: Ако има брояч → създай cashflow запис
+  let cashflowDrinksSold = 0;
   if (counterVal2 && obj) {
     await createCashflowEntry(counterVal2, obj, tech, date, header.id);
+    // Вземи току-що създадения cashflow за да знаем drinks_sold
+    const { data: justCreated } = await db.from('cashflow')
+      .select('drinks_sold')
+      .eq('operation_id', header.id)
+      .is('deleted_at', null)
+      .order('id', { ascending: false })
+      .limit(1);
+    cashflowDrinksSold = justCreated?.[0]?.drinks_sold || 0;
+  }
+
+  // СТЪПКА 4: АВТО ПРОДУКТИ - чаши, бъркалки (auto_add=true) по drinks_sold от cashflow
+  const autoProducts = allProducts.filter(p => p.auto_add);
+  if (cashflowDrinksSold > 0 && autoProducts.length) {
+    const autoRows = [];
+    let autoTotal = 0;
+    autoProducts.forEach(p => {
+      const amt = parseFloat((p.price_with_vat * cashflowDrinksSold).toFixed(2));
+      autoTotal += amt;
+      autoRows.push({
+        header_id: header.id, date,
+        object_name: obj?.name, technician_name: tech?.name,
+        product_id: p.id, product_name: p.name + ' (авто)',
+        quantity: cashflowDrinksSold,
+        cost_value: amt, amount: amt,
+        account_code: '30201', entry_type: 'C'
+      });
+    });
+    if (autoRows.length) await db.from('operations').insert(autoRows);
+
+    // Обнови 60101 реда с новата сума
+    const newTotal = parseFloat((totalCostValue + autoTotal).toFixed(2));
+    await db.from('operations')
+      .update({ amount: newTotal, cost_value: newTotal })
+      .eq('header_id', header.id)
+      .eq('account_code', '60101');
+    await db.from('operation_headers')
+      .update({ total_cost: newTotal })
+      .eq('id', header.id);
   }
 
   showToast(`✅ Записани ${lines.length} продукта!`, 'success');
@@ -1498,15 +1574,18 @@ async function createCashflowEntry(counter, obj, tech, date, operationId) {
 
 async function loadCashflow() {
   const objFilter = document.getElementById('cfFilterObject')?.value || '';
-  const dateFilter = document.getElementById('cfFilterDate')?.value || '';
+  const dateFrom = document.getElementById('cfFilterDateFrom')?.value || '';
+  const dateTo = document.getElementById('cfFilterDateTo')?.value || '';
 
   // Pending
   const pendingEl = document.getElementById('pendingList');
   pendingEl.innerHTML = '<div class="loading"><div class="spinner"></div> зарежда...</div>';
 
-  let pendingQ = db.from('cashflow').select('*').eq('status', 'pending').order('date', { ascending: false });
+
+  let pendingQ = db.from('cashflow').select('*').eq('status', 'pending').is('deleted_at', null).order('date', { ascending: false });
   if (objFilter) pendingQ = pendingQ.eq('object_id', parseInt(objFilter));
-  if (dateFilter) pendingQ = pendingQ.gte('date', dateFilter);
+  if (dateFrom) pendingQ = pendingQ.gte('date', dateFrom);
+  if (dateTo) pendingQ = pendingQ.lte('date', dateTo);
   const { data: pending } = await pendingQ;
 
   if (!pending?.length) {
@@ -1538,7 +1617,8 @@ async function loadCashflow() {
   const completedEl = document.getElementById('completedList');
   let completedQ = db.from('cashflow').select('*').eq('status', 'completed').is('deleted_at', null).order('completed_at', { ascending: false }).limit(30);
   if (objFilter) completedQ = completedQ.eq('object_id', parseInt(objFilter));
-  if (dateFilter) completedQ = completedQ.gte('date', dateFilter);
+  if (dateFrom) completedQ = completedQ.gte('date', dateFrom);
+  if (dateTo) completedQ = completedQ.lte('date', dateTo);
   const { data: completed } = await completedQ;
 
   if (!completed?.length) {
@@ -1678,9 +1758,67 @@ async function saveEditCf() {
     }
   }
 
+  // ОПРЕСНЯВАНЕ НА AUTO-ADD ПРОДУКТИТЕ (Чаши, Бъркалки)
+  // Намери header-а от зареждането (cf.operation_id)
+  if (cf.operation_id && update.drinks_sold != null) {
+    const autoProducts = allProducts.filter(p => p.auto_add);
+    if (autoProducts.length) {
+      // Изтрий старите auto редове за този хедър
+      const autoIds = autoProducts.map(p => p.id);
+      await db.from('operations')
+        .delete()
+        .eq('header_id', cf.operation_id)
+        .in('product_id', autoIds);
+
+      // Добави нови auto редове с новия drinks_sold
+      const newDrinks = update.drinks_sold;
+      let autoTotal = 0;
+      const autoRows = [];
+      if (newDrinks > 0) {
+        autoProducts.forEach(p => {
+          const amt = parseFloat((p.price_with_vat * newDrinks).toFixed(2));
+          autoTotal += amt;
+          autoRows.push({
+            header_id: cf.operation_id,
+            date: cf.date,
+            object_name: cf.object_name,
+            technician_name: cf.technician_name,
+            product_id: p.id,
+            product_name: p.name + ' (авто)',
+            quantity: newDrinks,
+            cost_value: amt, amount: amt,
+            account_code: '30201', entry_type: 'C'
+          });
+        });
+        if (autoRows.length) await db.from('operations').insert(autoRows);
+      }
+
+      // Преизчисли total_cost от всички 30201 редове + обнови 60101 ред
+      const { data: allCreditRows } = await db.from('operations')
+        .select('amount')
+        .eq('header_id', cf.operation_id)
+        .eq('account_code', '30201')
+        .eq('entry_type', 'C')
+        .is('deleted_at', null);
+      const newTotal = (allCreditRows || []).reduce((s, r) => s + (r.amount || 0), 0);
+
+      // Обнови 60101 ред
+      await db.from('operations')
+        .update({ amount: parseFloat(newTotal.toFixed(2)), cost_value: parseFloat(newTotal.toFixed(2)) })
+        .eq('header_id', cf.operation_id)
+        .eq('account_code', '60101');
+
+      // Обнови total_cost в хедъра
+      await db.from('operation_headers')
+        .update({ total_cost: parseFloat(newTotal.toFixed(2)) })
+        .eq('id', cf.operation_id);
+    }
+  }
+
   closeEditCfModal();
   showToast('✅ Записът е обновен!', 'success');
   loadCashflow();
+  if (typeof loadRestockHistory === 'function') loadRestockHistory();
 }
 
 async function recalcNextCashflow(objectId, fromDate, newPrevCounter, fromId) {
@@ -1833,7 +1971,8 @@ async function loadRestockHistory() {
   console.log('Element exists, fetching data...');
   el.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
   const objFilter = document.getElementById('restockFilterObject')?.value || '';
-  const dateFilter = document.getElementById('restockFilterDate')?.value || '';
+  const dateFrom = document.getElementById('restockFilterDateFrom')?.value || '';
+  const dateTo = document.getElementById('restockFilterDateTo')?.value || '';
 
   let q = db.from('operation_headers')
     .select('*, operations(id, product_name, product_id, quantity, cost_value, account_code, amount, deleted_at)')
@@ -1843,7 +1982,8 @@ async function loadRestockHistory() {
     .order('created_at', { ascending: false })
     .limit(20);
   if (objFilter) q = q.eq('object_id', parseInt(objFilter));
-  if (dateFilter) q = q.gte('date', dateFilter);
+  if (dateFrom) q = q.gte('date', dateFrom);
+  if (dateTo) q = q.lte('date', dateTo);
 
   const { data, error } = await q;
   if (error) { el.innerHTML = `<div class="empty"><div class="empty-icon">❌</div><p>${error.message}</p></div>`; return; }
@@ -1888,7 +2028,8 @@ async function loadHistory() {
   list.innerHTML = '<div class="loading"><div class="spinner"></div> зарежда...</div>';
 
   const objFilter = document.getElementById('histFilterObject')?.value || '';
-  const dateFilter = document.getElementById('histFilterDate')?.value || '';
+  const dateFrom = document.getElementById('histFilterDateFrom')?.value || '';
+  const dateTo = document.getElementById('histFilterDateTo')?.value || '';
 
   // Зареди хедъри с JOIN към редовете
   let q = db.from('operation_headers')
@@ -1897,7 +2038,8 @@ async function loadHistory() {
     .order('created_at', { ascending: false })
     .limit(30);
   if (objFilter) q = q.eq('object_id', parseInt(objFilter));
-  if (dateFilter) q = q.gte('date', dateFilter);
+  if (dateFrom) q = q.gte('date', dateFrom);
+  if (dateTo) q = q.lte('date', dateTo);
 
   const { data, error } = await q;
   console.log('History data:', data, 'error:', error);
@@ -2021,6 +2163,18 @@ async function saveEditOp() {
   }).eq('id', currentEditOpId);
 
   if (error) { showToast('❌ ' + error.message, 'error'); return; }
+
+  // Обнови дата/обект/техник и в свързаните operations
+  await db.from('operations').update({
+    date, object_name: obj?.name, technician_name: tech?.name
+  }).eq('header_id', currentEditOpId);
+
+  // Обнови и cashflow ако има (за restock хедъри)
+  await db.from('cashflow').update({
+    date, object_id: objId, object_name: obj?.name,
+    technician_id: techId, technician_name: tech?.name
+  }).eq('operation_id', currentEditOpId);
+
   closeEditOpModal();
   showToast('✅ Хедърът е обновен!', 'success');
   await loadRestockHistory();
@@ -2106,41 +2260,116 @@ async function deleteOp(id) {
 }
 
 // ── STATS ──
+function statsResetMonth() {
+  const now = new Date();
+  const first = new Date(now.getFullYear(), now.getMonth(), 1);
+  const firstStr = first.toISOString().split('T')[0];
+  const todayStr = getLocalDateString();
+  document.getElementById('statsDateFrom').value = firstStr;
+  document.getElementById('statsDateTo').value = todayStr;
+  document.getElementById('statsPeriodLabel').textContent = 'Текущ месец';
+  loadStats();
+}
+
 async function loadStats() {
   await loadBalanceSummary();
   const grid = document.getElementById('statsGrid');
   grid.innerHTML = '<div class="loading" style="grid-column:1/-1"><div class="spinner"></div></div>';
-  const weekStart = getWeekStart();
-  const [{ data: headersData }, { data: cashData }] = await Promise.all([
-    db.from('operation_headers').select('*, operations(cost_value)').gte('date', weekStart),
-    db.from('cashflow').select('*').gte('date', weekStart).eq('status', 'completed')
-  ]);
-  if (!headersData) return;
-  const totalCash = (cashData || []).reduce((s,r) => s+(r.cash||0), 0);
-  const totalCost = headersData.reduce((s,h) => s+(h.total_cost||0), 0);
-  const uniqueObjs = new Set(headersData.map(h=>h.object_id)).size;
-  const totalRestocks = headersData.length;
-  grid.innerHTML = `
-    <div class="stat-card"><div class="stat-label">Cash тази седм.</div><div class="stat-value green">${totalCash.toFixed(0)} EUR</div></div>
-    <div class="stat-card"><div class="stat-label">Стойност заредено</div><div class="stat-value amber">${totalCost.toFixed(0)} EUR</div></div>
-    <div class="stat-card"><div class="stat-label">Зареждания</div><div class="stat-value blue">${totalRestocks}</div></div>
-    <div class="stat-card"><div class="stat-label">Обекти</div><div class="stat-value">${uniqueObjs}</div></div>`;
+
+  // Период по подразбиране - текущ месец
+  let dateFrom = document.getElementById('statsDateFrom')?.value;
+  let dateTo = document.getElementById('statsDateTo')?.value;
+  if (!dateFrom || !dateTo) {
+    const now = new Date();
+    const first = new Date(now.getFullYear(), now.getMonth(), 1);
+    dateFrom = first.toISOString().split('T')[0];
+    dateTo = getLocalDateString();
+    if (document.getElementById('statsDateFrom')) document.getElementById('statsDateFrom').value = dateFrom;
+    if (document.getElementById('statsDateTo')) document.getElementById('statsDateTo').value = dateTo;
+  }
+
+  // Обнови label
+  const labelEl = document.getElementById('statsPeriodLabel');
+  const now = new Date();
+  const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+  const todayStr = getLocalDateString();
+  if (dateFrom === firstOfMonth && dateTo === todayStr) {
+    labelEl.textContent = 'Текущ месец';
+  } else {
+    labelEl.textContent = `${formatDateBG(new Date(dateFrom))} — ${formatDateBG(new Date(dateTo))}`;
+  }
+
+  // Взимаме operations с header data - филтрираме по период и не-изтрити
+  const { data: ops } = await db.from('operations')
+    .select('account_code, amount, entry_type, object_name, header_id, operation_headers!inner(date, op_type, deleted_at, object_name)')
+    .gte('operation_headers.date', dateFrom)
+    .lte('operation_headers.date', dateTo)
+    .is('deleted_at', null);
+
+  if (!ops) {
+    grid.innerHTML = '<div class="empty"><div class="empty-icon">📊</div><p>Няма данни</p></div>';
+    return;
+  }
+
+  // Филтрирай само не-изтрити хедъри
+  const validOps = ops.filter(o => !o.operation_headers?.deleted_at);
+
+  // Групирай по обект
   const byObj = {};
-  headersData.forEach(h => {
-    if(!byObj[h.object_name]) byObj[h.object_name]={cash:0,cost:0,ops:0};
-    byObj[h.object_name].cost+=h.total_cost||0;
-    byObj[h.object_name].ops++;
+  let totalIncome = 0, totalExpense = 0;
+
+  validOps.forEach(op => {
+    const objName = op.object_name || op.operation_headers?.object_name || '—';
+    if (!byObj[objName]) byObj[objName] = { income: 0, expense: 0 };
+
+    const acc = op.account_code || '';
+    const entry = op.entry_type;
+    const amt = op.amount || 0;
+
+    // 7xxxx сметки = Приход. Кредит увеличава.
+    if (acc.startsWith('7')) {
+      if (entry === 'C') byObj[objName].income += amt;
+      else if (entry === 'D') byObj[objName].income -= amt;
+    }
+    // 6xxxx сметки = Разход. Дебит увеличава.
+    else if (acc.startsWith('6')) {
+      if (entry === 'D') byObj[objName].expense += amt;
+      else if (entry === 'C') byObj[objName].expense -= amt;
+    }
   });
-  (cashData||[]).forEach(r => {
-    if(!byObj[r.object_name]) byObj[r.object_name]={cash:0,cost:0,ops:0};
-    byObj[r.object_name].cash+=r.cash||0;
+
+  // Общи стойности
+  Object.values(byObj).forEach(s => {
+    totalIncome += s.income;
+    totalExpense += s.expense;
   });
-  document.getElementById('objectStats').innerHTML = Object.entries(byObj).sort((a,b)=>b[1].cash-a[1].cash).map(([name,s])=>`
-    <div class="card">
-      <div class="info-row" style="padding-top:0"><span style="font-weight:700">${name}</span><span class="badge green">${s.cash.toFixed(0)} EUR</span></div>
-      <div class="info-row"><span class="key">Заредено</span><span class="val" style="color:var(--amber)">${s.cost.toFixed(0)} EUR</span></div>
-      <div class="info-row" style="padding-bottom:0"><span class="key">Зареждания</span><span class="val">${s.ops}</span></div>
-    </div>`).join('') || '<div class="empty"><div class="empty-icon">📊</div><p>Няма данни</p></div>';
+
+  const profit = totalIncome - totalExpense;
+  const objCount = Object.keys(byObj).filter(k => byObj[k].income > 0 || byObj[k].expense > 0).length;
+
+  grid.innerHTML = `
+    <div class="stat-card"><div class="stat-label">Приход</div><div class="stat-value green">${totalIncome.toFixed(0)} EUR</div></div>
+    <div class="stat-card"><div class="stat-label">Разход</div><div class="stat-value" style="color:var(--red)">${totalExpense.toFixed(0)} EUR</div></div>
+    <div class="stat-card"><div class="stat-label">Печалба</div><div class="stat-value ${profit >= 0 ? 'green' : ''}" style="${profit < 0 ? 'color:var(--red)' : ''}">${profit.toFixed(0)} EUR</div></div>
+    <div class="stat-card"><div class="stat-label">Обекти</div><div class="stat-value">${objCount}</div></div>`;
+
+  // По обект
+  const sorted = Object.entries(byObj)
+    .filter(([n, s]) => s.income > 0 || s.expense > 0)
+    .sort((a, b) => (b[1].income - b[1].expense) - (a[1].income - a[1].expense));
+
+  document.getElementById('objectStats').innerHTML = sorted.map(([name, s]) => {
+    const result = s.income - s.expense;
+    return `
+      <div class="card">
+        <div class="info-row" style="padding-top:0">
+          <span style="font-weight:700">${name}</span>
+          <span class="badge ${result >= 0 ? 'green' : ''}" style="${result < 0 ? 'background:rgba(220,38,38,0.15); color:var(--red); border-color:rgba(220,38,38,0.3);' : ''}">${result.toFixed(2)} EUR</span>
+        </div>
+        <div class="info-row"><span class="key">Приходи</span><span class="val" style="color:var(--green)">${s.income.toFixed(2)} EUR</span></div>
+        <div class="info-row" style="padding-bottom:0"><span class="key">Разходи</span><span class="val" style="color:var(--red)">${s.expense.toFixed(2)} EUR</span></div>
+      </div>`;
+  }).join('') || '<div class="empty"><div class="empty-icon">📊</div><p>Няма данни</p></div>';
 }
 
 // ── TECH DEFAULT ──
@@ -2474,7 +2703,8 @@ async function loadTxHistory() {
   if (!el) return;
   el.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
   const typeFilter = document.getElementById('txFilterType')?.value || '';
-  const dateFilter = document.getElementById('txFilterDate')?.value || '';
+  const dateFrom = document.getElementById('txFilterDateFrom')?.value || '';
+  const dateTo = document.getElementById('txFilterDateTo')?.value || '';
 
   let q = db.from('operation_headers')
     .select('*, operations(account_code, amount, product_name)')
@@ -2485,7 +2715,8 @@ async function loadTxHistory() {
     .limit(40);
   if (typeFilter === 'income') q = q.eq('op_type', 'finance_income');
   if (typeFilter === 'expense') q = q.eq('op_type', 'finance_expense');
-  if (dateFilter) q = q.gte('date', dateFilter);
+  if (dateFrom) q = q.gte('date', dateFrom);
+  if (dateTo) q = q.lte('date', dateTo);
 
   const { data, error } = await q;
   if (error) { el.innerHTML = `<div class="empty"><div class="empty-icon">❌</div><p>${error.message}</p></div>`; return; }
@@ -2740,7 +2971,8 @@ async function loadServiceOrders() {
 
   let q = db.from('service_orders').select('*').order('date', { ascending: false }).limit(30);
   if (statusFilter) q = q.eq('status', statusFilter);
-  if (dateFilter) q = q.gte('date', dateFilter);
+  if (dateFrom) q = q.gte('date', dateFrom);
+  if (dateTo) q = q.lte('date', dateTo);
 
   const { data } = await q;
   if (!data?.length) { el.innerHTML = '<div class="empty"><div class="empty-icon">🔧</div><p>Няма поръчки</p></div>'; return; }
