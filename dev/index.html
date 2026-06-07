@@ -1392,6 +1392,13 @@ async function submitRestock() {
   // Засега - вземи последния cashflow drinks_sold за обекта (преди това посещение)
   const autoProducts = allProducts.filter(p => p.auto_add);
   let autoDrinks = 0;
+  console.log('AUTO-ADD DEBUG:', { 
+    allProductsCount: allProducts?.length, 
+    autoProductsCount: autoProducts.length,
+    autoProducts: autoProducts.map(p => p.name),
+    counterVal2,
+    objId: obj?.id 
+  });
   if (autoProducts.length && counterVal2 && obj) {
     // Намери последния cashflow запис със знаен брояч ЗА ТОЗИ обект
     const { data: prevCf } = await db.from('cashflow')
@@ -1403,10 +1410,12 @@ async function submitRestock() {
       .order('id', { ascending: false })
       .limit(1);
     const prevCounter = prevCf?.[0]?.counter;
+    console.log('Prev counter:', prevCounter, 'New:', counterVal2, 'Diff:', counterVal2 - prevCounter);
     if (prevCounter != null && counterVal2 > prevCounter) {
       autoDrinks = counterVal2 - prevCounter;
     }
   }
+  console.log('autoDrinks computed:', autoDrinks);
 
   if (autoDrinks > 0) {
     autoProducts.forEach(p => {
