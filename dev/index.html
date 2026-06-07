@@ -1401,15 +1401,26 @@ async function submitRestock() {
   });
   if (autoProducts.length && counterVal2 && obj) {
     // Намери последния cashflow запис със знаен брояч ЗА ТОЗИ обект
+    // Вземи последния cashflow за обекта с counter (преди текущия запис)
     const { data: prevCf } = await db.from('cashflow')
-      .select('counter')
+      .select('counter, date, id')
       .eq('object_id', obj.id)
-      .lt('date', date)
       .not('counter', 'is', null)
       .is('deleted_at', null)
       .order('id', { ascending: false })
-      .limit(1);
-    const prevCounter = prevCf?.[0]?.counter;
+      .limit(2);  // вземаме 2 - текущия + предишния
+    console.log('prevCf raw:', prevCf);
+    // Намираме предишния (не току-що създадения)
+    let prevEntry = null;
+    if (prevCf?.length >= 2) {
+      prevEntry = prevCf[1];  // вторият е предишния
+    } else if (prevCf?.length === 1) {
+      // Има само 1 запис - може да е токущо създадения или истински предишен
+      // Проверка по дата
+      if (prevCf[0].date < date) prevEntry = prevCf[0];
+    }
+    console.log('prevEntry:', prevEntry);
+    const prevCounter = prevEntry?.counter;
     console.log('Prev counter:', prevCounter, 'New:', counterVal2, 'Diff:', counterVal2 - prevCounter);
     if (prevCounter != null && counterVal2 > prevCounter) {
       autoDrinks = counterVal2 - prevCounter;
