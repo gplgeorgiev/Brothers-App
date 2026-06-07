@@ -360,16 +360,20 @@
   <!-- История на зарежданията -->
   <div class="section-label" style="margin-top:20px">Последни зареждания</div>
   <div class="card" style="margin-bottom:8px; padding:10px 14px;">
+    <div class="field" style="margin-bottom:10px;">
+      <label>ОБЕКТ</label>
+      <select id="restockFilterObject" onchange="loadRestockHistory()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; appearance:none; font-family:var(--font);">
+        <option value="">Всички</option>
+      </select>
+    </div>
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
       <div class="field" style="margin-bottom:0;">
-        <label>ОБЕКТ</label>
-        <select id="restockFilterObject" onchange="loadRestockHistory()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; appearance:none; font-family:var(--font);">
-          <option value="">Всички</option>
-        </select>
+        <label>ДАТА ОТ</label>
+        <input type="date" id="restockFilterDateFrom" onchange="loadRestockHistory()">
       </div>
       <div class="field" style="margin-bottom:0;">
-        <label>ДАТА ОТ</label>
-        <input type="date" id="restockFilterDate" onchange="loadRestockHistory()">
+        <label>ДО</label>
+        <input type="date" id="restockFilterDateTo" onchange="loadRestockHistory()">
       </div>
     </div>
   </div>
@@ -638,18 +642,22 @@
   <!-- История -->
   <div class="section-label" style="margin-top:20px">Последни транзакции</div>
   <div class="card" style="margin-bottom:8px; padding:10px 14px;">
+    <div class="field" style="margin-bottom:10px;">
+      <label>ФИЛТЪР ТИП</label>
+      <select id="txFilterType" onchange="loadTxHistory()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; appearance:none; font-family:var(--font);">
+        <option value="">Всички</option>
+        <option value="income">Приходи</option>
+        <option value="expense">Разходи</option>
+      </select>
+    </div>
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
       <div class="field" style="margin-bottom:0;">
-        <label>ФИЛТЪР ТИП</label>
-        <select id="txFilterType" onchange="loadTxHistory()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; appearance:none; font-family:var(--font);">
-          <option value="">Всички</option>
-          <option value="income">Приходи</option>
-          <option value="expense">Разходи</option>
-        </select>
+        <label>ДАТА ОТ</label>
+        <input type="date" id="txFilterDateFrom" onchange="loadTxHistory()">
       </div>
       <div class="field" style="margin-bottom:0;">
-        <label>ДАТА ОТ</label>
-        <input type="date" id="txFilterDate" onchange="loadTxHistory()">
+        <label>ДО</label>
+        <input type="date" id="txFilterDateTo" onchange="loadTxHistory()">
       </div>
     </div>
   </div>
@@ -1547,7 +1555,8 @@ async function createCashflowEntry(counter, obj, tech, date, operationId) {
 
 async function loadCashflow() {
   const objFilter = document.getElementById('cfFilterObject')?.value || '';
-  const dateFilter = document.getElementById('cfFilterDate')?.value || '';
+  const dateFrom = document.getElementById('cfFilterDateFrom')?.value || '';
+  const dateTo = document.getElementById('cfFilterDateTo')?.value || '';
 
   // Pending
   const pendingEl = document.getElementById('pendingList');
@@ -1556,7 +1565,8 @@ async function loadCashflow() {
   console.log('loadCashflow filters:', { objFilter, dateFilter });
   let pendingQ = db.from('cashflow').select('*').eq('status', 'pending').is('deleted_at', null).order('date', { ascending: false });
   if (objFilter) pendingQ = pendingQ.eq('object_id', parseInt(objFilter));
-  if (dateFilter) pendingQ = pendingQ.gte('date', dateFilter);
+  if (dateFrom) pendingQ = pendingQ.gte('date', dateFrom);
+  if (dateTo) pendingQ = pendingQ.lte('date', dateTo);
   const { data: pending } = await pendingQ;
 
   if (!pending?.length) {
@@ -1588,7 +1598,8 @@ async function loadCashflow() {
   const completedEl = document.getElementById('completedList');
   let completedQ = db.from('cashflow').select('*').eq('status', 'completed').is('deleted_at', null).order('completed_at', { ascending: false }).limit(30);
   if (objFilter) completedQ = completedQ.eq('object_id', parseInt(objFilter));
-  if (dateFilter) completedQ = completedQ.gte('date', dateFilter);
+  if (dateFrom) completedQ = completedQ.gte('date', dateFrom);
+  if (dateTo) completedQ = completedQ.lte('date', dateTo);
   const { data: completed } = await completedQ;
 
   if (!completed?.length) {
@@ -1941,8 +1952,8 @@ async function loadRestockHistory() {
   console.log('Element exists, fetching data...');
   el.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
   const objFilter = document.getElementById('restockFilterObject')?.value || '';
-  const dateFilter = document.getElementById('restockFilterDate')?.value || '';
-  console.log('Restock filters:', { objFilter, dateFilter });
+  const dateFrom = document.getElementById('restockFilterDateFrom')?.value || '';
+  const dateTo = document.getElementById('restockFilterDateTo')?.value || '';
 
   let q = db.from('operation_headers')
     .select('*, operations(id, product_name, product_id, quantity, cost_value, account_code, amount, deleted_at)')
@@ -1952,7 +1963,8 @@ async function loadRestockHistory() {
     .order('created_at', { ascending: false })
     .limit(20);
   if (objFilter) q = q.eq('object_id', parseInt(objFilter));
-  if (dateFilter) q = q.gte('date', dateFilter);
+  if (dateFrom) q = q.gte('date', dateFrom);
+  if (dateTo) q = q.lte('date', dateTo);
 
   const { data, error } = await q;
   if (error) { el.innerHTML = `<div class="empty"><div class="empty-icon">❌</div><p>${error.message}</p></div>`; return; }
@@ -1997,7 +2009,8 @@ async function loadHistory() {
   list.innerHTML = '<div class="loading"><div class="spinner"></div> зарежда...</div>';
 
   const objFilter = document.getElementById('histFilterObject')?.value || '';
-  const dateFilter = document.getElementById('histFilterDate')?.value || '';
+  const dateFrom = document.getElementById('histFilterDateFrom')?.value || '';
+  const dateTo = document.getElementById('histFilterDateTo')?.value || '';
 
   // Зареди хедъри с JOIN към редовете
   let q = db.from('operation_headers')
@@ -2006,7 +2019,8 @@ async function loadHistory() {
     .order('created_at', { ascending: false })
     .limit(30);
   if (objFilter) q = q.eq('object_id', parseInt(objFilter));
-  if (dateFilter) q = q.gte('date', dateFilter);
+  if (dateFrom) q = q.gte('date', dateFrom);
+  if (dateTo) q = q.lte('date', dateTo);
 
   const { data, error } = await q;
   console.log('History data:', data, 'error:', error);
@@ -2583,8 +2597,8 @@ async function loadTxHistory() {
   if (!el) return;
   el.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
   const typeFilter = document.getElementById('txFilterType')?.value || '';
-  const dateFilter = document.getElementById('txFilterDate')?.value || '';
-  console.log('Tx filters:', { typeFilter, dateFilter });
+  const dateFrom = document.getElementById('txFilterDateFrom')?.value || '';
+  const dateTo = document.getElementById('txFilterDateTo')?.value || '';
 
   let q = db.from('operation_headers')
     .select('*, operations(account_code, amount, product_name)')
@@ -2595,7 +2609,8 @@ async function loadTxHistory() {
     .limit(40);
   if (typeFilter === 'income') q = q.eq('op_type', 'finance_income');
   if (typeFilter === 'expense') q = q.eq('op_type', 'finance_expense');
-  if (dateFilter) q = q.gte('date', dateFilter);
+  if (dateFrom) q = q.gte('date', dateFrom);
+  if (dateTo) q = q.lte('date', dateTo);
 
   const { data, error } = await q;
   if (error) { el.innerHTML = `<div class="empty"><div class="empty-icon">❌</div><p>${error.message}</p></div>`; return; }
@@ -2850,7 +2865,8 @@ async function loadServiceOrders() {
 
   let q = db.from('service_orders').select('*').order('date', { ascending: false }).limit(30);
   if (statusFilter) q = q.eq('status', statusFilter);
-  if (dateFilter) q = q.gte('date', dateFilter);
+  if (dateFrom) q = q.gte('date', dateFrom);
+  if (dateTo) q = q.lte('date', dateTo);
 
   const { data } = await q;
   if (!data?.length) { el.innerHTML = '<div class="empty"><div class="empty-icon">🔧</div><p>Няма поръчки</p></div>'; return; }
