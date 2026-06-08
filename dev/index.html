@@ -303,7 +303,7 @@
       <div class="prod-label"><span id="popupIcon">☕</span><span id="popupName">Продукт</span></div>
       <div class="qty-controls">
         <div class="qty-big-btn" onclick="changePopupQty(-1)">−</div>
-        <input class="qty-big-input" id="popupQtyInput" type="number" value="1" min="0" step="1" oninput="updateBasketFromInput(this.value)">
+        <input class="qty-big-input" id="popupQtyInput" type="number" value="1" min="0" step="1" oninput="updateBasketFromInput(this.value)" onfocus="this.select()">
         <div class="qty-big-btn" onclick="changePopupQty(1)">＋</div>
       </div>
       
