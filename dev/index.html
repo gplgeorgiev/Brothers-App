@@ -180,7 +180,8 @@
   .submit-btn:disabled { opacity:0.5; cursor:not-allowed; }
 
   /* BOTTOM NAV */
-  .bottom-nav { position:fixed; bottom:0; left:50%; transform:translateX(-50%); width:100%; max-width:480px; background:var(--bg2); color:var(--text); backdrop-filter:blur(16px); border-top:1px solid var(--border); display:flex; padding:4px 16px 10px; z-index:100; }
+  .bottom-nav { position:fixed; bottom:0; left:50%; transform:translateX(-50%); width:100%; max-width:480px; background:var(--bg2); color:var(--text); backdrop-filter:blur(16px); border-top:1px solid var(--border); display:flex; padding:4px 16px 10px; z-index:100; transition: transform 0.3s ease; }
+.bottom-nav.hidden { transform: translateX(-50%) translateY(100%); }
   .nav-icon { font-size:22px; }
 [data-theme="coffee-dark"] .nav-icon,
 [data-theme="coffee-light"] .nav-icon { font-size:28px; }
@@ -1017,6 +1018,36 @@ let timerInterval = null, timerSeconds = 0, timerRunning = false;
 let lineCounter = 0;
 
 // ── INIT ──
+// Auto-hide bottom nav on scroll
+let lastScrollY = 0;
+let scrollTimer = null;
+window.addEventListener('scroll', () => {
+  const currentScroll = window.scrollY || document.documentElement.scrollTop;
+  const bottomNav = document.querySelector('.bottom-nav');
+  if (!bottomNav) return;
+  
+  // Показвай винаги в горната част на страницата
+  if (currentScroll < 50) {
+    bottomNav.classList.remove('hidden');
+    lastScrollY = currentScroll;
+    return;
+  }
+  
+  // Надолу = скрий, нагоре = покажи
+  if (currentScroll > lastScrollY + 5) {
+    bottomNav.classList.add('hidden');
+  } else if (currentScroll < lastScrollY - 5) {
+    bottomNav.classList.remove('hidden');
+  }
+  lastScrollY = currentScroll;
+  
+  // Авто-покажи след 2 сек бездействие
+  clearTimeout(scrollTimer);
+  scrollTimer = setTimeout(() => {
+    bottomNav.classList.remove('hidden');
+  }, 2000);
+}, { passive: true });
+
 document.addEventListener('DOMContentLoaded', async () => {
   // Apply saved theme
   const savedTheme = localStorage.getItem('app_theme') || 'standard';
