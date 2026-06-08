@@ -302,16 +302,16 @@
       <div class="prod-label"><span id="popupIcon">☕</span><span id="popupName">Продукт</span></div>
       <div class="qty-controls">
         <div class="qty-big-btn" onclick="changePopupQty(-1)">−</div>
-        <input class="qty-big-input" id="popupQtyInput" type="number" value="1" min="1" step="1" oninput="popupQty=parseFloat(this.value)||1">
+        <input class="qty-big-input" id="popupQtyInput" type="number" value="1" min="0" step="1" oninput="updateBasketFromInput(this.value)" onfocus="this.select()">
         <div class="qty-big-btn" onclick="changePopupQty(1)">＋</div>
       </div>
-      <button class="qty-add-btn" onclick="addToBasket()">✓ Добави</button>
+      
     </div>
     <div class="added-lines" id="addedLines"></div>
   </div>
 
   <!-- РЕЗЮМЕ -->
-  <div id="summarySection"></div>
+  <div id="summarySection" style="display:none;"></div>
 
   <!-- 3. БРОЯЧ -->
   <div class="section-label">Брояч</div>
@@ -1155,23 +1155,66 @@ function renderProductCards() {
 
 function selectProdCard(id) {
   selectedProdId = id;
-  popupQty = 1;
   document.querySelectorAll('.prod-card').forEach(c => c.classList.remove('selected'));
   document.getElementById(`pc-${id}`)?.classList.add('selected');
   const prod = products.find(p => p.id === id);
   if (!prod) return;
+
+  // АВТО-ДОБАВЯНЕ: ако още не е в кошницата → добави с qty=1
+  const existing = basket.find(b => b.product.id === id);
+  if (!existing) {
+    basket.push({ product: prod, qty: 1 });
+    popupQty = 1;
+  } else {
+    popupQty = existing.qty;
+  }
+
   document.getElementById('popupIcon').textContent = prod.icon || '📦';
   document.getElementById('popupName').textContent = prod.name;
   const qinp = document.getElementById('popupQtyInput'); if(qinp) qinp.value = popupQty;
   document.getElementById('qtyPopup').classList.add('visible');
-  // scroll картата в изглед
+  renderBasket();
+  updateSummary();
   document.getElementById(`pc-${id}`)?.scrollIntoView({ behavior:'smooth', block:'nearest', inline:'center' });
 }
 
 function changePopupQty(delta) {
-  popupQty = Math.max(1, popupQty + delta);
-  // показваме като цяло число ако е цяло
+  popupQty = Math.max(0, popupQty + delta);
   const inp = document.getElementById('popupQtyInput'); if(inp) inp.value = popupQty;
+  // Auto-update basket
+  if (selectedProdId) {
+    const existing = basket.find(b => b.product.id === selectedProdId);
+    if (popupQty === 0) {
+      basket = basket.filter(b => b.product.id !== selectedProdId);
+      document.getElementById(`pc-${selectedProdId}`)?.classList.remove('selected');
+      document.getElementById('qtyPopup').classList.remove('visible');
+      selectedProdId = null;
+    } else if (existing) {
+      existing.qty = popupQty;
+    }
+    renderBasket();
+    updateSummary();
+  }
+}
+
+function updateBasketFromInput(val) {
+  const qty = parseFloat(val) || 0;
+  popupQty = qty;
+  if (!selectedProdId) return;
+  const existing = basket.find(b => b.product.id === selectedProdId);
+  if (qty === 0) {
+    basket = basket.filter(b => b.product.id !== selectedProdId);
+    document.getElementById(`pc-${selectedProdId}`)?.classList.remove('selected');
+    document.getElementById('qtyPopup').classList.remove('visible');
+    selectedProdId = null;
+  } else if (existing) {
+    existing.qty = qty;
+  } else {
+    const prod = products.find(p => p.id === selectedProdId);
+    if (prod) basket.push({ product: prod, qty });
+  }
+  renderBasket();
+  updateSummary();
 }
 
 function addToBasket() {
