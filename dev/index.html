@@ -1188,6 +1188,11 @@ function selectProdCard(id) {
   renderBasket();
   updateSummary();
   document.getElementById(`pc-${id}`)?.scrollIntoView({ behavior:'smooth', block:'nearest', inline:'center' });
+  // Auto-scroll popup в горната част на видимия екран за iOS клавиатура
+  setTimeout(() => {
+    document.getElementById('qtyPopup')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    window.scrollBy({ top: -100, behavior: 'smooth' });
+  }, 150);
 }
 
 function changePopupQty(delta) {
