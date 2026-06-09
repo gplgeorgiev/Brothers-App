@@ -314,7 +314,7 @@ input.qty-big-input {
       <div class="prod-label"><span id="popupIcon">☕</span><span id="popupName">Продукт</span></div>
       <div class="qty-controls">
         <div class="qty-big-btn" onclick="changePopupQty(-1)">−</div>
-        <input class="qty-big-input" id="popupQtyInput" type="number" value="1" min="0" step="0.001" inputmode="decimal" oninput="updateBasketFromInput(this.value)" oncontextmenu="event.preventDefault();" onfocus="this.select()">
+        <input class="qty-big-input" id="popupQtyInput" type="text" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*" value="1" oninput="updateBasketFromInput(this.value.replace(',', '.'))" oncontextmenu="event.preventDefault();" onfocus="this.select()">
         <div class="qty-big-btn" onclick="changePopupQty(1)">＋</div>
       </div>
       
@@ -601,7 +601,7 @@ input.qty-big-input {
       <div class="prod-label"><span id="finCatIcon">📦</span><span id="finCatName">Категория</span></div>
       <div class="qty-controls">
         <div class="qty-big-btn" onclick="changeFinAmount(-10)">−</div>
-        <input class="qty-big-input" id="finAmountInput" type="number" inputmode="decimal" value="0" min="0" step="0.01" placeholder="0.00">
+        <input class="qty-big-input" id="finAmountInput" type="text" pattern="[0-9]*[.,]?[0-9]*" inputmode="decimal" value="0" min="0" step="0.01" placeholder="0.00">
         <div class="qty-big-btn" onclick="changeFinAmount(10)">＋</div>
       </div>
       <button class="qty-add-btn" onclick="addFinLine()">✓ Добави</button>
