@@ -968,6 +968,18 @@ input.qty-big-input {
     </div>
   </div>
 
+  <div class="section-label" style="margin-top:20px">Преизчисли километри</div>
+  <div class="card">
+    <div class="field" style="margin-bottom:0">
+      <label>ДАТА</label>
+      <div style="display:flex; gap:8px; align-items:center;">
+        <input type="date" id="recalcKmDate" style="flex:1; background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; font-family:var(--font);">
+        <button onclick="recalcKmForDate()" style="padding:10px 16px; border-radius:8px; border:none; background:var(--accent); color:#fff; font-size:13px; font-weight:700; cursor:pointer; font-family:var(--font);">▶ Пусни</button>
+      </div>
+      <div style="font-size:11px; color:var(--text3); margin-top:6px;">Преизчислява km в хедърите за избраната дата.</div>
+    </div>
+  </div>
+
   <div class="section-label" style="margin-top:20px">Маршрути за добавяне</div>
   <div id="unknownRoutesList"><div class="loading"><div class="spinner"></div></div></div>
 </div>
