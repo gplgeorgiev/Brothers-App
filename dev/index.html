@@ -2532,8 +2532,11 @@ async function loadStats() {
     return;
   }
 
-  // Филтрирай само не-изтрити хедъри
-  const validOps = ops.filter(o => !o.operation_headers?.deleted_at);
+  // Филтрирай само не-изтрити хедъри + по обект ако е избран
+  let validOps = ops.filter(o => !o.operation_headers?.deleted_at);
+  if (objFilter) {
+    validOps = validOps.filter(o => (o.object_name || o.operation_headers?.object_name) === objFilter);
+  }
 
   // Групирай по обект
   const byObj = {};
@@ -2607,7 +2610,7 @@ async function loadStats() {
   document.getElementById('objectStats').innerHTML = sorted.map(([name, s]) => {
     const result = s.income - s.expense;
     const det = detailsByObj[name] || { income: [], expense: [] };
-    const safeId = name.replace(/[^a-zA-Z0-9]/g, '_');
+    const safeId = btoa(unescape(encodeURIComponent(name))).replace(/[^a-zA-Z0-9]/g, '_').substring(0, 30);
 
     const renderRow = (r) => {
       const extras = [r.contractor, r.comment].filter(Boolean).join(' · ');
