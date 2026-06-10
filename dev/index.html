@@ -1111,6 +1111,15 @@ async function loadObjects() {
       opt.value = o.id; opt.textContent = o.name; sel.appendChild(opt);
     });
   });
+  // statsObjFilter с value=name (за filter по object_name)
+  const statsSel = document.getElementById('statsObjFilter');
+  if (statsSel) {
+    statsSel.innerHTML = '<option value="">Всички</option>';
+    data.forEach(o => {
+      const opt = document.createElement('option');
+      opt.value = o.name; opt.textContent = o.name; statsSel.appendChild(opt);
+    });
+  }
   // Попълни обектите в Финанси
   const finObjSel = document.getElementById('finObjectSelect');
   if (finObjSel) {
@@ -2443,8 +2452,10 @@ async function deleteOp(id) {
 
 // ── STATS ──
 function toggleStatDetails(safeId) {
+  console.log('Toggle stat for:', safeId);
   const el = document.getElementById(`stat-details-${safeId}`);
   const arrow = document.getElementById(`stat-arrow-${safeId}`);
+  console.log('Found el:', !!el, 'arrow:', !!arrow);
   if (!el) return;
   const visible = el.style.display !== 'none';
   el.style.display = visible ? 'none' : 'block';
