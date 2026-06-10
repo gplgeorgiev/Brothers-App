@@ -900,7 +900,7 @@ input.qty-big-input {
   <div class="section-label" id="statsPeriodLabel" style="margin-top:20px">Текущ месец</div>
   <div class="stats-grid" id="statsGrid"><div class="loading" style="grid-column:1/-1"><div class="spinner"></div></div></div>
   <div class="section-label" style="margin-top:24px">По обект</div>
-  <div id="objectStats"></div>
+  <div id="objectStats" style="padding-bottom:120px;"></div>
 </div>
 
 <!-- PAGE: КОШЧЕ -->
@@ -2449,6 +2449,19 @@ function toggleStatDetails(safeId) {
   const visible = el.style.display !== 'none';
   el.style.display = visible ? 'none' : 'block';
   if (arrow) arrow.textContent = visible ? '▼' : '▲';
+  // Scroll картата в изглед след разгъване
+  if (!visible) {
+    setTimeout(() => {
+      const card = document.getElementById(`stat-card-${safeId}`);
+      if (card) {
+        const rect = card.getBoundingClientRect();
+        const bottomNavHeight = 80;
+        if (rect.bottom > window.innerHeight - bottomNavHeight) {
+          window.scrollBy({ top: rect.bottom - (window.innerHeight - bottomNavHeight) + 20, behavior: 'smooth' });
+        }
+      }
+    }, 100);
+  }
 }
 
 function statsResetMonth() {
