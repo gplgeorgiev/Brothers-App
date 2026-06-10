@@ -2492,7 +2492,7 @@ async function loadStats() {
 
   // Взимаме operations с header data - филтрираме по период и не-изтрити
   const { data: ops } = await db.from('operations')
-    .select('account_code, amount, entry_type, object_name, header_id, operation_headers!inner(date, op_type, deleted_at, object_name)')
+    .select('account_code, amount, entry_type, object_name, product_name, header_id, operation_headers!inner(date, op_type, deleted_at, object_name, contractor, comment, document_ref)')
     .gte('operation_headers.date', dateFrom)
     .lte('operation_headers.date', dateTo)
     .is('deleted_at', null);
