@@ -3533,6 +3533,33 @@ function loadThemeSetting() {
   if (sel) sel.value = saved;
 }
 
+async function recalcKmForDate() {
+  const date = document.getElementById('recalcKmDate').value;
+  if (!date) { showToast('Избери дата!', 'error'); return; }
+
+  const btn = event.target;
+  btn.disabled = true;
+  btn.textContent = '⏳ Изпълнява...';
+
+  try {
+    const resp = await fetch(`${SUPABASE_URL}/functions/v1/calc-daily-km?date=${date}`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    const data = await resp.json();
+    if (data.ok) {
+      showToast(`✅ Преизчислено за ${date}`, 'success');
+    } else {
+      showToast('❌ ' + (data.error || 'Грешка'), 'error');
+    }
+  } catch (e) {
+    showToast('❌ ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '▶ Пусни';
+  }
+}
+
 async function openCapitalModal() {
   document.getElementById('capitalDate').value = getLocalDateString();
   document.getElementById('capitalBank').value = '';
