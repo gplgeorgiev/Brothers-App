@@ -15,7 +15,18 @@
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
-  :root, [data-theme="standard"] {
+  /* Скриване на iOS context menu за number inputs */
+input[type="number"]::selection {
+  background: var(--accent) !important;
+  color: var(--bg) !important;
+}
+input.qty-big-input {
+  -webkit-user-select: all;
+  user-select: all;
+  -webkit-touch-callout: none;
+}
+
+:root, [data-theme="standard"] {
     /* СТАНДАРТ - светла teal */
     --bg: #f0f2f5; --bg2: #ffffff; --bg3: #e8ecf0;
     --border: #d0d7e2; --accent: #0ea5a0; --accent2: #e8622a;
@@ -302,7 +313,7 @@
       <div class="prod-label"><span id="popupIcon">☕</span><span id="popupName">Продукт</span></div>
       <div class="qty-controls">
         <div class="qty-big-btn" onclick="changePopupQty(-1)">−</div>
-        <input class="qty-big-input" id="popupQtyInput" type="number" value="1" min="0" step="1" oninput="updateBasketFromInput(this.value)" onfocus="this.select()">
+        <input class="qty-big-input" id="popupQtyInput" type="text" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*" value="1" oninput="updateBasketFromInput(this.value.replace(',', '.'))" oncontextmenu="event.preventDefault();" onfocus="this.select()">
         <div class="qty-big-btn" onclick="changePopupQty(1)">＋</div>
       </div>
       
@@ -319,7 +330,7 @@
     <div class="field" style="margin-bottom:0">
       <label>БРОЯЧ (незадължително)</label>
       <div style="display:flex; gap:8px;">
-        <input type="number" id="counterInput" placeholder="напр. 12450" style="flex:1">
+        <input type="number" inputmode="decimal" id="counterInput" placeholder="напр. 12450" style="flex:1">
         <button class="ocr-btn" onclick="triggerCamera()" title="Снимай брояча">📷</button>
         <button class="ocr-btn" onclick="triggerGallery()" title="От галерия">🖼️</button>
       </div>
@@ -448,7 +459,7 @@
     <div style="font-size:13px; color:var(--text2); margin-bottom:20px;" id="modalSub"></div>
     <div class="field">
       <label>CASH (EUR)</label>
-      <input type="number" id="modalCashInput" placeholder="0.00" step="0.01" min="0"
+      <input type="number" inputmode="decimal" id="modalCashInput" placeholder="0.00" step="0.01" min="0"
         style="font-size:24px; font-weight:700; text-align:center; padding:16px;">
     </div>
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:8px;">
@@ -464,11 +475,11 @@
     <div style="font-size:15px; font-weight:800; margin-bottom:16px;" id="editCfTitle">✏️ Редакция</div>
     <div class="field">
       <label>БРОЯЧ</label>
-      <input type="number" id="editCfCounter" placeholder="напр. 12450">
+      <input type="number" inputmode="decimal" id="editCfCounter" placeholder="напр. 12450">
     </div>
     <div class="field">
       <label>CASH (EUR)</label>
-      <input type="number" id="editCfCash" placeholder="0.00" step="0.01">
+      <input type="number" inputmode="decimal" id="editCfCash" placeholder="0.00" step="0.01">
     </div>
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:8px;">
       <button onclick="closeEditCfModal()" style="padding:14px; border-radius:12px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:15px; font-weight:700; cursor:pointer;">Отказ</button>
@@ -498,7 +509,7 @@
       </div>
       <div class="field" style="margin-bottom:10px;">
         <label>КМ</label>
-        <input type="number" id="editHdrKm" step="0.1" min="0">
+        <input type="number" inputmode="decimal" id="editHdrKm" step="0.1" min="0">
       </div>
     </div>
     <div class="field" style="margin-bottom:14px;">
@@ -524,7 +535,7 @@
           <button onclick="changeEditQty(1)" style="width:36px; height:36px; border-radius:8px; background:var(--accent); border:none; color:#fff; font-size:18px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center;">＋</button>
           <button onclick="changeEditQty(-1)" style="width:36px; height:36px; border-radius:8px; background:var(--bg2); border:1px solid var(--border); color:var(--text); font-size:18px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center;">−</button>
         </div>
-        <input type="number" id="editLineQty" step="1" min="0.5"
+        <input type="number" inputmode="decimal" id="editLineQty" step="1" min="0.5"
           style="width:90px; text-align:center; background:var(--bg2); border:1px solid var(--border); border-radius:10px; padding:14px 8px; color:var(--text); font-family:var(--mono); font-size:28px; font-weight:800; outline:none;">
       </div>
     </div>
@@ -589,7 +600,7 @@
       <div class="prod-label"><span id="finCatIcon">📦</span><span id="finCatName">Категория</span></div>
       <div class="qty-controls">
         <div class="qty-big-btn" onclick="changeFinAmount(-10)">−</div>
-        <input class="qty-big-input" id="finAmountInput" type="number" value="0" min="0" step="0.01" placeholder="0.00">
+        <input class="qty-big-input" id="finAmountInput" type="text" pattern="[0-9]*[.,]?[0-9]*" inputmode="decimal" value="0" min="0" step="0.01" placeholder="0.00">
         <div class="qty-big-btn" onclick="changeFinAmount(10)">＋</div>
       </div>
       <button class="qty-add-btn" onclick="addFinLine()">✓ Добави</button>
@@ -753,13 +764,13 @@
       </div>
       <div class="field" style="margin-bottom:10px;">
         <label>ПРИХОД (EUR)</label>
-        <input type="number" id="soIncome" placeholder="0.00" step="0.01" min="0">
+        <input type="number" inputmode="decimal" id="soIncome" placeholder="0.00" step="0.01" min="0">
       </div>
     </div>
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
       <div class="field" style="margin-bottom:10px;">
         <label>РАЗХОД ЧАСТИ (EUR)</label>
-        <input type="number" id="soExpense" placeholder="0.00" step="0.01" min="0">
+        <input type="number" inputmode="decimal" id="soExpense" placeholder="0.00" step="0.01" min="0">
       </div>
       <div class="field" style="margin-bottom:10px;">
         <label>ТЕХНИК</label>
@@ -949,7 +960,7 @@
     <div class="field" style="margin-bottom:0">
       <label>СЪХРАНЕНИЕ В КОШЧЕТО (ДНИ)</label>
       <div style="display:flex; gap:8px; align-items:center;">
-        <input type="number" id="trashRetentionDays" min="1" max="365" placeholder="30" style="flex:1">
+        <input type="number" inputmode="decimal" id="trashRetentionDays" min="1" max="365" placeholder="30" style="flex:1">
         <button onclick="saveTrashRetention()" style="padding:10px 16px; border-radius:8px; border:none; background:var(--accent); color:#fff; font-size:13px; font-weight:700; cursor:pointer; font-family:var(--font);">Запази</button>
       </div>
       <div style="font-size:11px; color:var(--text3); margin-top:6px;">След този срок изтритите записи се премахват окончателно.</div>
@@ -977,14 +988,14 @@
     <div class="section-label">🏦 Банка</div>
     <div class="card" style="margin-bottom:14px;">
       <div class="field" style="margin-bottom:0">
-        <input type="number" id="capitalBank" placeholder="0.00" step="0.01" min="0" style="text-align:right; font-family:var(--mono); font-weight:700;">
+        <input type="number" inputmode="decimal" id="capitalBank" placeholder="0.00" step="0.01" min="0" style="text-align:right; font-family:var(--mono); font-weight:700;">
       </div>
     </div>
 
     <div class="section-label">📦 Материали в склад (стойност)</div>
     <div class="card" style="margin-bottom:14px;">
       <div class="field" style="margin-bottom:0">
-        <input type="number" id="capitalMaterials" placeholder="0.00" step="0.01" min="0" style="text-align:right; font-family:var(--mono); font-weight:700;">
+        <input type="number" inputmode="decimal" id="capitalMaterials" placeholder="0.00" step="0.01" min="0" style="text-align:right; font-family:var(--mono); font-weight:700;">
       </div>
     </div>
 
@@ -1176,6 +1187,11 @@ function selectProdCard(id) {
   renderBasket();
   updateSummary();
   document.getElementById(`pc-${id}`)?.scrollIntoView({ behavior:'smooth', block:'nearest', inline:'center' });
+  // Auto-scroll popup в горната част на видимия екран за iOS клавиатура
+  setTimeout(() => {
+    document.getElementById('qtyPopup')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    window.scrollBy({ top: -100, behavior: 'smooth' });
+  }, 150);
 }
 
 function changePopupQty(delta) {
@@ -2154,16 +2170,19 @@ async function loadHistory() {
   const objFilter = document.getElementById('histFilterObject')?.value || '';
   const dateFrom = document.getElementById('histFilterDateFrom')?.value || '';
   const dateTo = document.getElementById('histFilterDateTo')?.value || '';
+  const typeFilter = document.getElementById('histFilterType')?.value || '';
 
-  // Зареди хедъри с JOIN към редовете
+  // Зареди хедъри с JOIN към редовете (само не-изтрити)
   let q = db.from('operation_headers')
-    .select('*, operations(id, product_name, product_id, quantity, cost_value)')
+    .select('*, operations(id, product_name, product_id, quantity, cost_value, account_code, amount)')
+    .is('deleted_at', null)
     .order('date', { ascending: false })
     .order('created_at', { ascending: false })
-    .limit(30);
+    .limit(50);
   if (objFilter) q = q.eq('object_id', parseInt(objFilter));
   if (dateFrom) q = q.gte('date', dateFrom);
   if (dateTo) q = q.lte('date', dateTo);
+  if (typeFilter) q = q.eq('op_type', typeFilter);
 
   const { data, error } = await q;
   console.log('History data:', data, 'error:', error);
@@ -2171,12 +2190,24 @@ async function loadHistory() {
   if (!data?.length) { list.innerHTML = '<div class="empty"><div class="empty-icon">📭</div><p>Няма записи</p></div>'; return; }
   console.log('First record:', JSON.stringify(data[0]));
 
+  const opLabels = {
+    'restock': '⬆️ Зареждане',
+    'cash_income': '💰 Cash отчет',
+    'finance_expense': '📤 Разход',
+    'finance_income': '📥 Приход',
+    'opening_balance': '🏁 Начално салдо',
+    'service': '🔧 Сервиз'
+  };
+
   list.innerHTML = data.map(h => `
     <div class="card" style="margin-bottom:10px;">
       <div style="display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:8px;">
-        <div>
+        <div style="flex:1;">
+          <div style="font-size:11px; color:var(--accent); font-weight:700; margin-bottom:2px;">${opLabels[h.op_type] || h.op_type}</div>
           <div style="font-size:15px; font-weight:800;">${h.object_name || '—'}</div>
-          <div style="font-size:12px; color:var(--text2);">${formatDateBG(new Date(h.date))} ${h.created_at ? `${new Date(h.created_at).toLocaleTimeString('bg-BG', {hour:'2-digit', minute:'2-digit'})}` : ''} · ${h.technician_name || '—'}</div>
+          <div style="font-size:12px; color:var(--text2);">${formatDateBG(new Date(h.date))} ${h.created_at ? `${new Date(h.created_at).toLocaleTimeString('bg-BG', {hour:'2-digit', minute:'2-digit'})}` : ''}${h.technician_name ? ` · ${h.technician_name}` : ''}</div>
+          ${h.contractor ? `<div style="font-size:11px; color:var(--text3); margin-top:2px;">🏢 ${h.contractor}</div>` : ''}
+          ${h.document_ref ? `<div style="font-size:11px; color:var(--text3); margin-top:2px;">📄 ${h.document_ref}</div>` : ''}
           ${h.comment ? `<div style="font-size:11px; color:var(--text3); margin-top:2px;">💬 ${h.comment}</div>` : ''}
         </div>
         <div style="display:flex; gap:5px;">
@@ -2240,7 +2271,7 @@ function addEditLine_unused() {
     </div>
     <div class="qty-inline" style="flex-shrink:0;">
       <div class="qty-inline-btn" onclick="changeEditLineQty('${tempId}', -1)">−</div>
-      <input type="number" value="1" min="0.5" step="0.5" class="edit-line-qty" data-line="${tempId}"
+      <input type="number" inputmode="decimal" value="1" min="0.5" step="0.5" class="edit-line-qty" data-line="${tempId}"
         style="width:46px; text-align:center; background:var(--bg2); border:1px solid var(--border); border-radius:7px; padding:5px 2px; color:var(--text); font-family:var(--mono); font-size:14px; font-weight:700; outline:none;">
       <div class="qty-inline-btn" onclick="changeEditLineQty('${tempId}', 1)">＋</div>
     </div>
@@ -2929,7 +2960,7 @@ async function openEditFinModal(id) {
         style="background:var(--bg2); border:1px solid var(--border); border-radius:7px; padding:6px 8px; color:var(--text); font-size:12px; outline:none; appearance:none; width:100%;">
         ${categories.map(c => `<option value="${c.code}" ${c.code === o.account_code ? 'selected' : ''}>${c.icon} ${c.label}</option>`).join('')}
       </select>
-      <input type="number" class="edit-fin-amount" data-line="${o.id}" value="${o.amount}" step="0.01" min="0"
+      <input type="number" inputmode="decimal" class="edit-fin-amount" data-line="${o.id}" value="${o.amount}" step="0.01" min="0"
         style="width:80px; text-align:center; background:var(--bg2); border:1px solid var(--border); border-radius:7px; padding:6px; color:var(--text); font-family:var(--mono); font-size:13px; font-weight:700; outline:none;">
       <button onclick="removeEditFinLine(${o.id})" style="width:28px; height:28px; border-radius:6px; background:transparent; border:1px solid var(--border); color:var(--text3); font-size:14px; cursor:pointer; display:flex; align-items:center; justify-content:center;">✕</button>
     </div>
@@ -3497,7 +3528,7 @@ async function openCapitalModal() {
   cashList.innerHTML = technicians.map(t => `
     <div class="field" style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
       <label style="flex:1; margin-bottom:0;">${t.name}</label>
-      <input type="number" id="capitalCash-${t.id}" class="capital-cash" placeholder="0.00" step="0.01" min="0"
+      <input type="number" inputmode="decimal" id="capitalCash-${t.id}" class="capital-cash" placeholder="0.00" step="0.01" min="0"
         style="width:140px; text-align:right; background:var(--bg2); border:1px solid var(--border); border-radius:8px; padding:8px 12px; color:var(--text); font-family:var(--mono); font-size:14px; font-weight:700; outline:none;"
         oninput="updateCapitalTotal()">
     </div>
@@ -3650,7 +3681,7 @@ async function loadUnknownRoutes() {
       </div>
       <div class="field" style="margin-bottom:10px;">
         <label>ОБЩО КИЛОМЕТРИ (в една посока)</label>
-        <input type="number" id="kmInput-${r.id}" placeholder="напр. 45" step="0.5" min="0">
+        <input type="number" inputmode="decimal" id="kmInput-${r.id}" placeholder="напр. 45" step="0.5" min="0">
       </div>
       <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
         <button onclick="dismissUnknownRoute(${r.id})" style="padding:10px; border-radius:8px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:13px; font-weight:700; cursor:pointer; font-family:var(--font);">Игнорирай</button>
