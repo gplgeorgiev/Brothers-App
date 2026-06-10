@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Brothers">
-<title>Coffee Brothers</title>
+<title>Coffee Brothers DEV</title>
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="icon" type="image/png" href="icon-192.png">
 <link rel="manifest" href="manifest.json">
@@ -247,6 +247,7 @@ input.qty-big-input {
 </head>
 <body>
 
+<div style="background:#ff6b35; color:#fff; text-align:center; padding:6px; font-weight:800; font-size:12px; letter-spacing:1px;">⚠️ DEV ENVIRONMENT ⚠️</div>
 <div class="header" style="display:flex; align-items:center; justify-content:space-between; padding:9px 16px;">
   <button class="menu-btn" onclick="toggleSideMenu()" style="background:transparent; border:none; padding:8px; cursor:pointer; display:flex; flex-direction:column; gap:4px; color:var(--text);">
     <span style="width:22px; height:2px; background:currentColor; border-radius:2px;"></span>
@@ -1030,8 +1031,8 @@ input.qty-big-input {
 
 
 <script>
-const SUPABASE_URL = 'https://yqbfrncncserfpcdikxy.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_n4UfSazXU9vhI9fs2paVNQ_3kz_SD9L';
+const SUPABASE_URL = 'https://neqmyzoxbdedoaoqlpvq.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_EiMiF401eNLhjYa038FOJA_XnBfPQTO';
 const { createClient } = supabase;
 const db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
@@ -2441,6 +2442,15 @@ async function deleteOp(id) {
 }
 
 // ── STATS ──
+function toggleStatDetails(safeId) {
+  const el = document.getElementById(`stat-details-${safeId}`);
+  const arrow = document.getElementById(`stat-arrow-${safeId}`);
+  if (!el) return;
+  const visible = el.style.display !== 'none';
+  el.style.display = visible ? 'none' : 'block';
+  if (arrow) arrow.textContent = visible ? '▼' : '▲';
+}
+
 function statsResetMonth() {
   const now = new Date();
   const first = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -2539,16 +2549,59 @@ async function loadStats() {
     .filter(([n, s]) => s.income > 0 || s.expense > 0)
     .sort((a, b) => (b[1].income - b[1].expense) - (a[1].income - a[1].expense));
 
+  // Групирай детайлите по обект
+  const detailsByObj = {};
+  validOps.forEach(op => {
+    const objName = op.object_name || op.operation_headers?.object_name || '—';
+    if (!detailsByObj[objName]) detailsByObj[objName] = { income: [], expense: [] };
+    const acc = op.account_code || '';
+    if (acc.startsWith('7')) {
+      detailsByObj[objName].income.push({
+        accountName: op.product_name || acc,
+        amount: op.entry_type === 'C' ? (op.amount || 0) : -(op.amount || 0),
+        contractor: op.operation_headers?.contractor,
+        comment: op.operation_headers?.comment,
+        date: op.operation_headers?.date
+      });
+    } else if (acc.startsWith('6')) {
+      detailsByObj[objName].expense.push({
+        accountName: op.product_name || acc,
+        amount: op.entry_type === 'D' ? (op.amount || 0) : -(op.amount || 0),
+        contractor: op.operation_headers?.contractor,
+        comment: op.operation_headers?.comment,
+        date: op.operation_headers?.date
+      });
+    }
+  });
+
   document.getElementById('objectStats').innerHTML = sorted.map(([name, s]) => {
     const result = s.income - s.expense;
+    const det = detailsByObj[name] || { income: [], expense: [] };
+    const safeId = name.replace(/[^a-zA-Z0-9]/g, '_');
+
+    const renderRow = (r) => {
+      const extras = [r.contractor, r.comment].filter(Boolean).join(' · ');
+      return `<div style="font-size:11px; color:var(--text2); padding:3px 0; display:flex; justify-content:space-between; gap:8px;">
+        <span style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${r.accountName}${extras ? ` <span style="color:var(--text3);">· ${extras}</span>` : ''}</span>
+        <span style="font-family:var(--mono); font-weight:600; white-space:nowrap;">${r.amount.toFixed(2)}</span>
+      </div>`;
+    };
+
     return `
-      <div class="card">
-        <div class="info-row" style="padding-top:0">
+      <div class="card" id="stat-card-${safeId}">
+        <div class="info-row" style="padding-top:0; cursor:pointer;" onclick="toggleStatDetails('${safeId}')">
           <span style="font-weight:700">${name}</span>
-          <span class="badge ${result >= 0 ? 'green' : ''}" style="${result < 0 ? 'background:rgba(220,38,38,0.15); color:var(--red); border-color:rgba(220,38,38,0.3);' : ''}">${result.toFixed(2)} EUR</span>
+          <span style="display:flex; align-items:center; gap:6px;">
+            <span class="badge ${result >= 0 ? 'green' : ''}" style="${result < 0 ? 'background:rgba(220,38,38,0.15); color:var(--red); border-color:rgba(220,38,38,0.3);' : ''}">${result.toFixed(2)} EUR</span>
+            <span id="stat-arrow-${safeId}" style="font-size:10px; color:var(--text2);">▼</span>
+          </span>
         </div>
-        <div class="info-row"><span class="key">Приходи</span><span class="val" style="color:var(--green)">${s.income.toFixed(2)} EUR</span></div>
-        <div class="info-row" style="padding-bottom:0"><span class="key">Разходи</span><span class="val" style="color:var(--red)">${s.expense.toFixed(2)} EUR</span></div>
+        <div class="info-row" style="cursor:pointer;" onclick="toggleStatDetails('${safeId}')"><span class="key">Приходи</span><span class="val" style="color:var(--green)">${s.income.toFixed(2)} EUR</span></div>
+        <div class="info-row" style="padding-bottom:0; cursor:pointer;" onclick="toggleStatDetails('${safeId}')"><span class="key">Разходи</span><span class="val" style="color:var(--red)">${s.expense.toFixed(2)} EUR</span></div>
+        <div id="stat-details-${safeId}" style="display:none; margin-top:10px; padding-top:10px; border-top:1px dashed var(--border);">
+          ${det.income.length ? `<div style="font-size:11px; font-weight:700; color:var(--green); margin-bottom:4px;">📈 ПРИХОДИ</div>${det.income.map(renderRow).join('')}` : ''}
+          ${det.expense.length ? `<div style="font-size:11px; font-weight:700; color:var(--red); margin-top:8px; margin-bottom:4px;">📉 РАЗХОДИ</div>${det.expense.map(renderRow).join('')}` : ''}
+        </div>
       </div>`;
   }).join('') || '<div class="empty"><div class="empty-icon">📊</div><p>Няма данни</p></div>';
 }
