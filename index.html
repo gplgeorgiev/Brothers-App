@@ -2370,16 +2370,30 @@ async function saveEditLine() {
   const costValue = prod ? parseFloat((prod.price_with_vat * qty).toFixed(2)) : null;
 
   const update = { quantity: qty };
-  if (costValue) update.cost_value = costValue;
+  if (costValue) { update.cost_value = costValue; update.amount = costValue; }
 
   const { error } = await db.from('operations').update(update).eq('id', currentEditLineId);
   if (error) { showToast('❌ ' + error.message, 'error'); return; }
 
-  // Обнови total_cost в хедъра
+  // Обнови total_cost в хедъра + 60101 реда
   if (op?.header_id) {
-    const { data: allLines } = await db.from('operations').select('cost_value').eq('header_id', op.header_id).is('deleted_at', null);
-    const newTotal = (allLines || []).reduce((s, r) => s + (r.cost_value || 0), 0);
-    await db.from('operation_headers').update({ total_cost: parseFloat(newTotal.toFixed(2)) }).eq('id', op.header_id);
+    // Сума само от 30201 редовете (изписани материали)
+    const { data: creditLines } = await db.from('operations')
+      .select('amount')
+      .eq('header_id', op.header_id)
+      .eq('account_code', '30201')
+      .eq('entry_type', 'C')
+      .is('deleted_at', null);
+    const newTotal = parseFloat(((creditLines || []).reduce((s, r) => s + (r.amount || 0), 0)).toFixed(2));
+
+    // Update 60101 реда (общия разход)
+    await db.from('operations')
+      .update({ amount: newTotal, cost_value: newTotal })
+      .eq('header_id', op.header_id)
+      .eq('account_code', '60101');
+
+    // Update total_cost в хедъра
+    await db.from('operation_headers').update({ total_cost: newTotal }).eq('id', op.header_id);
   }
 
   closeEditLineModal();
