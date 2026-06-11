@@ -1,6 +1,6 @@
 {
   "name": "Coffee Brothers",
-  "short_name": "Brothers",
+  "short_name": "Coffee Brothers",
   "description": "Вендинг мениджър",
   "start_url": "/Brothers-App/",
   "display": "standalone",
