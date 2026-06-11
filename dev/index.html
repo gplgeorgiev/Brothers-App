@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#0ea5a0">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="Brothers">
+<meta name="apple-mobile-web-app-title" content="Coffee Brothers">
 <title>Coffee Brothers DEV</title>
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="icon" type="image/png" href="icon-192.png">
@@ -2649,11 +2649,38 @@ function saveDefaultTech() { const v = document.getElementById('defaultTechSelec
 function loadDefaultTech() { const v = localStorage.getItem('defaultTech'); if(v) { document.getElementById('techSelect').value=v; document.getElementById('defaultTechSelect').value=v; } }
 
 // ── NAV ──
+const tabTitles = {
+  'restock': { icon: '⬆️', name: 'Зареждане' },
+  'cashflow': { icon: '💰', name: 'Отчитане' },
+  'finance': { icon: '💳', name: 'Финанси' },
+  'service': { icon: '🔧', name: 'Сервиз' },
+  'stats': { icon: '📊', name: 'Статистика' },
+  'history': { icon: '📋', name: 'История' },
+  'trash': { icon: '🗑', name: 'Кошче' },
+  'settings': { icon: '⚙️', name: 'Настройки' }
+};
+
+function updateHeaderTitle(tab) {
+  const t = tabTitles[tab];
+  if (!t) return;
+  const el = document.getElementById('headerTitle');
+  if (!el) return;
+  // Use Lucide SVG for coffee themes, emoji for standard
+  const theme = localStorage.getItem('app_theme') || 'standard';
+  const isLucide = (theme === 'coffee-dark' || theme === 'coffee-light');
+  let iconHtml = t.icon;
+  if (isLucide && typeof lucideIcons !== 'undefined' && lucideIcons[t.icon]) {
+    iconHtml = lucideIcons[t.icon];
+  }
+  el.innerHTML = `${iconHtml} ${t.name}`;
+}
+
 function switchTab(tab) {
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById(`page-${tab}`).classList.add('active');
+  updateHeaderTitle(tab);
   document.getElementById(`nav-${tab}`)?.classList.add('active');
   const tabMap = ['restock','cashflow','history','finance','service','stats','settings'];
   document.querySelectorAll('.tab')[tabMap.indexOf(tab)]?.classList.add('active');
