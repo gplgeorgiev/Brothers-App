@@ -2484,7 +2484,8 @@ function toggleStatDetails(safeId) {
 function statsResetMonth() {
   const now = new Date();
   const first = new Date(now.getFullYear(), now.getMonth(), 1);
-  const firstStr = first.toISOString().split('T')[0];
+  // Локална дата без UTC изместване
+  const firstStr = `${first.getFullYear()}-${String(first.getMonth()+1).padStart(2,'0')}-${String(first.getDate()).padStart(2,'0')}`;
   const todayStr = getLocalDateString();
   document.getElementById('statsDateFrom').value = firstStr;
   document.getElementById('statsDateTo').value = todayStr;
@@ -2503,7 +2504,7 @@ async function loadStats() {
   if (!dateFrom || !dateTo) {
     const now = new Date();
     const first = new Date(now.getFullYear(), now.getMonth(), 1);
-    dateFrom = first.toISOString().split('T')[0];
+    dateFrom = `${first.getFullYear()}-${String(first.getMonth()+1).padStart(2,'0')}-${String(first.getDate()).padStart(2,'0')}`;
     dateTo = getLocalDateString();
     if (document.getElementById('statsDateFrom')) document.getElementById('statsDateFrom').value = dateFrom;
     if (document.getElementById('statsDateTo')) document.getElementById('statsDateTo').value = dateTo;
@@ -2512,7 +2513,8 @@ async function loadStats() {
   // Обнови label
   const labelEl = document.getElementById('statsPeriodLabel');
   const now = new Date();
-  const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+  const _first = new Date(now.getFullYear(), now.getMonth(), 1);
+  const firstOfMonth = `${_first.getFullYear()}-${String(_first.getMonth()+1).padStart(2,'0')}-${String(_first.getDate()).padStart(2,'0')}`;
   const todayStr = getLocalDateString();
   if (dateFrom === firstOfMonth && dateTo === todayStr) {
     labelEl.textContent = 'Текущ месец';
