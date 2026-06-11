@@ -249,13 +249,12 @@ input.qty-big-input {
 
 <div style="background:#ff6b35; color:#fff; text-align:center; padding:6px; font-weight:800; font-size:12px; letter-spacing:1px;">⚠️ DEV ENVIRONMENT ⚠️</div>
 <div class="header" style="display:flex; align-items:center; justify-content:space-between; padding:9px 16px;">
-  <button class="menu-btn" onclick="toggleSideMenu()" style="background:transparent; border:none; padding:8px; cursor:pointer; display:flex; flex-direction:column; gap:4px; color:var(--text); flex-shrink:0;">
+  <button class="menu-btn" onclick="toggleSideMenu()" style="background:transparent; border:none; padding:8px; cursor:pointer; display:flex; flex-direction:column; gap:4px; color:var(--text);">
     <span style="width:22px; height:2px; background:currentColor; border-radius:2px;"></span>
     <span style="width:22px; height:2px; background:currentColor; border-radius:2px;"></span>
     <span style="width:22px; height:2px; background:currentColor; border-radius:2px;"></span>
   </button>
-  <div id="headerTitle" style="flex:1; text-align:center; font-size:15px; font-weight:800; line-height:1.1; color:var(--accent);">⬆️ Зареждане</div>
-  <div style="display:flex; align-items:center; gap:10px; flex-shrink:0;">
+  <div style="display:flex; align-items:center; gap:10px;">
     <div style="text-align:right;">
       <div style="font-size:15px; font-weight:800; line-height:1.1; color:var(--text);">Coffee Brothers</div>
       <div class="header-sub" id="headerDate" style="font-size:11px; color:var(--text2);">зарежда...</div>
@@ -263,6 +262,9 @@ input.qty-big-input {
     <img src="icon-192.png" style="width:36px; height:36px; border-radius:8px; object-fit:cover;">
   </div>
 </div>
+
+<!-- PAGE TITLE BAR -->
+<div id="pageTitleBar" style="background:var(--bg2); border-bottom:1px solid var(--border); padding:6px 16px; font-size:13px; font-weight:700; color:var(--accent); text-align:center;">⬆️ Зареждане</div>
 
 <!-- SIDE MENU -->
 <div id="sideMenuOverlay" onclick="closeSideMenu()" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:150;"></div>
@@ -2664,7 +2666,7 @@ const tabTitles = {
 function updateHeaderTitle(tab) {
   const t = tabTitles[tab];
   if (!t) return;
-  const el = document.getElementById('headerTitle');
+  const el = document.getElementById('pageTitleBar');
   if (!el) return;
   // Use Lucide SVG for coffee themes, emoji for standard
   const theme = localStorage.getItem('app_theme') || 'standard';
