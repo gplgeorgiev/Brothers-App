@@ -2520,6 +2520,9 @@ async function loadStats() {
     labelEl.textContent = `${formatDateBG(new Date(dateFrom))} — ${formatDateBG(new Date(dateTo))}`;
   }
 
+  // Филтър за обект
+  const objFilter = document.getElementById('statsObjFilter')?.value || '';
+
   // Взимаме operations с header data - филтрираме по период и не-изтрити
   const { data: ops } = await db.from('operations')
     .select('account_code, amount, entry_type, object_name, product_name, header_id, operation_headers!inner(date, op_type, deleted_at, object_name, contractor, comment, document_ref)')
