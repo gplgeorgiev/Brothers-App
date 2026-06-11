@@ -249,14 +249,15 @@ input.qty-big-input {
 
 <div style="background:#ff6b35; color:#fff; text-align:center; padding:6px; font-weight:800; font-size:12px; letter-spacing:1px;">⚠️ DEV ENVIRONMENT ⚠️</div>
 <div class="header" style="display:flex; align-items:center; justify-content:space-between; padding:9px 16px;">
-  <button class="menu-btn" onclick="toggleSideMenu()" style="background:transparent; border:none; padding:8px; cursor:pointer; display:flex; flex-direction:column; gap:4px; color:var(--text);">
+  <button class="menu-btn" onclick="toggleSideMenu()" style="background:transparent; border:none; padding:8px; cursor:pointer; display:flex; flex-direction:column; gap:4px; color:var(--text); flex-shrink:0;">
     <span style="width:22px; height:2px; background:currentColor; border-radius:2px;"></span>
     <span style="width:22px; height:2px; background:currentColor; border-radius:2px;"></span>
     <span style="width:22px; height:2px; background:currentColor; border-radius:2px;"></span>
   </button>
-  <div style="display:flex; align-items:center; gap:10px;">
+  <div id="headerTitle" style="flex:1; text-align:center; font-size:15px; font-weight:800; line-height:1.1; color:var(--accent);">⬆️ Зареждане</div>
+  <div style="display:flex; align-items:center; gap:10px; flex-shrink:0;">
     <div style="text-align:right;">
-      <div style="font-size:15px; font-weight:800; line-height:1.1; color:var(--text);">Brothers</div>
+      <div style="font-size:15px; font-weight:800; line-height:1.1; color:var(--text);">Coffee Brothers</div>
       <div class="header-sub" id="headerDate" style="font-size:11px; color:var(--text2);">зарежда...</div>
     </div>
     <img src="icon-192.png" style="width:36px; height:36px; border-radius:8px; object-fit:cover;">
