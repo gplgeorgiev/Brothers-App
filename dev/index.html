@@ -2426,6 +2426,31 @@ async function saveEditOp() {
     technician_id: techId, technician_name: tech?.name
   }).eq('operation_id', currentEditOpId);
 
+  // Намери cashflow записа за този restock хедър и обнови свързаните cash_income хедъри/operations
+  const { data: relatedCf } = await db.from('cashflow')
+    .select('id')
+    .eq('operation_id', currentEditOpId)
+    .is('deleted_at', null);
+  if (relatedCf && relatedCf.length > 0) {
+    const cfIds = relatedCf.map(c => c.id);
+    // Обнови cash_income хедърите
+    await db.from('operation_headers').update({
+      date, object_id: objId, object_name: obj?.name,
+      technician_id: techId, technician_name: tech?.name
+    }).in('cashflow_id', cfIds).eq('op_type', 'cash_income');
+    // И техните operations
+    const { data: cashHdrs } = await db.from('operation_headers')
+      .select('id')
+      .in('cashflow_id', cfIds)
+      .eq('op_type', 'cash_income')
+      .is('deleted_at', null);
+    if (cashHdrs && cashHdrs.length > 0) {
+      await db.from('operations').update({
+        date, object_name: obj?.name, technician_name: tech?.name
+      }).in('header_id', cashHdrs.map(h => h.id));
+    }
+  }
+
   closeEditOpModal();
   showToast('✅ Хедърът е обновен!', 'success');
   await loadRestockHistory();
