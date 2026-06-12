@@ -887,11 +887,11 @@ input.qty-big-input {
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px;">
       <div class="field" style="margin-bottom:0;">
         <label>ДАТА ОТ</label>
-        <input type="date" id="statsDateFrom" onchange="loadStats()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; font-family:var(--font);">
+        <input type="date" id="statsDateFrom" onchange="loadStats(); loadBalanceSummary();" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; font-family:var(--font);">
       </div>
       <div class="field" style="margin-bottom:0;">
         <label>ДО</label>
-        <input type="date" id="statsDateTo" onchange="loadStats()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; font-family:var(--font);">
+        <input type="date" id="statsDateTo" onchange="loadStats(); loadBalanceSummary();" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; font-family:var(--font);">
       </div>
     </div>
     <button onclick="statsResetMonth()" style="width:100%; padding:8px; border-radius:8px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:12px; font-weight:700; cursor:pointer; font-family:var(--font); margin-bottom:8px;">📅 Текущ месец</button>
@@ -1601,6 +1601,7 @@ async function submitRestock() {
     week_number: weekNum,
     period,
     op_type: 'restock',
+    vehicle_id: tech?.vehicle_id || null,
     comment
   }).select().single();
 
@@ -2617,6 +2618,59 @@ async function loadStats() {
   // Филтър за обект
   const objFilter = document.getElementById('statsObjFilter')?.value || '';
 
+  // Зареди обектите с rent и km_from_base + vehicles
+  const { data: objsForStats } = await db.from('objects').select('id, name, rent').is('deleted_at', null);
+  const { data: vehiclesForStats } = await db.from('vehicles').select('id, fuel_consumption, fuel_price').is('deleted_at', null);
+  const vehMap = new Map((vehiclesForStats || []).map(v => [v.id, v]));
+
+  // Взимаме хедърите за периода (за гориво смятане)
+  const { data: hdrsForStats } = await db.from('operation_headers')
+    .select('id, date, object_name, km, vehicle_id, op_type')
+    .gte('date', dateFrom)
+    .lte('date', dateTo)
+    .in('op_type', ['restock', 'service'])
+    .is('deleted_at', null);
+
+  // Изчисли начислен наем за периода: пропорционално за всеки месец
+  function calcRentForPeriod(monthlyRent, fromStr, toStr) {
+    if (!monthlyRent || monthlyRent <= 0) return { total: 0, months: 0, days: 0 };
+    const from = new Date(fromStr);
+    const to = new Date(toStr);
+    let total = 0;
+    let fullMonths = 0;
+    let extraDays = 0;
+    let cursor = new Date(from.getFullYear(), from.getMonth(), 1);
+    while (cursor <= to) {
+      const year = cursor.getFullYear();
+      const month = cursor.getMonth();
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+      const monthStart = new Date(year, month, 1);
+      const monthEnd = new Date(year, month + 1, 0);
+      const periodStart = from > monthStart ? from : monthStart;
+      const periodEnd = to < monthEnd ? to : monthEnd;
+      const daysInPeriod = Math.floor((periodEnd - periodStart) / (1000*60*60*24)) + 1;
+      total += monthlyRent * (daysInPeriod / daysInMonth);
+      if (daysInPeriod === daysInMonth) {
+        fullMonths++;
+      } else {
+        extraDays += daysInPeriod;
+      }
+      cursor = new Date(year, month + 1, 1);
+    }
+    return { total: parseFloat(total.toFixed(2)), months: fullMonths, days: extraDays };
+  }
+
+  // Изчисли гориво за обект в периода
+  const fuelByObj = {};
+  (hdrsForStats || []).forEach(h => {
+    if (!h.km || !h.vehicle_id) return;
+    if (objFilter && h.object_name !== objFilter) return;
+    const v = vehMap.get(h.vehicle_id);
+    if (!v || !v.fuel_consumption || !v.fuel_price) return;
+    const cost = h.km * (v.fuel_consumption / 100) * v.fuel_price;
+    fuelByObj[h.object_name] = (fuelByObj[h.object_name] || 0) + cost;
+  });
+
   // Взимаме operations с header data - филтрираме по период и не-изтрити
   const { data: ops } = await db.from('operations')
     .select('account_code, amount, entry_type, object_name, product_name, header_id, operation_headers!inner(date, op_type, deleted_at, object_name, contractor, comment, document_ref)')
@@ -2635,9 +2689,44 @@ async function loadStats() {
     validOps = validOps.filter(o => (o.object_name || o.operation_headers?.object_name) === objFilter);
   }
 
-  // Групирай по обект
+  // Групирай по обект - с начислен наем и гориво
   const byObj = {};
   let totalIncome = 0, totalExpense = 0;
+
+  // Initialize byObj с обектите (филтрирани ако има obj filter)
+  const allObjNames = new Set();
+  (objsForStats || []).forEach(o => {
+    if (!objFilter || o.name === objFilter) allObjNames.add(o.name);
+  });
+  Object.keys(fuelByObj).forEach(n => {
+    if (!objFilter || n === objFilter) allObjNames.add(n);
+  });
+  allObjNames.forEach(name => {
+    byObj[name] = { income: 0, expense: 0, accrued_rent: 0, fuel: 0 };
+  });
+
+  // Добави начислен наем за всеки обект с rent (филтриран)
+  (objsForStats || []).forEach(o => {
+    if (objFilter && o.name !== objFilter) return;
+    if (o.rent && o.rent > 0) {
+      const r = calcRentForPeriod(o.rent, dateFrom, dateTo);
+      if (byObj[o.name]) {
+        byObj[o.name].accrued_rent = r.total;
+        byObj[o.name].rent_months = r.months;
+        byObj[o.name].rent_days = r.days;
+        byObj[o.name].expense += r.total;
+      }
+    }
+  });
+
+  // Добави гориво (филтрирано)
+  Object.entries(fuelByObj).forEach(([name, fuel]) => {
+    if (objFilter && name !== objFilter) return;
+    if (byObj[name]) {
+      byObj[name].fuel = parseFloat(fuel.toFixed(2));
+      byObj[name].expense += parseFloat(fuel.toFixed(2));
+    }
+  });
 
   validOps.forEach(op => {
     const objName = op.object_name || op.operation_headers?.object_name || '—';
@@ -2674,6 +2763,8 @@ async function loadStats() {
     <div class="stat-card"><div class="stat-label">Печалба</div><div class="stat-value ${profit >= 0 ? 'green' : ''}" style="${profit < 0 ? 'color:var(--red)' : ''}">${profit.toFixed(0)} EUR</div></div>
     <div class="stat-card"><div class="stat-label">Обекти</div><div class="stat-value">${objCount}</div></div>`;
 
+  // DEBUG
+  console.log('byObj final state:', JSON.parse(JSON.stringify(byObj)));
   // По обект
   const sorted = Object.entries(byObj)
     .filter(([n, s]) => s.income > 0 || s.expense > 0)
@@ -2730,7 +2821,7 @@ async function loadStats() {
         <div class="info-row" style="padding-bottom:0; cursor:pointer;" onclick="toggleStatDetails('${safeId}')"><span class="key">Разходи</span><span class="val" style="color:var(--red)">${s.expense.toFixed(2)} EUR</span></div>
         <div id="stat-details-${safeId}" style="display:none; margin-top:10px; padding-top:10px; border-top:1px dashed var(--border);">
           ${det.income.length ? `<div style="font-size:11px; font-weight:700; color:var(--green); margin-bottom:4px;">📈 ПРИХОДИ</div>${det.income.map(renderRow).join('')}` : ''}
-          ${det.expense.length ? `<div style="font-size:11px; font-weight:700; color:var(--red); margin-top:8px; margin-bottom:4px;">📉 РАЗХОДИ</div>${det.expense.map(renderRow).join('')}` : ''}
+          ${det.expense.length || s.accrued_rent || s.fuel ? `<div style="font-size:11px; font-weight:700; color:var(--red); margin-top:8px; margin-bottom:4px;">📉 РАЗХОДИ</div>${det.expense.map(renderRow).join('')}${s.accrued_rent ? `<div style="font-size:11px; color:var(--text2); padding:3px 0; display:flex; justify-content:space-between; gap:8px; font-style:italic;"><span>🏠 Наем начислен ${(s.rent_months || s.rent_days) ? `<span style="color:var(--text3);">(${s.rent_months ? s.rent_months + ' мес' : ''}${s.rent_months && s.rent_days ? ', ' : ''}${s.rent_days ? s.rent_days + ' дни' : ''})</span>` : ''}</span><span style="font-family:var(--mono); font-weight:600;">${s.accrued_rent.toFixed(2)}</span></div>` : ''}${s.fuel ? `<div style="font-size:11px; color:var(--text2); padding:3px 0; display:flex; justify-content:space-between; gap:8px; font-style:italic;"><span>⛽ Гориво начислено</span><span style="font-family:var(--mono); font-weight:600;">${s.fuel.toFixed(2)}</span></div>` : ''}` : ''}
         </div>
       </div>`;
   }).join('') || '<div class="empty"><div class="empty-icon">📊</div><p>Няма данни</p></div>';
@@ -3299,13 +3390,13 @@ async function saveEditFin() {
 async function loadBalanceSummary() {
   const el = document.getElementById('balanceSummary');
   const { data } = await db.from('operations')
-    .select('account_code, amount, technician_name, entry_type, header_id, operation_headers!inner(payment_method, op_type, deleted_at)')
+    .select('account_code, amount, technician_name, entry_type, header_id, operation_headers!inner(date, payment_method, op_type, deleted_at, object_name, comment, contractor)')
     .in('account_code', ['50101', '50301'])
     .is('deleted_at', null);
   if (!data) return;
 
-  const cashOps = data.filter(o => o.account_code === '50101');
-  const bankOps = data.filter(o => o.account_code === '50301');
+  const cashOps = data.filter(o => o.account_code === '50101' && !o.operation_headers?.deleted_at);
+  const bankOps = data.filter(o => o.account_code === '50301' && !o.operation_headers?.deleted_at);
 
   // За активи (каса, банка): Дебит увеличава, Кредит намалява
   const getSign = (op) => op.entry_type === 'D' ? 1 : -1;
@@ -3313,12 +3404,53 @@ async function loadBalanceSummary() {
   const totalCash = cashOps.reduce((s, o) => s + (o.amount || 0) * getSign(o), 0);
   const totalBank = bankOps.reduce((s, o) => s + (o.amount || 0) * getSign(o), 0);
 
+  // Period от UI - за filtering на drill-down движения
+  const periodFrom = document.getElementById('statsDateFrom')?.value || '';
+  const periodTo = document.getElementById('statsDateTo')?.value || '';
+
+  // Групирай движения по техник: byTech = общ баланс, movesByTech = само за периода
   const byTech = {};
+  const movesByTech = {};
   cashOps.forEach(o => {
     const name = o.technician_name || 'Неизвестен';
-    if (!byTech[name]) byTech[name] = 0;
-    byTech[name] += (o.amount || 0) * getSign(o);
+    if (!byTech[name]) { byTech[name] = 0; movesByTech[name] = []; }
+    const sign = getSign(o);
+    const amt = (o.amount || 0) * sign;
+    byTech[name] += amt;  // ВИНАГИ - общ баланс
+    // Само ако е в периода → добави в drill-down
+    const opDate = o.operation_headers?.date;
+    if (opDate && (!periodFrom || opDate >= periodFrom) && (!periodTo || opDate <= periodTo)) {
+      movesByTech[name].push({
+        date: opDate,
+        amount: amt,
+        op_type: o.operation_headers?.op_type,
+        object_name: o.operation_headers?.object_name,
+        contractor: o.operation_headers?.contractor,
+        comment: o.operation_headers?.comment
+      });
+    }
   });
+
+  const opLabels = {
+    'restock': '⬆️ Зареждане',
+    'cash_income': '💰 Cash отчет',
+    'finance_expense': '📤 Разход',
+    'finance_income': '📥 Приход',
+    'opening_balance': '🏁 Нач. салдо',
+    'service': '🔧 Сервиз'
+  };
+
+  const renderMove = (m) => {
+    const sign = m.amount >= 0 ? '+' : '';
+    const color = m.amount >= 0 ? 'var(--green)' : 'var(--red)';
+    const dateStr = m.date ? formatDateBG(new Date(m.date)) : '';
+    const label = opLabels[m.op_type] || m.op_type;
+    const extras = [m.object_name, m.contractor, m.comment].filter(Boolean).join(' · ');
+    return `<div style="font-size:11px; padding:3px 0; display:flex; justify-content:space-between; gap:8px;">
+      <span style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text2);">${dateStr} · ${label}${extras ? ` <span style="color:var(--text3);">· ${extras}</span>` : ''}</span>
+      <span style="font-family:var(--mono); font-weight:700; white-space:nowrap; color:${color};">${sign}${m.amount.toFixed(2)}</span>
+    </div>`;
+  };
 
   el.innerHTML = `
     <div class="stats-grid" style="margin-bottom:12px;">
@@ -3333,12 +3465,31 @@ async function loadBalanceSummary() {
     </div>
     <div class="card">
       <div style="font-size:11px; font-weight:700; letter-spacing:1px; color:var(--text3); text-transform:uppercase; margin-bottom:10px;">По техник (каса)</div>
-      ${Object.entries(byTech).map(([name, bal]) => `
-        <div class="info-row">
-          <span class="key">👤 ${name}</span>
-          <span class="val" style="color:${bal >= 0 ? 'var(--green)' : 'var(--red)'}">${bal.toFixed(2)} EUR</span>
-        </div>`).join('') || '<div style="color:var(--text3); font-size:13px;">Няма данни</div>'}
+      ${Object.entries(byTech).map(([name, bal]) => {
+        const safeId = btoa(unescape(encodeURIComponent(name))).replace(/[^a-zA-Z0-9]/g, '_').substring(0, 30);
+        const moves = (movesByTech[name] || []).sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+        const periodSum = moves.reduce((s, m) => s + m.amount, 0);
+        return `
+        <div id="techCard-${safeId}">
+          <div class="info-row" style="cursor:pointer;" onclick="toggleTechDetails('${safeId}')">
+            <span class="key">👤 ${name} <span id="techArrow-${safeId}" style="font-size:10px; color:var(--text2);">▼</span></span>
+            <span class="val" style="color:${bal >= 0 ? 'var(--green)' : 'var(--red)'}">${bal.toFixed(2)} EUR</span>
+          </div>
+          <div id="techDetails-${safeId}" style="display:none; padding:8px 0; border-top:1px dashed var(--border); margin-top:6px;">
+            ${moves.length ? `<div style="font-size:11px; font-weight:700; color:var(--text2); margin-bottom:6px; display:flex; justify-content:space-between;"><span>📊 Оборот за периода:</span><span style="font-family:var(--mono); color:${periodSum >= 0 ? 'var(--green)' : 'var(--red)'};">${periodSum >= 0 ? '+' : ''}${periodSum.toFixed(2)}</span></div>${moves.map(renderMove).join('')}` : '<div style="font-size:11px; color:var(--text3); font-style:italic;">Няма движения в периода</div>'}
+          </div>
+        </div>`;
+      }).join('') || '<div style="color:var(--text3); font-size:13px;">Няма данни</div>'}
     </div>`;
+}
+
+function toggleTechDetails(safeId) {
+  const el = document.getElementById(`techDetails-${safeId}`);
+  const arrow = document.getElementById(`techArrow-${safeId}`);
+  if (!el) return;
+  const visible = el.style.display !== 'none';
+  el.style.display = visible ? 'none' : 'block';
+  if (arrow) arrow.textContent = visible ? '▼' : '▲';
 }
 
 // ── SERVICE ──
