@@ -2634,10 +2634,12 @@ async function loadStats() {
 
   // Изчисли начислен наем за периода: пропорционално за всеки месец
   function calcRentForPeriod(monthlyRent, fromStr, toStr) {
-    if (!monthlyRent || monthlyRent <= 0) return 0;
+    if (!monthlyRent || monthlyRent <= 0) return { total: 0, months: 0, days: 0 };
     const from = new Date(fromStr);
     const to = new Date(toStr);
     let total = 0;
+    let fullMonths = 0;
+    let extraDays = 0;
     let cursor = new Date(from.getFullYear(), from.getMonth(), 1);
     while (cursor <= to) {
       const year = cursor.getFullYear();
@@ -2649,9 +2651,14 @@ async function loadStats() {
       const periodEnd = to < monthEnd ? to : monthEnd;
       const daysInPeriod = Math.floor((periodEnd - periodStart) / (1000*60*60*24)) + 1;
       total += monthlyRent * (daysInPeriod / daysInMonth);
+      if (daysInPeriod === daysInMonth) {
+        fullMonths++;
+      } else {
+        extraDays += daysInPeriod;
+      }
       cursor = new Date(year, month + 1, 1);
     }
-    return parseFloat(total.toFixed(2));
+    return { total: parseFloat(total.toFixed(2)), months: fullMonths, days: extraDays };
   }
 
   // Изчисли гориво за обект в периода
@@ -2697,11 +2704,13 @@ async function loadStats() {
   // Добави начислен наем за всеки обект с rent
   (objsForStats || []).forEach(o => {
     if (o.rent && o.rent > 0) {
-      const rent = calcRentForPeriod(o.rent, dateFrom, dateTo);
+      const r = calcRentForPeriod(o.rent, dateFrom, dateTo);
       if (byObj[o.name]) {
-        byObj[o.name].accrued_rent = rent;
-        byObj[o.name].expense += rent;
-        totalExpense += rent;
+        byObj[o.name].accrued_rent = r.total;
+        byObj[o.name].rent_months = r.months;
+        byObj[o.name].rent_days = r.days;
+        byObj[o.name].expense += r.total;
+        totalExpense += r.total;
       }
     }
   });
@@ -2806,7 +2815,7 @@ async function loadStats() {
         <div class="info-row" style="padding-bottom:0; cursor:pointer;" onclick="toggleStatDetails('${safeId}')"><span class="key">Разходи</span><span class="val" style="color:var(--red)">${s.expense.toFixed(2)} EUR</span></div>
         <div id="stat-details-${safeId}" style="display:none; margin-top:10px; padding-top:10px; border-top:1px dashed var(--border);">
           ${det.income.length ? `<div style="font-size:11px; font-weight:700; color:var(--green); margin-bottom:4px;">📈 ПРИХОДИ</div>${det.income.map(renderRow).join('')}` : ''}
-          ${det.expense.length || s.accrued_rent || s.fuel ? `<div style="font-size:11px; font-weight:700; color:var(--red); margin-top:8px; margin-bottom:4px;">📉 РАЗХОДИ</div>${det.expense.map(renderRow).join('')}${s.accrued_rent ? `<div style="font-size:11px; color:var(--text2); padding:3px 0; display:flex; justify-content:space-between; gap:8px; font-style:italic;"><span>🏠 Начислен наем</span><span style="font-family:var(--mono); font-weight:600;">${s.accrued_rent.toFixed(2)}</span></div>` : ''}${s.fuel ? `<div style="font-size:11px; color:var(--text2); padding:3px 0; display:flex; justify-content:space-between; gap:8px; font-style:italic;"><span>⛽ Гориво (калк.)</span><span style="font-family:var(--mono); font-weight:600;">${s.fuel.toFixed(2)}</span></div>` : ''}` : ''}
+          ${det.expense.length || s.accrued_rent || s.fuel ? `<div style="font-size:11px; font-weight:700; color:var(--red); margin-top:8px; margin-bottom:4px;">📉 РАЗХОДИ</div>${det.expense.map(renderRow).join('')}${s.accrued_rent ? `<div style="font-size:11px; color:var(--text2); padding:3px 0; display:flex; justify-content:space-between; gap:8px; font-style:italic;"><span>🏠 Наем начислен ${(s.rent_months || s.rent_days) ? `<span style="color:var(--text3);">(${s.rent_months ? s.rent_months + ' мес' : ''}${s.rent_months && s.rent_days ? ', ' : ''}${s.rent_days ? s.rent_days + ' дни' : ''})</span>` : ''}</span><span style="font-family:var(--mono); font-weight:600;">${s.accrued_rent.toFixed(2)}</span></div>` : ''}${s.fuel ? `<div style="font-size:11px; color:var(--text2); padding:3px 0; display:flex; justify-content:space-between; gap:8px; font-style:italic;"><span>⛽ Гориво начислено</span><span style="font-family:var(--mono); font-weight:600;">${s.fuel.toFixed(2)}</span></div>` : ''}` : ''}
         </div>
       </div>`;
   }).join('') || '<div class="empty"><div class="empty-icon">📊</div><p>Няма данни</p></div>';
