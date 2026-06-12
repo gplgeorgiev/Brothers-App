@@ -2766,6 +2766,8 @@ async function loadStats() {
     <div class="stat-card"><div class="stat-label">Печалба</div><div class="stat-value ${profit >= 0 ? 'green' : ''}" style="${profit < 0 ? 'color:var(--red)' : ''}">${profit.toFixed(0)} EUR</div></div>
     <div class="stat-card"><div class="stat-label">Обекти</div><div class="stat-value">${objCount}</div></div>`;
 
+  // DEBUG
+  console.log('byObj final state:', JSON.parse(JSON.stringify(byObj)));
   // По обект
   const sorted = Object.entries(byObj)
     .filter(([n, s]) => s.income > 0 || s.expense > 0)
