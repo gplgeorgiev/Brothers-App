@@ -888,11 +888,11 @@ input.qty-big-input {
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px;">
       <div class="field" style="margin-bottom:0;">
         <label>ДАТА ОТ</label>
-        <input type="date" id="statsDateFrom" onchange="loadStats()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; font-family:var(--font);">
+        <input type="date" id="statsDateFrom" onchange="loadStats(); loadBalanceSummary();" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; font-family:var(--font);">
       </div>
       <div class="field" style="margin-bottom:0;">
         <label>ДО</label>
-        <input type="date" id="statsDateTo" onchange="loadStats()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; font-family:var(--font);">
+        <input type="date" id="statsDateTo" onchange="loadStats(); loadBalanceSummary();" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; font-family:var(--font);">
       </div>
     </div>
     <button onclick="statsResetMonth()" style="width:100%; padding:8px; border-radius:8px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:12px; font-weight:700; cursor:pointer; font-family:var(--font); margin-bottom:8px;">📅 Текущ месец</button>
@@ -3405,22 +3405,31 @@ async function loadBalanceSummary() {
   const totalCash = cashOps.reduce((s, o) => s + (o.amount || 0) * getSign(o), 0);
   const totalBank = bankOps.reduce((s, o) => s + (o.amount || 0) * getSign(o), 0);
 
-  // Групирай движения по техник за drill-down
+  // Period от UI - за filtering на drill-down движения
+  const periodFrom = document.getElementById('statsDateFrom')?.value || '';
+  const periodTo = document.getElementById('statsDateTo')?.value || '';
+
+  // Групирай движения по техник: byTech = общ баланс, movesByTech = само за периода
   const byTech = {};
   const movesByTech = {};
   cashOps.forEach(o => {
     const name = o.technician_name || 'Неизвестен';
     if (!byTech[name]) { byTech[name] = 0; movesByTech[name] = []; }
     const sign = getSign(o);
-    byTech[name] += (o.amount || 0) * sign;
-    movesByTech[name].push({
-      date: o.operation_headers?.date,
-      amount: (o.amount || 0) * sign,
-      op_type: o.operation_headers?.op_type,
-      object_name: o.operation_headers?.object_name,
-      contractor: o.operation_headers?.contractor,
-      comment: o.operation_headers?.comment
-    });
+    const amt = (o.amount || 0) * sign;
+    byTech[name] += amt;  // ВИНАГИ - общ баланс
+    // Само ако е в периода → добави в drill-down
+    const opDate = o.operation_headers?.date;
+    if (opDate && (!periodFrom || opDate >= periodFrom) && (!periodTo || opDate <= periodTo)) {
+      movesByTech[name].push({
+        date: opDate,
+        amount: amt,
+        op_type: o.operation_headers?.op_type,
+        object_name: o.operation_headers?.object_name,
+        contractor: o.operation_headers?.contractor,
+        comment: o.operation_headers?.comment
+      });
+    }
   });
 
   const opLabels = {
@@ -3460,6 +3469,7 @@ async function loadBalanceSummary() {
       ${Object.entries(byTech).map(([name, bal]) => {
         const safeId = btoa(unescape(encodeURIComponent(name))).replace(/[^a-zA-Z0-9]/g, '_').substring(0, 30);
         const moves = (movesByTech[name] || []).sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+        const periodSum = moves.reduce((s, m) => s + m.amount, 0);
         return `
         <div id="techCard-${safeId}">
           <div class="info-row" style="cursor:pointer;" onclick="toggleTechDetails('${safeId}')">
@@ -3467,7 +3477,7 @@ async function loadBalanceSummary() {
             <span class="val" style="color:${bal >= 0 ? 'var(--green)' : 'var(--red)'}">${bal.toFixed(2)} EUR</span>
           </div>
           <div id="techDetails-${safeId}" style="display:none; padding:8px 0; border-top:1px dashed var(--border); margin-top:6px;">
-            ${moves.map(renderMove).join('')}
+            ${moves.length ? `<div style="font-size:11px; font-weight:700; color:var(--text2); margin-bottom:6px; display:flex; justify-content:space-between;"><span>📊 Оборот за периода:</span><span style="font-family:var(--mono); color:${periodSum >= 0 ? 'var(--green)' : 'var(--red)'};">${periodSum >= 0 ? '+' : ''}${periodSum.toFixed(2)}</span></div>${moves.map(renderMove).join('')}` : '<div style="font-size:11px; color:var(--text3); font-style:italic;">Няма движения в периода</div>'}
           </div>
         </div>`;
       }).join('') || '<div style="color:var(--text3); font-size:13px;">Няма данни</div>'}
