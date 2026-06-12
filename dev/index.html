@@ -1602,6 +1602,7 @@ async function submitRestock() {
     week_number: weekNum,
     period,
     op_type: 'restock',
+    vehicle_id: tech?.vehicle_id || null,
     comment
   }).select().single();
 
@@ -2618,6 +2619,51 @@ async function loadStats() {
   // Филтър за обект
   const objFilter = document.getElementById('statsObjFilter')?.value || '';
 
+  // Зареди обектите с rent и km_from_base + vehicles
+  const { data: objsForStats } = await db.from('objects').select('id, name, rent').is('deleted_at', null);
+  const { data: vehiclesForStats } = await db.from('vehicles').select('id, fuel_consumption, fuel_price').is('deleted_at', null);
+  const vehMap = new Map((vehiclesForStats || []).map(v => [v.id, v]));
+
+  // Взимаме хедърите за периода (за гориво смятане)
+  const { data: hdrsForStats } = await db.from('operation_headers')
+    .select('id, date, object_name, km, vehicle_id, op_type')
+    .gte('date', dateFrom)
+    .lte('date', dateTo)
+    .in('op_type', ['restock', 'service'])
+    .is('deleted_at', null);
+
+  // Изчисли начислен наем за периода: пропорционално за всеки месец
+  function calcRentForPeriod(monthlyRent, fromStr, toStr) {
+    if (!monthlyRent || monthlyRent <= 0) return 0;
+    const from = new Date(fromStr);
+    const to = new Date(toStr);
+    let total = 0;
+    let cursor = new Date(from.getFullYear(), from.getMonth(), 1);
+    while (cursor <= to) {
+      const year = cursor.getFullYear();
+      const month = cursor.getMonth();
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+      const monthStart = new Date(year, month, 1);
+      const monthEnd = new Date(year, month + 1, 0);
+      const periodStart = from > monthStart ? from : monthStart;
+      const periodEnd = to < monthEnd ? to : monthEnd;
+      const daysInPeriod = Math.floor((periodEnd - periodStart) / (1000*60*60*24)) + 1;
+      total += monthlyRent * (daysInPeriod / daysInMonth);
+      cursor = new Date(year, month + 1, 1);
+    }
+    return parseFloat(total.toFixed(2));
+  }
+
+  // Изчисли гориво за обект в периода
+  const fuelByObj = {};
+  (hdrsForStats || []).forEach(h => {
+    if (!h.km || !h.vehicle_id) return;
+    const v = vehMap.get(h.vehicle_id);
+    if (!v || !v.fuel_consumption || !v.fuel_price) return;
+    const cost = h.km * (v.fuel_consumption / 100) * v.fuel_price;
+    fuelByObj[h.object_name] = (fuelByObj[h.object_name] || 0) + cost;
+  });
+
   // Взимаме operations с header data - филтрираме по период и не-изтрити
   const { data: ops } = await db.from('operations')
     .select('account_code, amount, entry_type, object_name, product_name, header_id, operation_headers!inner(date, op_type, deleted_at, object_name, contractor, comment, document_ref)')
@@ -2636,9 +2682,38 @@ async function loadStats() {
     validOps = validOps.filter(o => (o.object_name || o.operation_headers?.object_name) === objFilter);
   }
 
-  // Групирай по обект
+  // Групирай по обект - с начислен наем и гориво
   const byObj = {};
   let totalIncome = 0, totalExpense = 0;
+
+  // Initialize byObj с всички обекти (за rent и fuel дори да няма transactions)
+  const allObjNames = new Set();
+  (objsForStats || []).forEach(o => allObjNames.add(o.name));
+  Object.keys(fuelByObj).forEach(n => allObjNames.add(n));
+  allObjNames.forEach(name => {
+    byObj[name] = { income: 0, expense: 0, accrued_rent: 0, fuel: 0 };
+  });
+
+  // Добави начислен наем за всеки обект с rent
+  (objsForStats || []).forEach(o => {
+    if (o.rent && o.rent > 0) {
+      const rent = calcRentForPeriod(o.rent, dateFrom, dateTo);
+      if (byObj[o.name]) {
+        byObj[o.name].accrued_rent = rent;
+        byObj[o.name].expense += rent;
+        totalExpense += rent;
+      }
+    }
+  });
+
+  // Добави гориво
+  Object.entries(fuelByObj).forEach(([name, fuel]) => {
+    if (byObj[name]) {
+      byObj[name].fuel = parseFloat(fuel.toFixed(2));
+      byObj[name].expense += parseFloat(fuel.toFixed(2));
+      totalExpense += parseFloat(fuel.toFixed(2));
+    }
+  });
 
   validOps.forEach(op => {
     const objName = op.object_name || op.operation_headers?.object_name || '—';
@@ -2731,7 +2806,7 @@ async function loadStats() {
         <div class="info-row" style="padding-bottom:0; cursor:pointer;" onclick="toggleStatDetails('${safeId}')"><span class="key">Разходи</span><span class="val" style="color:var(--red)">${s.expense.toFixed(2)} EUR</span></div>
         <div id="stat-details-${safeId}" style="display:none; margin-top:10px; padding-top:10px; border-top:1px dashed var(--border);">
           ${det.income.length ? `<div style="font-size:11px; font-weight:700; color:var(--green); margin-bottom:4px;">📈 ПРИХОДИ</div>${det.income.map(renderRow).join('')}` : ''}
-          ${det.expense.length ? `<div style="font-size:11px; font-weight:700; color:var(--red); margin-top:8px; margin-bottom:4px;">📉 РАЗХОДИ</div>${det.expense.map(renderRow).join('')}` : ''}
+          ${det.expense.length || s.accrued_rent || s.fuel ? `<div style="font-size:11px; font-weight:700; color:var(--red); margin-top:8px; margin-bottom:4px;">📉 РАЗХОДИ</div>${det.expense.map(renderRow).join('')}${s.accrued_rent ? `<div style="font-size:11px; color:var(--text2); padding:3px 0; display:flex; justify-content:space-between; gap:8px; font-style:italic;"><span>🏠 Начислен наем</span><span style="font-family:var(--mono); font-weight:600;">${s.accrued_rent.toFixed(2)}</span></div>` : ''}${s.fuel ? `<div style="font-size:11px; color:var(--text2); padding:3px 0; display:flex; justify-content:space-between; gap:8px; font-style:italic;"><span>⛽ Гориво (калк.)</span><span style="font-family:var(--mono); font-weight:600;">${s.fuel.toFixed(2)}</span></div>` : ''}` : ''}
         </div>
       </div>`;
   }).join('') || '<div class="empty"><div class="empty-icon">📊</div><p>Няма данни</p></div>';
