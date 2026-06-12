@@ -1495,7 +1495,54 @@ async function processOCR(input) {
 }
 
 // ── SUBMIT ──
+// Universal lock for any async save function to prevent double-submit
+async function lockSubmit(fn, btnSelector, loadingText = '⏳ Запазва...') {
+  const btn = document.querySelector(btnSelector);
+  if (btn && btn.disabled) return; // Already running
+  const originalText = btn?.innerHTML;
+  if (btn) { btn.disabled = true; btn.innerHTML = loadingText; }
+  try {
+    await fn();
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = originalText; }
+  }
+}
+
+// Helper: провери дали в последните N секунди няма идентичен хедър
+async function checkDuplicate(opType, objectId, totalCost, technicianId, withinSec = 5) {
+  const cutoff = new Date(Date.now() - withinSec * 1000).toISOString();
+  const { data } = await db.from('operation_headers')
+    .select('id')
+    .eq('op_type', opType)
+    .eq('object_id', objectId)
+    .eq('total_cost', totalCost)
+    .eq('technician_id', technicianId)
+    .gte('created_at', cutoff)
+    .is('deleted_at', null)
+    .limit(1);
+  return data && data.length > 0;
+}
+
 async function submitRestock() {
+  // Защита срещу double-click
+  const submitBtn = document.querySelector('button.submit-btn');
+  if (submitBtn?.disabled) return;
+  if (submitBtn) { 
+    submitBtn.disabled = true; 
+    const origText = submitBtn.innerHTML;
+    submitBtn.innerHTML = '⏳ Запазва...';
+    setTimeout(() => { if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = origText; } }, 5000);
+  }
+  // Проверка за дубликат в последните 5 секунди
+  const _objId = parseInt(document.getElementById('objectSelect').value);
+  const _techId = parseInt(document.getElementById('techSelect').value);
+  const _lines = getLines();
+  const _total = parseFloat(_lines.reduce((s, l) => s + (l.cost_value || 0), 0).toFixed(2));
+  if (_objId && _techId && await checkDuplicate('restock', _objId, _total, _techId)) {
+    showToast('⚠️ Вече има идентичен запис в последните секунди', 'error');
+    if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = '✓ Запиши'; }
+    return;
+  }
   const techId = document.getElementById('techSelect').value;
   const objectId = document.getElementById('objectSelect').value;
   const date = document.getElementById('dateInput').value;
@@ -2066,9 +2113,27 @@ async function saveCash() {
   if (!cash || cash <= 0) { showToast('Въведи сума!', 'error'); return; }
   if (!currentCashflowId) return;
 
+  // Disable бутона да предотврати dual submit
+  const saveBtn = document.querySelector('button[onclick="saveCash()"]');
+  if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = '⏳ Запазва...'; }
+
   // Вземи cashflow записа за да знаем обекта и техника
   const { data: cf } = await db.from('cashflow').select('*').eq('id', currentCashflowId).is('deleted_at', null).single();
-  if (!cf) return;
+  if (!cf) { if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 Запиши'; } return; }
+
+  // Провери дали вече има cash_income хедър за този cashflow
+  const { data: existing } = await db.from('operation_headers')
+    .select('id')
+    .eq('cashflow_id', currentCashflowId)
+    .eq('op_type', 'cash_income')
+    .is('deleted_at', null)
+    .limit(1);
+
+  if (existing && existing.length > 0) {
+    showToast('⚠️ Вече има запис за този cashflow', 'error');
+    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 Запиши'; }
+    return;
+  }
 
   // 1. Обнови cashflow
   const { error } = await db.from('cashflow').update({
@@ -2094,6 +2159,8 @@ async function saveCash() {
     comment: `Вендинг cash — ${cf.object_name}`,
     cashflow_id: currentCashflowId
   }).select().single();
+
+  if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 Запиши'; }
 
   if (!hdrErr && header) {
     // 3. Два реда: 701 Приход и 501 Каса
@@ -2902,6 +2969,11 @@ function populateFinanceSelects() {
 }
 
 async function saveFinance() {
+  // Защита срещу double-click
+  const finBtn = document.querySelector('button[onclick="saveFinance()"]');
+  if (finBtn?.disabled) return;
+  if (finBtn) { finBtn.disabled = true; setTimeout(() => { if (finBtn) finBtn.disabled = false; }, 5000); }
+
   const objId = document.getElementById('finObjectSelect').value;
   const techId = document.getElementById('finTechSelect').value;
   const date = document.getElementById('finDateInput').value;
@@ -3729,6 +3801,24 @@ function updateCapitalTotal() {
 }
 
 async function saveCapital() {
+  // Защита срещу double-click
+  const capBtn = document.querySelector('button[onclick="saveCapital()"]');
+  if (capBtn?.disabled) return;
+  if (capBtn) {
+    capBtn.disabled = true;
+    setTimeout(() => { if (capBtn) capBtn.disabled = false; }, 5000);
+  }
+  // Провери дали вече има opening_balance (трябва да е единствен!)
+  const { data: existingOB } = await db.from('operation_headers')
+    .select('id')
+    .eq('op_type', 'opening_balance')
+    .is('deleted_at', null)
+    .limit(1);
+  if (existingOB && existingOB.length > 0) {
+    showToast('⚠️ Вече има начално салдо. Изтрий го преди да създадеш ново.', 'error');
+    if (capBtn) capBtn.disabled = false;
+    return;
+  }
   const date = document.getElementById('capitalDate').value;
   if (!date) { showToast('Избери дата!', 'error'); return; }
 
