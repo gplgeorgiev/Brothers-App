@@ -2665,6 +2665,7 @@ async function loadStats() {
   const fuelByObj = {};
   (hdrsForStats || []).forEach(h => {
     if (!h.km || !h.vehicle_id) return;
+    if (objFilter && h.object_name !== objFilter) return;
     const v = vehMap.get(h.vehicle_id);
     if (!v || !v.fuel_consumption || !v.fuel_price) return;
     const cost = h.km * (v.fuel_consumption / 100) * v.fuel_price;
@@ -2693,16 +2694,21 @@ async function loadStats() {
   const byObj = {};
   let totalIncome = 0, totalExpense = 0;
 
-  // Initialize byObj с всички обекти (за rent и fuel дори да няма transactions)
+  // Initialize byObj с обектите (филтрирани ако има obj filter)
   const allObjNames = new Set();
-  (objsForStats || []).forEach(o => allObjNames.add(o.name));
-  Object.keys(fuelByObj).forEach(n => allObjNames.add(n));
+  (objsForStats || []).forEach(o => {
+    if (!objFilter || o.name === objFilter) allObjNames.add(o.name);
+  });
+  Object.keys(fuelByObj).forEach(n => {
+    if (!objFilter || n === objFilter) allObjNames.add(n);
+  });
   allObjNames.forEach(name => {
     byObj[name] = { income: 0, expense: 0, accrued_rent: 0, fuel: 0 };
   });
 
-  // Добави начислен наем за всеки обект с rent
+  // Добави начислен наем за всеки обект с rent (филтриран)
   (objsForStats || []).forEach(o => {
+    if (objFilter && o.name !== objFilter) return;
     if (o.rent && o.rent > 0) {
       const r = calcRentForPeriod(o.rent, dateFrom, dateTo);
       if (byObj[o.name]) {
@@ -2715,8 +2721,9 @@ async function loadStats() {
     }
   });
 
-  // Добави гориво
+  // Добави гориво (филтрирано)
   Object.entries(fuelByObj).forEach(([name, fuel]) => {
+    if (objFilter && name !== objFilter) return;
     if (byObj[name]) {
       byObj[name].fuel = parseFloat(fuel.toFixed(2));
       byObj[name].expense += parseFloat(fuel.toFixed(2));
@@ -3384,13 +3391,13 @@ async function saveEditFin() {
 async function loadBalanceSummary() {
   const el = document.getElementById('balanceSummary');
   const { data } = await db.from('operations')
-    .select('account_code, amount, technician_name, entry_type, header_id, operation_headers!inner(payment_method, op_type, deleted_at)')
+    .select('account_code, amount, technician_name, entry_type, header_id, operation_headers!inner(date, payment_method, op_type, deleted_at, object_name, comment, contractor)')
     .in('account_code', ['50101', '50301'])
     .is('deleted_at', null);
   if (!data) return;
 
-  const cashOps = data.filter(o => o.account_code === '50101');
-  const bankOps = data.filter(o => o.account_code === '50301');
+  const cashOps = data.filter(o => o.account_code === '50101' && !o.operation_headers?.deleted_at);
+  const bankOps = data.filter(o => o.account_code === '50301' && !o.operation_headers?.deleted_at);
 
   // За активи (каса, банка): Дебит увеличава, Кредит намалява
   const getSign = (op) => op.entry_type === 'D' ? 1 : -1;
@@ -3398,12 +3405,44 @@ async function loadBalanceSummary() {
   const totalCash = cashOps.reduce((s, o) => s + (o.amount || 0) * getSign(o), 0);
   const totalBank = bankOps.reduce((s, o) => s + (o.amount || 0) * getSign(o), 0);
 
+  // Групирай движения по техник за drill-down
   const byTech = {};
+  const movesByTech = {};
   cashOps.forEach(o => {
     const name = o.technician_name || 'Неизвестен';
-    if (!byTech[name]) byTech[name] = 0;
-    byTech[name] += (o.amount || 0) * getSign(o);
+    if (!byTech[name]) { byTech[name] = 0; movesByTech[name] = []; }
+    const sign = getSign(o);
+    byTech[name] += (o.amount || 0) * sign;
+    movesByTech[name].push({
+      date: o.operation_headers?.date,
+      amount: (o.amount || 0) * sign,
+      op_type: o.operation_headers?.op_type,
+      object_name: o.operation_headers?.object_name,
+      contractor: o.operation_headers?.contractor,
+      comment: o.operation_headers?.comment
+    });
   });
+
+  const opLabels = {
+    'restock': '⬆️ Зареждане',
+    'cash_income': '💰 Cash отчет',
+    'finance_expense': '📤 Разход',
+    'finance_income': '📥 Приход',
+    'opening_balance': '🏁 Нач. салдо',
+    'service': '🔧 Сервиз'
+  };
+
+  const renderMove = (m) => {
+    const sign = m.amount >= 0 ? '+' : '';
+    const color = m.amount >= 0 ? 'var(--green)' : 'var(--red)';
+    const dateStr = m.date ? formatDateBG(new Date(m.date)) : '';
+    const label = opLabels[m.op_type] || m.op_type;
+    const extras = [m.object_name, m.contractor, m.comment].filter(Boolean).join(' · ');
+    return `<div style="font-size:11px; padding:3px 0; display:flex; justify-content:space-between; gap:8px;">
+      <span style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text2);">${dateStr} · ${label}${extras ? ` <span style="color:var(--text3);">· ${extras}</span>` : ''}</span>
+      <span style="font-family:var(--mono); font-weight:700; white-space:nowrap; color:${color};">${sign}${m.amount.toFixed(2)}</span>
+    </div>`;
+  };
 
   el.innerHTML = `
     <div class="stats-grid" style="margin-bottom:12px;">
@@ -3418,12 +3457,30 @@ async function loadBalanceSummary() {
     </div>
     <div class="card">
       <div style="font-size:11px; font-weight:700; letter-spacing:1px; color:var(--text3); text-transform:uppercase; margin-bottom:10px;">По техник (каса)</div>
-      ${Object.entries(byTech).map(([name, bal]) => `
-        <div class="info-row">
-          <span class="key">👤 ${name}</span>
-          <span class="val" style="color:${bal >= 0 ? 'var(--green)' : 'var(--red)'}">${bal.toFixed(2)} EUR</span>
-        </div>`).join('') || '<div style="color:var(--text3); font-size:13px;">Няма данни</div>'}
+      ${Object.entries(byTech).map(([name, bal]) => {
+        const safeId = btoa(unescape(encodeURIComponent(name))).replace(/[^a-zA-Z0-9]/g, '_').substring(0, 30);
+        const moves = (movesByTech[name] || []).sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+        return `
+        <div id="techCard-${safeId}">
+          <div class="info-row" style="cursor:pointer;" onclick="toggleTechDetails('${safeId}')">
+            <span class="key">👤 ${name} <span id="techArrow-${safeId}" style="font-size:10px; color:var(--text2);">▼</span></span>
+            <span class="val" style="color:${bal >= 0 ? 'var(--green)' : 'var(--red)'}">${bal.toFixed(2)} EUR</span>
+          </div>
+          <div id="techDetails-${safeId}" style="display:none; padding:8px 0; border-top:1px dashed var(--border); margin-top:6px;">
+            ${moves.map(renderMove).join('')}
+          </div>
+        </div>`;
+      }).join('') || '<div style="color:var(--text3); font-size:13px;">Няма данни</div>'}
     </div>`;
+}
+
+function toggleTechDetails(safeId) {
+  const el = document.getElementById(`techDetails-${safeId}`);
+  const arrow = document.getElementById(`techArrow-${safeId}`);
+  if (!el) return;
+  const visible = el.style.display !== 'none';
+  el.style.display = visible ? 'none' : 'block';
+  if (arrow) arrow.textContent = visible ? '▼' : '▲';
 }
 
 // ── SERVICE ──
