@@ -3503,7 +3503,7 @@ async function saveEditFin() {
 async function loadBalanceSummary() {
   const el = document.getElementById('balanceSummary');
   const { data } = await db.from('operations')
-    .select('account_code, amount, technician_name, entry_type, header_id, operation_headers!inner(date, payment_method, op_type, deleted_at, object_name, comment, contractor)')
+    .select('account_code, amount, technician_name, entry_type, header_id, product_name, operation_headers!inner(date, payment_method, op_type, deleted_at, object_name, comment, contractor)')
     .in('account_code', ['50101', '50301'])
     .is('deleted_at', null);
   if (!data) return;
@@ -3540,6 +3540,7 @@ async function loadBalanceSummary() {
         amount: amt,
         op_type: o.operation_headers?.op_type,
         object_name: o.operation_headers?.object_name,
+        category: o.product_name,
         contractor: o.operation_headers?.contractor,
         comment: o.operation_headers?.comment
       });
@@ -3563,7 +3564,7 @@ async function loadBalanceSummary() {
       return `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}`;
     })() : '';
     const label = opLabels[m.op_type] || m.op_type;
-    const extras = [m.object_name, m.contractor, m.comment].filter(Boolean).join(' · ');
+    const extras = [m.object_name, m.category, m.contractor, m.comment].filter(Boolean).join(' · ');
     return `<div style="font-size:11px; padding:3px 0; display:flex; justify-content:space-between; gap:8px;">
       <span style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text2);">${dateStr} · ${label}${extras ? ` <span style="color:var(--text3);">· ${extras}</span>` : ''}</span>
       <span style="font-family:var(--mono); font-weight:700; white-space:nowrap; color:${color};">${sign}${m.amount.toFixed(2)}</span>
