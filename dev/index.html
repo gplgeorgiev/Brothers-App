@@ -3558,7 +3558,10 @@ async function loadBalanceSummary() {
   const renderMove = (m) => {
     const sign = m.amount >= 0 ? '+' : '';
     const color = m.amount >= 0 ? 'var(--green)' : 'var(--red)';
-    const dateStr = m.date ? formatDateBG(new Date(m.date)) : '';
+    const dateStr = m.date ? (() => {
+      const d = new Date(m.date);
+      return `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}`;
+    })() : '';
     const label = opLabels[m.op_type] || m.op_type;
     const extras = [m.object_name, m.contractor, m.comment].filter(Boolean).join(' · ');
     return `<div style="font-size:11px; padding:3px 0; display:flex; justify-content:space-between; gap:8px;">
