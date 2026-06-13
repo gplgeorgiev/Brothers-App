@@ -930,6 +930,49 @@ input.qty-big-input {
 </div>
 
 <!-- PAGE: НАСТРОЙКИ -->
+<div class="page" id="page-accounts">
+  <div class="section-label" style="margin-top:0">Сметкоплан</div>
+  <div class="card">
+    <button onclick="openAccountModal()" style="width:100%; padding:10px; border-radius:8px; border:none; background:var(--accent); color:#fff; font-size:13px; font-weight:700; cursor:pointer; font-family:var(--font); margin-bottom:10px;">+ Нова сметка</button>
+    <div id="accountsList"></div>
+  </div>
+</div>
+
+<!-- Modal за нова/редакция на сметка -->
+<div id="accountModal" class="modal-overlay" style="display:none;">
+  <div class="modal">
+    <div class="modal-title" id="accountModalTitle">Нова сметка</div>
+    <div class="field">
+      <label>КОД</label>
+      <input type="text" id="accCode" placeholder="напр. 60201">
+    </div>
+    <div class="field">
+      <label>ИМЕ</label>
+      <input type="text" id="accName" placeholder="напр. Наем">
+    </div>
+    <div class="field">
+      <label>ТИП</label>
+      <select id="accType">
+        <option value="asset">Актив</option>
+        <option value="liability">Пасив</option>
+        <option value="income">Приход</option>
+        <option value="expense">Разход</option>
+      </select>
+    </div>
+    <div class="field">
+      <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+        <input type="checkbox" id="accExcludeStats" style="width:18px; height:18px;">
+        <span>Изключи от Статистика (за начислени разходи)</span>
+      </label>
+      <div style="font-size:11px; color:var(--text3); margin-top:4px;">Например наем и гориво - те се отчитат начислено в статистиката, реалните плащания не трябва да се дублират.</div>
+    </div>
+    <div class="modal-btns">
+      <button class="cancel" onclick="closeAccountModal()">Откажи</button>
+      <button onclick="saveAccount()">✓ Запиши</button>
+    </div>
+  </div>
+</div>
+
 <div class="page" id="page-settings">
   <div class="section-label">Връзка</div>
   <div class="card">
@@ -2616,6 +2659,13 @@ async function loadStats() {
     labelEl.textContent = `${formatDateBG(new Date(dateFrom))} — ${formatDateBG(new Date(dateTo))}`;
   }
 
+  // Зареди сметките които са изключени от статистика
+  const { data: excludedAccs } = await db.from('accounts')
+    .select('code')
+    .eq('exclude_from_stats', true)
+    .is('deleted_at', null);
+  const excludedAccountCodes = new Set((excludedAccs || []).map(a => a.code));
+
   // Филтър за обект
   const objFilter = document.getElementById('statsObjFilter')?.value || '';
 
@@ -2737,6 +2787,9 @@ async function loadStats() {
     const entry = op.entry_type;
     const amt = op.amount || 0;
 
+    // Изключи сметки маркирани в Основни данни
+    if (excludedAccountCodes.has(acc)) return;
+
     // 7xxxx сметки = Приход. Кредит увеличава.
     if (acc.startsWith('7')) {
       if (entry === 'C') byObj[objName].income += amt;
@@ -2777,6 +2830,7 @@ async function loadStats() {
     const objName = op.object_name || op.operation_headers?.object_name || '—';
     if (!detailsByObj[objName]) detailsByObj[objName] = { income: [], expense: [] };
     const acc = op.account_code || '';
+    if (excludedAccountCodes.has(acc)) return;
     if (acc.startsWith('7')) {
       detailsByObj[objName].income.push({
         accountName: op.product_name || acc,
@@ -2841,7 +2895,13 @@ const tabTitles = {
   'stats': { icon: '📊', name: 'Статистика' },
   'history': { icon: '📋', name: 'История' },
   'trash': { icon: '🗑', name: 'Кошче' },
-  'settings': { icon: '⚙️', name: 'Настройки' }
+  'settings': { icon: '⚙️', name: 'Настройки' },
+  'accounts': { icon: '📊', name: 'Сметкоплан' },
+  'objects': { icon: '📍', name: 'Обекти' },
+  'technicians': { icon: '👤', name: 'Техници' },
+  'vehicles': { icon: '🚗', name: 'Превозни средства' },
+  'routes': { icon: '🗺', name: 'Маршрути' },
+  'products': { icon: '📦', name: 'Продукти' }
 };
 
 function updateHeaderTitle(tab) {
@@ -2864,6 +2924,7 @@ function switchTab(tab) {
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById(`page-${tab}`).classList.add('active');
   updateHeaderTitle(tab);
+  if (tab === 'accounts') loadAccountsList();
   document.getElementById(`nav-${tab}`)?.classList.add('active');
   const tabMap = ['restock','cashflow','history','finance','service','stats','settings'];
   document.querySelectorAll('.tab')[tabMap.indexOf(tab)]?.classList.add('active');
@@ -3409,18 +3470,20 @@ async function loadBalanceSummary() {
   const periodFrom = document.getElementById('statsDateFrom')?.value || '';
   const periodTo = document.getElementById('statsDateTo')?.value || '';
 
-  // Групирай движения по техник: byTech = общ баланс, movesByTech = само за периода
+  // Групирай: byTech = общ баланс, startBalByTech = до periodFrom (изключително), movesByTech = в периода
   const byTech = {};
+  const startBalByTech = {};
   const movesByTech = {};
   cashOps.forEach(o => {
     const name = o.technician_name || 'Неизвестен';
-    if (!byTech[name]) { byTech[name] = 0; movesByTech[name] = []; }
+    if (!byTech[name]) { byTech[name] = 0; startBalByTech[name] = 0; movesByTech[name] = []; }
     const sign = getSign(o);
     const amt = (o.amount || 0) * sign;
     byTech[name] += amt;  // ВИНАГИ - общ баланс
-    // Само ако е в периода → добави в drill-down
     const opDate = o.operation_headers?.date;
-    if (opDate && (!periodFrom || opDate >= periodFrom) && (!periodTo || opDate <= periodTo)) {
+    if (opDate && periodFrom && opDate < periodFrom) {
+      startBalByTech[name] += amt;  // преди периода = начално салдо
+    } else if (opDate && (!periodFrom || opDate >= periodFrom) && (!periodTo || opDate <= periodTo)) {
       movesByTech[name].push({
         date: opDate,
         amount: amt,
@@ -3470,6 +3533,7 @@ async function loadBalanceSummary() {
         const safeId = btoa(unescape(encodeURIComponent(name))).replace(/[^a-zA-Z0-9]/g, '_').substring(0, 30);
         const moves = (movesByTech[name] || []).sort((a, b) => (a.date || '').localeCompare(b.date || ''));
         const periodSum = moves.reduce((s, m) => s + m.amount, 0);
+        const startBal = startBalByTech[name] || 0;
         return `
         <div id="techCard-${safeId}">
           <div class="info-row" style="cursor:pointer;" onclick="toggleTechDetails('${safeId}')">
@@ -3477,6 +3541,7 @@ async function loadBalanceSummary() {
             <span class="val" style="color:${bal >= 0 ? 'var(--green)' : 'var(--red)'}">${bal.toFixed(2)} EUR</span>
           </div>
           <div id="techDetails-${safeId}" style="display:none; padding:8px 0; border-top:1px dashed var(--border); margin-top:6px;">
+            <div style="font-size:11px; font-weight:700; color:var(--text2); margin-bottom:6px; display:flex; justify-content:space-between;"><span>🏁 Начално салдо:</span><span style="font-family:var(--mono); color:${startBal >= 0 ? 'var(--green)' : 'var(--red)'};">${startBal.toFixed(2)}</span></div>
             ${moves.length ? `<div style="font-size:11px; font-weight:700; color:var(--text2); margin-bottom:6px; display:flex; justify-content:space-between;"><span>📊 Оборот за периода:</span><span style="font-family:var(--mono); color:${periodSum >= 0 ? 'var(--green)' : 'var(--red)'};">${periodSum >= 0 ? '+' : ''}${periodSum.toFixed(2)}</span></div>${moves.map(renderMove).join('')}` : '<div style="font-size:11px; color:var(--text3); font-style:italic;">Няма движения в периода</div>'}
           </div>
         </div>`;
@@ -4199,6 +4264,15 @@ function closeSideMenu() {
   document.getElementById('sideMenuOverlay').style.display = 'none';
 }
 
+function toggleMasterDataMenu() {
+  const sub = document.getElementById('masterDataSubmenu');
+  const arrow = document.getElementById('masterArrow');
+  if (!sub) return;
+  const visible = sub.style.display !== 'none';
+  sub.style.display = visible ? 'none' : 'block';
+  if (arrow) arrow.textContent = visible ? '▼' : '▲';
+}
+
 function selectMenu(tab) {
   document.querySelectorAll('.menu-item').forEach(b => b.classList.remove('active'));
   document.querySelector(`.menu-item[data-tab="${tab}"]`)?.classList.add('active');
@@ -4260,6 +4334,100 @@ function getWeekNumber(d) { const j=new Date(d.getFullYear(),0,1); return Math.c
 function getWeekStart() { const n=new Date(); const day=n.getDay()||7; const m=new Date(n); m.setDate(n.getDate()-day+1); return m.toISOString().split('T')[0]; }
 function getProductIcon(name) { const p=products.find(x=>x.name===name); return p?p.icon:'📦'; }
 function getProductUnit(name) { const p=products.find(x=>x.name===name); return p?p.unit:''; }
+
+// === СМЕТКОПЛАН CRUD ===
+let editingAccountId = null;
+
+async function loadAccountsList() {
+  const list = document.getElementById('accountsList');
+  if (!list) return;
+  list.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  const { data } = await db.from('accounts')
+    .select('*')
+    .is('deleted_at', null)
+    .order('code');
+  if (!data || data.length === 0) {
+    list.innerHTML = '<div class="empty"><p>Няма сметки</p></div>';
+    return;
+  }
+  const typeLabels = { asset: 'Актив', liability: 'Пасив', income: 'Приход', expense: 'Разход' };
+  list.innerHTML = data.map(a => `
+    <div style="padding:10px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; gap:8px;">
+      <div style="flex:1; min-width:0;">
+        <div style="font-weight:700; font-size:14px;"><span style="font-family:var(--mono); color:var(--accent);">${a.code}</span> ${a.name}</div>
+        <div style="font-size:11px; color:var(--text2); margin-top:2px;">${typeLabels[a.type] || a.type}${a.exclude_from_stats ? ' · <span style="color:var(--amber);">⚠️ Изключено от статистика</span>' : ''}</div>
+      </div>
+      <button onclick="editAccount(${a.id})" style="padding:5px 10px; border-radius:7px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:11px; font-weight:700; cursor:pointer;">✏️</button>
+      <button onclick="deleteAccount(${a.id}, '${a.code}')" style="padding:5px 10px; border-radius:7px; border:1px solid var(--red); background:transparent; color:var(--red); font-size:11px; font-weight:700; cursor:pointer;">🗑</button>
+    </div>
+  `).join('');
+}
+
+function openAccountModal() {
+  editingAccountId = null;
+  document.getElementById('accountModalTitle').textContent = 'Нова сметка';
+  document.getElementById('accCode').value = '';
+  document.getElementById('accName').value = '';
+  document.getElementById('accType').value = 'expense';
+  document.getElementById('accExcludeStats').checked = false;
+  document.getElementById('accountModal').style.display = 'flex';
+}
+
+function closeAccountModal() {
+  document.getElementById('accountModal').style.display = 'none';
+}
+
+async function editAccount(id) {
+  const { data: a } = await db.from('accounts').select('*').eq('id', id).single();
+  if (!a) return;
+  editingAccountId = id;
+  document.getElementById('accountModalTitle').textContent = 'Редакция на сметка';
+  document.getElementById('accCode').value = a.code;
+  document.getElementById('accName').value = a.name;
+  document.getElementById('accType').value = a.type;
+  document.getElementById('accExcludeStats').checked = !!a.exclude_from_stats;
+  document.getElementById('accountModal').style.display = 'flex';
+}
+
+async function saveAccount() {
+  const code = document.getElementById('accCode').value.trim();
+  const name = document.getElementById('accName').value.trim();
+  const type = document.getElementById('accType').value;
+  const excludeStats = document.getElementById('accExcludeStats').checked;
+  if (!code || !name) { showToast('Попълни код и име!', 'error'); return; }
+
+  const payload = { code, name, type, exclude_from_stats: excludeStats };
+  let result;
+  if (editingAccountId) {
+    result = await db.from('accounts').update(payload).eq('id', editingAccountId);
+  } else {
+    result = await db.from('accounts').insert(payload);
+  }
+  if (result.error) { showToast('❌ ' + result.error.message, 'error'); return; }
+  showToast('✅ Запазено', 'success');
+  closeAccountModal();
+  await loadAccountsList();
+}
+
+async function deleteAccount(id, code) {
+  // Проверка дали има operations с тази сметка
+  const { data: ops } = await db.from('operations')
+    .select('id')
+    .eq('account_code', code)
+    .is('deleted_at', null)
+    .limit(1);
+  if (ops && ops.length > 0) {
+    showToast('❌ Не може да се изтрие - има операции по сметка ' + code, 'error');
+    return;
+  }
+  const ok = await showConfirm(`Изтрий сметка ${code}?`);
+  if (!ok) return;
+  const { error } = await db.from('accounts').update({ deleted_at: new Date().toISOString() }).eq('id', id);
+  if (error) { showToast('❌ ' + error.message, 'error'); return; }
+  showToast('✅ Преместено в кошчето', 'success');
+  await loadAccountsList();
+}
+
 </script>
 <!-- BOTTOM NAV - shortcuts -->
 <div class="bottom-nav">
