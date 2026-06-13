@@ -4484,10 +4484,10 @@ async function deleteAccount(id, code) {
       </select>
     </div>
     <div class="field">
-      <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
-        <input type="checkbox" id="accExcludeStats" style="width:20px; height:20px; cursor:pointer; accent-color:var(--accent); flex-shrink:0;">
-        <span>Изключи от Статистика (за начислени разходи)</span>
-      </label>
+      <div style="display:flex; align-items:center; gap:10px;">
+        <input type="checkbox" id="accExcludeStats" style="width:22px; height:22px; cursor:pointer; accent-color:var(--accent); flex-shrink:0; margin:0;">
+        <span onclick="document.getElementById('accExcludeStats').click()" style="cursor:pointer; user-select:none;">Изключи от Статистика (за начислени разходи)</span>
+      </div>
       <div style="font-size:11px; color:var(--text3); margin-top:4px;">Например наем и гориво - те се отчитат начислено в статистиката, реалните плащания не трябва да се дублират.</div>
     </div>
     <div class="modal-btns">
