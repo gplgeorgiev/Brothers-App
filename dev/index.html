@@ -3511,6 +3511,22 @@ async function loadBalanceSummary() {
   const cashOps = data.filter(o => o.account_code === '50101' && !o.operation_headers?.deleted_at);
   const bankOps = data.filter(o => o.account_code === '50301' && !o.operation_headers?.deleted_at);
 
+  // Намери категорията от партньорския 6xxxx/7xxxx ред в същия хедър
+  const headerIds = [...new Set(cashOps.map(o => o.header_id).filter(Boolean))];
+  const categoryByHeader = {};
+  if (headerIds.length > 0) {
+    const { data: catOps } = await db.from('operations')
+      .select('header_id, account_code, product_name')
+      .in('header_id', headerIds)
+      .is('deleted_at', null);
+    (catOps || []).forEach(o => {
+      const acc = o.account_code || '';
+      if (acc.startsWith('6') || acc.startsWith('7')) {
+        if (!categoryByHeader[o.header_id]) categoryByHeader[o.header_id] = o.product_name;
+      }
+    });
+  }
+
   // За активи (каса, банка): Дебит увеличава, Кредит намалява
   const getSign = (op) => op.entry_type === 'D' ? 1 : -1;
 
@@ -3540,7 +3556,7 @@ async function loadBalanceSummary() {
         amount: amt,
         op_type: o.operation_headers?.op_type,
         object_name: o.operation_headers?.object_name,
-        category: o.product_name,
+        category: categoryByHeader[o.header_id] || null,
         contractor: o.operation_headers?.contractor,
         comment: o.operation_headers?.comment
       });
