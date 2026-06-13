@@ -487,7 +487,7 @@ input.qty-big-input {
   <button class="submit-btn" id="submitBtn" onclick="submitRestock()">💾 Запиши зареждането</button>
 
   <!-- История на зарежданията -->
-  <div style="margin-top:48px; padding-top:36px; border-top:2px solid var(--border);"></div><div class="section-label" style="margin-top:0">Последни зареждания</div>
+  <div style="margin-top:72px; padding-top:48px; border-top:2px solid var(--border);"></div><div class="section-label" style="margin-top:0">Последни зареждания</div>
   <div class="card" style="margin-bottom:8px; padding:10px 14px;">
     <div class="field" style="margin-bottom:10px;">
       <label>ОБЕКТ</label>
@@ -773,7 +773,7 @@ input.qty-big-input {
   <button onclick="saveFinance()" class="submit-btn" id="finSubmitBtn">💾 Запиши транзакцията</button>
 
   <!-- История -->
-  <div style="margin-top:48px; padding-top:36px; border-top:2px solid var(--border);"></div><div class="section-label" style="margin-top:0">Последни транзакции</div>
+  <div style="margin-top:72px; padding-top:48px; border-top:2px solid var(--border);"></div><div class="section-label" style="margin-top:0">Последни транзакции</div>
   <div class="card" style="margin-bottom:8px; padding:10px 14px;">
     <div class="field" style="margin-bottom:10px;">
       <label>ФИЛТЪР ТИП</label>
@@ -3502,13 +3502,29 @@ async function saveEditFin() {
 async function loadBalanceSummary() {
   const el = document.getElementById('balanceSummary');
   const { data } = await db.from('operations')
-    .select('account_code, amount, technician_name, entry_type, header_id, operation_headers!inner(date, payment_method, op_type, deleted_at, object_name, comment, contractor)')
+    .select('account_code, amount, technician_name, entry_type, header_id, product_name, operation_headers!inner(date, payment_method, op_type, deleted_at, object_name, comment, contractor)')
     .in('account_code', ['50101', '50301'])
     .is('deleted_at', null);
   if (!data) return;
 
   const cashOps = data.filter(o => o.account_code === '50101' && !o.operation_headers?.deleted_at);
   const bankOps = data.filter(o => o.account_code === '50301' && !o.operation_headers?.deleted_at);
+
+  // Намери категорията от партньорския 6xxxx/7xxxx ред в същия хедър
+  const headerIds = [...new Set(cashOps.map(o => o.header_id).filter(Boolean))];
+  const categoryByHeader = {};
+  if (headerIds.length > 0) {
+    const { data: catOps } = await db.from('operations')
+      .select('header_id, account_code, product_name')
+      .in('header_id', headerIds)
+      .is('deleted_at', null);
+    (catOps || []).forEach(o => {
+      const acc = o.account_code || '';
+      if (acc.startsWith('6') || acc.startsWith('7')) {
+        if (!categoryByHeader[o.header_id]) categoryByHeader[o.header_id] = o.product_name;
+      }
+    });
+  }
 
   // За активи (каса, банка): Дебит увеличава, Кредит намалява
   const getSign = (op) => op.entry_type === 'D' ? 1 : -1;
@@ -3539,6 +3555,7 @@ async function loadBalanceSummary() {
         amount: amt,
         op_type: o.operation_headers?.op_type,
         object_name: o.operation_headers?.object_name,
+        category: categoryByHeader[o.header_id] || null,
         contractor: o.operation_headers?.contractor,
         comment: o.operation_headers?.comment
       });
@@ -3557,9 +3574,12 @@ async function loadBalanceSummary() {
   const renderMove = (m) => {
     const sign = m.amount >= 0 ? '+' : '';
     const color = m.amount >= 0 ? 'var(--green)' : 'var(--red)';
-    const dateStr = m.date ? formatDateBG(new Date(m.date)) : '';
+    const dateStr = m.date ? (() => {
+      const d = new Date(m.date);
+      return `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}`;
+    })() : '';
     const label = opLabels[m.op_type] || m.op_type;
-    const extras = [m.object_name, m.contractor, m.comment].filter(Boolean).join(' · ');
+    const extras = [m.object_name, m.category, m.contractor, m.comment].filter(Boolean).join(' · ');
     return `<div style="font-size:11px; padding:3px 0; display:flex; justify-content:space-between; gap:8px;">
       <span style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text2);">${dateStr} · ${label}${extras ? ` <span style="color:var(--text3);">· ${extras}</span>` : ''}</span>
       <span style="font-family:var(--mono); font-weight:700; white-space:nowrap; color:${color};">${sign}${m.amount.toFixed(2)}</span>
