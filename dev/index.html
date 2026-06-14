@@ -4652,7 +4652,7 @@ async function loadProductsList() {
     <div style="padding:10px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; gap:8px;">
       <div style="flex:1; min-width:0;">
         <div style="font-weight:700; font-size:14px;">${p.icon || '📦'} ${p.name}</div>
-        <div style="font-size:11px; color:var(--text2); margin-top:2px;">${p.unit || '—'} · ${(p.price || 0).toFixed(2)} EUR${p.auto_add ? ' · <span style="color:var(--amber);">🔄 Авто-добавяне</span>' : ''}</div>
+        <div style="font-size:11px; color:var(--text2); margin-top:2px;">${p.unit || '—'} · ${(p.price_with_vat || 0).toFixed(2)} EUR${p.auto_add ? ' · <span style="color:var(--amber);">🔄 Авто-добавяне</span>' : ''}</div>
       </div>
       <button onclick="editProduct(${p.id})" style="padding:5px 10px; border-radius:7px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:11px; font-weight:700; cursor:pointer;">✏️</button>
       <button onclick="deleteProduct(${p.id})" style="padding:5px 10px; border-radius:7px; border:1px solid var(--red); background:transparent; color:var(--red); font-size:11px; font-weight:700; cursor:pointer;">🗑</button>
@@ -4666,7 +4666,7 @@ function openProductModal() {
   document.getElementById('prodName').value = '';
   document.getElementById('prodIcon').value = '📦';
   document.getElementById('prodUnit').value = '';
-  document.getElementById('prodPrice').value = '';
+  document.getElementById('prodPriceVat').value = '';
   document.getElementById('prodAutoAdd').checked = false;
   document.getElementById('productModal').style.display = 'flex';
 }
@@ -4683,7 +4683,7 @@ async function editProduct(id) {
   document.getElementById('prodName').value = p.name;
   document.getElementById('prodIcon').value = p.icon || '📦';
   document.getElementById('prodUnit').value = p.unit || '';
-  document.getElementById('prodPrice').value = p.price || 0;
+  document.getElementById('prodPriceVat').value = p.price_with_vat || 0;
   document.getElementById('prodAutoAdd').checked = !!p.auto_add;
   document.getElementById('productModal').style.display = 'flex';
 }
@@ -4692,11 +4692,11 @@ async function saveProduct() {
   const name = document.getElementById('prodName').value.trim();
   const icon = document.getElementById('prodIcon').value.trim() || '📦';
   const unit = document.getElementById('prodUnit').value.trim();
-  const price = parseFloat(document.getElementById('prodPrice').value.replace(',', '.')) || 0;
+  const priceWithVat = parseFloat(document.getElementById('prodPriceVat').value.replace(',', '.')) || 0;
   const autoAdd = document.getElementById('prodAutoAdd').checked;
   if (!name) { showToast('Попълни име!', 'error'); return; }
 
-  const payload = { name, icon, unit, price, auto_add: autoAdd };
+  const payload = { name, icon, unit, price_with_vat: priceWithVat, auto_add: autoAdd };
   let result;
   if (editingProductId) {
     result = await db.from('products').update(payload).eq('id', editingProductId);
@@ -4816,8 +4816,8 @@ async function deleteProduct(id) {
       <input type="text" id="prodUnit" placeholder="кг / бр / л">
     </div>
     <div class="field">
-      <label>ЦЕНА</label>
-      <input type="text" id="prodPrice" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*" placeholder="0.80">
+      <label>СЕБЕСТОЙНОСТ</label>
+      <input type="text" id="prodPriceVat" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*" placeholder="0.80">
     </div>
     <div class="field">
       <div style="display:flex; align-items:center; gap:10px;">
