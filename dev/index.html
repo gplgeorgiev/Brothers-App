@@ -1024,6 +1024,30 @@ input.qty-big-input {
 
 
 
+<div class="page" id="page-objects">
+  <div class="section-label" style="margin-top:0">Обекти</div>
+  <div class="card">
+    <button onclick="openObjectModal()" style="width:100%; padding:10px; border-radius:8px; border:none; background:var(--accent); color:#fff; font-size:13px; font-weight:700; cursor:pointer; font-family:var(--font); margin-bottom:10px;">+ Нов обект</button>
+    <div id="objectsList"></div>
+  </div>
+</div>
+
+<div class="page" id="page-technicians">
+  <div class="section-label" style="margin-top:0">Техници</div>
+  <div class="card">
+    <button onclick="openTechnicianModal()" style="width:100%; padding:10px; border-radius:8px; border:none; background:var(--accent); color:#fff; font-size:13px; font-weight:700; cursor:pointer; font-family:var(--font); margin-bottom:10px;">+ Нов техник</button>
+    <div id="techniciansList"></div>
+  </div>
+</div>
+
+<div class="page" id="page-vehicles">
+  <div class="section-label" style="margin-top:0">Превозни средства</div>
+  <div class="card">
+    <button onclick="openVehicleModal()" style="width:100%; padding:10px; border-radius:8px; border:none; background:var(--accent); color:#fff; font-size:13px; font-weight:700; cursor:pointer; font-family:var(--font); margin-bottom:10px;">+ Ново превозно средство</button>
+    <div id="vehiclesList"></div>
+  </div>
+</div>
+
 <div class="page" id="page-routes">
   <div class="section-label" style="margin-top:0">Маршрути</div>
   <div class="card">
@@ -2992,6 +3016,9 @@ function switchTab(tab) {
   document.getElementById(`page-${tab}`).classList.add('active');
   updateHeaderTitle(tab);
   if (tab === 'accounts') loadAccountsList();
+  if (tab === 'objects') loadObjectsList();
+  if (tab === 'technicians') loadTechniciansList();
+  if (tab === 'vehicles') loadVehiclesList();
   if (tab === 'routes') loadRoutesList();
   if (tab === 'products') loadProductsList();
   document.getElementById(`nav-${tab}`)?.classList.add('active');
@@ -4730,6 +4757,304 @@ async function deleteProduct(id) {
   await loadProducts();
 }
 
+
+// === ОБЕКТИ CRUD ===
+let editingObjectId = null;
+
+async function loadObjectsList() {
+  const list = document.getElementById('objectsList');
+  if (!list) return;
+  list.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  const { data } = await db.from('objects').select('*').is('deleted_at', null).order('name');
+  if (!data || data.length === 0) {
+    list.innerHTML = '<div class="empty"><p>Няма обекти</p></div>';
+    return;
+  }
+  list.innerHTML = data.map(o => `
+    <div style="padding:10px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; gap:8px;">
+      <div style="flex:1; min-width:0;">
+        <div style="font-weight:700; font-size:14px;">${o.name}</div>
+        <div style="font-size:11px; color:var(--text2); margin-top:2px;">📏 ${o.km_from_base || 0} km · 🏠 ${(o.rent || 0).toFixed(2)} EUR · 🎯 ${(o.target_weekly || 0).toFixed(2)} EUR/седм · К:${o.k_percent || 0}%${o.lat ? ' · 📍' : ''}</div>
+      </div>
+      <button onclick="editObject(${o.id})" style="padding:5px 10px; border-radius:7px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:11px; font-weight:700; cursor:pointer;">✏️</button>
+      <button onclick="deleteObject(${o.id})" style="padding:5px 10px; border-radius:7px; border:1px solid var(--red); background:transparent; color:var(--red); font-size:11px; font-weight:700; cursor:pointer;">🗑</button>
+    </div>
+  `).join('');
+}
+
+function getObjectLocation() {
+  if (!navigator.geolocation) {
+    showToast('❌ Браузърът не поддържа геолокация', 'error');
+    return;
+  }
+  showToast('⏳ Взимам локация...', 'info');
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      document.getElementById('objLat').value = pos.coords.latitude.toFixed(6);
+      document.getElementById('objLng').value = pos.coords.longitude.toFixed(6);
+      showToast('✅ Локацията е взета', 'success');
+    },
+    (err) => {
+      showToast('❌ Грешка: ' + err.message, 'error');
+    },
+    { enableHighAccuracy: true, timeout: 10000 }
+  );
+}
+
+function openObjectModal() {
+  editingObjectId = null;
+  document.getElementById('objectModalTitle').textContent = 'Нов обект';
+  document.getElementById('objName').value = '';
+  document.getElementById('objKmFromBase').value = '';
+  document.getElementById('objRent').value = '';
+  document.getElementById('objTargetWeekly').value = '';
+  document.getElementById('objKPercent').value = '';
+  document.getElementById('objLat').value = '';
+  document.getElementById('objLng').value = '';
+  document.getElementById('objectModal').style.display = 'flex';
+}
+
+function closeObjectModal() {
+  document.getElementById('objectModal').style.display = 'none';
+}
+
+async function editObject(id) {
+  const { data: o } = await db.from('objects').select('*').eq('id', id).single();
+  if (!o) return;
+  editingObjectId = id;
+  document.getElementById('objectModalTitle').textContent = 'Редакция на обект';
+  document.getElementById('objName').value = o.name;
+  document.getElementById('objKmFromBase').value = o.km_from_base || '';
+  document.getElementById('objRent').value = o.rent || '';
+  document.getElementById('objTargetWeekly').value = o.target_weekly || '';
+  document.getElementById('objKPercent').value = o.k_percent || '';
+  document.getElementById('objLat').value = o.lat || '';
+  document.getElementById('objLng').value = o.lng || '';
+  document.getElementById('objectModal').style.display = 'flex';
+}
+
+async function saveObject() {
+  const name = document.getElementById('objName').value.trim();
+  const km = parseFloat(document.getElementById('objKmFromBase').value.replace(',', '.')) || 0;
+  const rent = parseFloat(document.getElementById('objRent').value.replace(',', '.')) || 0;
+  const targetWeekly = parseFloat(document.getElementById('objTargetWeekly').value.replace(',', '.')) || 0;
+  const kPercent = parseFloat(document.getElementById('objKPercent').value.replace(',', '.')) || 0;
+  const lat = parseFloat(document.getElementById('objLat').value.replace(',', '.')) || null;
+  const lng = parseFloat(document.getElementById('objLng').value.replace(',', '.')) || null;
+  if (!name) { showToast('Попълни име!', 'error'); return; }
+
+  const payload = { name, km_from_base: km, rent, target_weekly: targetWeekly, k_percent: kPercent, lat, lng };
+  if (!editingObjectId) payload.active = true;
+  let result;
+  if (editingObjectId) {
+    result = await db.from('objects').update(payload).eq('id', editingObjectId);
+  } else {
+    result = await db.from('objects').insert(payload);
+  }
+  if (result.error) { showToast('❌ ' + result.error.message, 'error'); return; }
+  showToast('✅ Запазено', 'success');
+  closeObjectModal();
+  await loadObjectsList();
+  await loadObjects();
+}
+
+async function deleteObject(id) {
+  const { data: ops } = await db.from('operation_headers').select('id').eq('object_id', id).is('deleted_at', null).limit(1);
+  if (ops && ops.length > 0) {
+    showToast('❌ Не може да се изтрие - има операции за този обект', 'error');
+    return;
+  }
+  const ok = await showConfirm('Изтрий обекта?');
+  if (!ok) return;
+  const { error } = await db.from('objects').update({ deleted_at: new Date().toISOString() }).eq('id', id);
+  if (error) { showToast('❌ ' + error.message, 'error'); return; }
+  showToast('✅ Преместено в кошчето', 'success');
+  await loadObjectsList();
+  await loadObjects();
+}
+
+// === ТЕХНИЦИ CRUD ===
+let editingTechnicianId = null;
+
+async function loadTechniciansList() {
+  const list = document.getElementById('techniciansList');
+  if (!list) return;
+  list.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  const { data } = await db.from('technicians').select('*').is('deleted_at', null).order('name');
+  if (!data || data.length === 0) {
+    list.innerHTML = '<div class="empty"><p>Няма техници</p></div>';
+    return;
+  }
+  const { data: vehs } = await db.from('vehicles').select('id, name, license').is('deleted_at', null);
+  const vehMap = new Map((vehs || []).map(v => [v.id, v]));
+  list.innerHTML = data.map(t => {
+    const v = vehMap.get(t.vehicle_id);
+    return `
+      <div style="padding:10px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; gap:8px;">
+        <div style="flex:1; min-width:0;">
+          <div style="font-weight:700; font-size:14px;">👤 ${t.name}</div>
+          <div style="font-size:11px; color:var(--text2); margin-top:2px;">🚗 ${v ? v.name + (v.license ? ' · ' + v.license : '') : '—'}</div>
+        </div>
+        <button onclick="editTechnician(${t.id})" style="padding:5px 10px; border-radius:7px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:11px; font-weight:700; cursor:pointer;">✏️</button>
+        <button onclick="deleteTechnician(${t.id})" style="padding:5px 10px; border-radius:7px; border:1px solid var(--red); background:transparent; color:var(--red); font-size:11px; font-weight:700; cursor:pointer;">🗑</button>
+      </div>
+    `;
+  }).join('');
+}
+
+async function populateTechVehicleSelect(selectedId = null) {
+  const { data: vehs } = await db.from('vehicles').select('*').is('deleted_at', null).order('name');
+  const sel = document.getElementById('techVehicleId');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">—</option>' + (vehs || []).map(v => `<option value="${v.id}" ${v.id === selectedId ? 'selected' : ''}>${v.name}${v.license ? ' · ' + v.license : ''}</option>`).join('');
+}
+
+async function openTechnicianModal() {
+  editingTechnicianId = null;
+  document.getElementById('technicianModalTitle').textContent = 'Нов техник';
+  document.getElementById('techName').value = '';
+  await populateTechVehicleSelect();
+  document.getElementById('technicianModal').style.display = 'flex';
+}
+
+function closeTechnicianModal() {
+  document.getElementById('technicianModal').style.display = 'none';
+}
+
+async function editTechnician(id) {
+  const { data: t } = await db.from('technicians').select('*').eq('id', id).single();
+  if (!t) return;
+  editingTechnicianId = id;
+  document.getElementById('technicianModalTitle').textContent = 'Редакция на техник';
+  document.getElementById('techName').value = t.name;
+  await populateTechVehicleSelect(t.vehicle_id);
+  document.getElementById('technicianModal').style.display = 'flex';
+}
+
+async function saveTechnician() {
+  const name = document.getElementById('techName').value.trim();
+  const vehicleId = parseInt(document.getElementById('techVehicleId').value) || null;
+  if (!name) { showToast('Попълни име!', 'error'); return; }
+
+  const payload = { name, vehicle_id: vehicleId };
+  if (!editingTechnicianId) payload.active = true;
+  let result;
+  if (editingTechnicianId) {
+    result = await db.from('technicians').update(payload).eq('id', editingTechnicianId);
+  } else {
+    result = await db.from('technicians').insert(payload);
+  }
+  if (result.error) { showToast('❌ ' + result.error.message, 'error'); return; }
+  showToast('✅ Запазено', 'success');
+  closeTechnicianModal();
+  await loadTechniciansList();
+  await loadTechnicians();
+}
+
+async function deleteTechnician(id) {
+  const { data: ops } = await db.from('operation_headers').select('id').eq('technician_id', id).is('deleted_at', null).limit(1);
+  if (ops && ops.length > 0) {
+    showToast('❌ Не може да се изтрие - има операции за този техник', 'error');
+    return;
+  }
+  const ok = await showConfirm('Изтрий техника?');
+  if (!ok) return;
+  const { error } = await db.from('technicians').update({ deleted_at: new Date().toISOString() }).eq('id', id);
+  if (error) { showToast('❌ ' + error.message, 'error'); return; }
+  showToast('✅ Преместено в кошчето', 'success');
+  await loadTechniciansList();
+  await loadTechnicians();
+}
+
+// === ПРЕВОЗНИ СРЕДСТВА CRUD ===
+let editingVehicleId = null;
+
+async function loadVehiclesList() {
+  const list = document.getElementById('vehiclesList');
+  if (!list) return;
+  list.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  const { data } = await db.from('vehicles').select('*').is('deleted_at', null).order('name');
+  if (!data || data.length === 0) {
+    list.innerHTML = '<div class="empty"><p>Няма превозни средства</p></div>';
+    return;
+  }
+  list.innerHTML = data.map(v => `
+    <div style="padding:10px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; gap:8px;">
+      <div style="flex:1; min-width:0;">
+        <div style="font-weight:700; font-size:14px;">🚗 ${v.name}${v.license ? ' · ' + v.license : ''}</div>
+        <div style="font-size:11px; color:var(--text2); margin-top:2px;">⛽ ${v.fuel_consumption || 0} л/100км · ${(v.fuel_price || 0).toFixed(2)} EUR/л</div>
+      </div>
+      <button onclick="editVehicle(${v.id})" style="padding:5px 10px; border-radius:7px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:11px; font-weight:700; cursor:pointer;">✏️</button>
+      <button onclick="deleteVehicle(${v.id})" style="padding:5px 10px; border-radius:7px; border:1px solid var(--red); background:transparent; color:var(--red); font-size:11px; font-weight:700; cursor:pointer;">🗑</button>
+    </div>
+  `).join('');
+}
+
+function openVehicleModal() {
+  editingVehicleId = null;
+  document.getElementById('vehicleModalTitle').textContent = 'Ново превозно средство';
+  document.getElementById('vehName').value = '';
+  document.getElementById('vehLicense').value = '';
+  document.getElementById('vehConsumption').value = '';
+  document.getElementById('vehPrice').value = '';
+  document.getElementById('vehicleModal').style.display = 'flex';
+}
+
+function closeVehicleModal() {
+  document.getElementById('vehicleModal').style.display = 'none';
+}
+
+async function editVehicle(id) {
+  const { data: v } = await db.from('vehicles').select('*').eq('id', id).single();
+  if (!v) return;
+  editingVehicleId = id;
+  document.getElementById('vehicleModalTitle').textContent = 'Редакция на превозно средство';
+  document.getElementById('vehName').value = v.name || '';
+  document.getElementById('vehLicense').value = v.license || '';
+  document.getElementById('vehConsumption').value = v.fuel_consumption || '';
+  document.getElementById('vehPrice').value = v.fuel_price || '';
+  document.getElementById('vehicleModal').style.display = 'flex';
+}
+
+async function saveVehicle() {
+  const name = document.getElementById('vehName').value.trim();
+  const license = document.getElementById('vehLicense').value.trim();
+  const consumption = parseFloat(document.getElementById('vehConsumption').value.replace(',', '.')) || 0;
+  const price = parseFloat(document.getElementById('vehPrice').value.replace(',', '.')) || 0;
+  if (!name) { showToast('Попълни име!', 'error'); return; }
+
+  const payload = { name, license, fuel_consumption: consumption, fuel_price: price };
+  let result;
+  if (editingVehicleId) {
+    result = await db.from('vehicles').update(payload).eq('id', editingVehicleId);
+  } else {
+    result = await db.from('vehicles').insert(payload);
+  }
+  if (result.error) { showToast('❌ ' + result.error.message, 'error'); return; }
+  showToast('✅ Запазено', 'success');
+  closeVehicleModal();
+  await loadVehiclesList();
+}
+
+async function deleteVehicle(id) {
+  const { data: techs } = await db.from('technicians').select('id').eq('vehicle_id', id).is('deleted_at', null).limit(1);
+  if (techs && techs.length > 0) {
+    showToast('❌ Не може да се изтрие - присвоено на техник', 'error');
+    return;
+  }
+  const { data: hdrs } = await db.from('operation_headers').select('id').eq('vehicle_id', id).is('deleted_at', null).limit(1);
+  if (hdrs && hdrs.length > 0) {
+    showToast('❌ Не може да се изтрие - има операции за това превозно средство', 'error');
+    return;
+  }
+  const ok = await showConfirm('Изтрий превозното средство?');
+  if (!ok) return;
+  const { error } = await db.from('vehicles').update({ deleted_at: new Date().toISOString() }).eq('id', id);
+  if (error) { showToast('❌ ' + error.message, 'error'); return; }
+  showToast('✅ Преместено в кошчето', 'success');
+  await loadVehiclesList();
+}
+
 </script>
 <!-- BOTTOM NAV - shortcuts -->
 <div class="bottom-nav">
@@ -4771,6 +5096,93 @@ async function deleteProduct(id) {
     <div class="modal-btns">
       <button class="cancel" onclick="closeAccountModal()">Откажи</button>
       <button onclick="saveAccount()">✓ Запиши</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal за нов/редакция обект -->
+<div id="objectModal" class="modal-overlay" style="display:none;">
+  <div class="modal">
+    <div class="modal-title" id="objectModalTitle">Нов обект</div>
+    <div class="field">
+      <label>ИМЕ</label>
+      <input type="text" id="objName" placeholder="напр. Бряст">
+    </div>
+    <div class="field">
+      <label>КМ ОТ БАЗА (една посока)</label>
+      <input type="text" id="objKmFromBase" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*" placeholder="напр. 42.5">
+    </div>
+    <div class="field">
+      <label>МЕСЕЧЕН НАЕМ</label>
+      <input type="text" id="objRent" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*" placeholder="напр. 35.79">
+    </div>
+    <div class="field">
+      <label>СЕДМИЧЕН ТАРГЕТ (EUR)</label>
+      <input type="text" id="objTargetWeekly" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*" placeholder="напр. 80.00">
+    </div>
+    <div class="field">
+      <label>КОЕФИЦИЕНТ (%)</label>
+      <input type="text" id="objKPercent" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*" placeholder="напр. 25">
+    </div>
+    <div class="field">
+      <label>ЛОКАЦИЯ (GPS)</label>
+      <div style="display:flex; gap:8px; margin-bottom:6px;">
+        <input type="text" id="objLat" inputmode="decimal" pattern="[0-9.\-]*" placeholder="lat" style="flex:1;">
+        <input type="text" id="objLng" inputmode="decimal" pattern="[0-9.\-]*" placeholder="lng" style="flex:1;">
+      </div>
+      <button onclick="getObjectLocation()" style="width:100%; padding:8px; border-radius:8px; border:1px solid var(--accent); background:transparent; color:var(--accent); font-size:12px; font-weight:700; cursor:pointer; font-family:var(--font);">📍 Вземи локация от телефона</button>
+    </div>
+    <div class="modal-btns">
+      <button class="cancel" onclick="closeObjectModal()">Откажи</button>
+      <button onclick="saveObject()">✓ Запиши</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal за нов/редакция техник -->
+<div id="technicianModal" class="modal-overlay" style="display:none;">
+  <div class="modal">
+    <div class="modal-title" id="technicianModalTitle">Нов техник</div>
+    <div class="field">
+      <label>ИМЕ</label>
+      <input type="text" id="techName" placeholder="напр. Бати">
+    </div>
+    <div class="field">
+      <label>ПРЕВОЗНО СРЕДСТВО</label>
+      <select id="techVehicleId" style="width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:8px; background:var(--bg3); color:var(--text); font-size:14px;">
+        <option value="">—</option>
+      </select>
+    </div>
+    <div class="modal-btns">
+      <button class="cancel" onclick="closeTechnicianModal()">Откажи</button>
+      <button onclick="saveTechnician()">✓ Запиши</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal за нов/редакция превозно средство -->
+<div id="vehicleModal" class="modal-overlay" style="display:none;">
+  <div class="modal">
+    <div class="modal-title" id="vehicleModalTitle">Ново превозно средство</div>
+    <div class="field">
+      <label>ИМЕ / МАРКА</label>
+      <input type="text" id="vehName" placeholder="напр. Renault Kangoo">
+    </div>
+    <div class="field">
+      <label>РЕГИСТРАЦИЯ</label>
+      <input type="text" id="vehLicense" placeholder="напр. CB1234XX">
+    </div>
+    <div class="field">
+      <label>РАЗХОД (Л/100КМ)</label>
+      <input type="text" id="vehConsumption" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*" placeholder="10">
+    </div>
+    <div class="field">
+      <label>ЦЕНА НА ЛИТЪР</label>
+      <input type="text" id="vehPrice" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*" placeholder="1.29">
+    </div>
+    <div class="modal-btns">
+      <button class="cancel" onclick="closeVehicleModal()">Откажи</button>
+      <button onclick="saveVehicle()">✓ Запиши</button>
     </div>
   </div>
 </div>
