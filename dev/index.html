@@ -488,7 +488,7 @@ input.qty-big-input {
   <button class="submit-btn" id="submitBtn" onclick="submitRestock()">💾 Запиши зареждането</button>
 
   <!-- История на зарежданията -->
-  <div style="margin-top:48px; padding-top:36px; border-top:2px solid var(--border);"></div><div class="section-label" style="margin-top:0">Последни зареждания</div>
+  <div style="margin-top:72px; padding-top:48px; border-top:2px solid var(--border);"></div><div class="section-label" style="margin-top:0">Последни зареждания</div>
   <div class="card" style="margin-bottom:8px; padding:10px 14px;">
     <div class="field" style="margin-bottom:10px;">
       <label>ОБЕКТ</label>
@@ -774,7 +774,7 @@ input.qty-big-input {
   <button onclick="saveFinance()" class="submit-btn" id="finSubmitBtn">💾 Запиши транзакцията</button>
 
   <!-- История -->
-  <div style="margin-top:48px; padding-top:36px; border-top:2px solid var(--border);"></div><div class="section-label" style="margin-top:0">Последни транзакции</div>
+  <div style="margin-top:72px; padding-top:48px; border-top:2px solid var(--border);"></div><div class="section-label" style="margin-top:0">Последни транзакции</div>
   <div class="card" style="margin-bottom:8px; padding:10px 14px;">
     <div class="field" style="margin-bottom:10px;">
       <label>ФИЛТЪР ТИП</label>
@@ -1023,6 +1023,22 @@ input.qty-big-input {
 </div>
 
 
+
+<div class="page" id="page-routes">
+  <div class="section-label" style="margin-top:0">Маршрути</div>
+  <div class="card">
+    <button onclick="openRouteModal()" style="width:100%; padding:10px; border-radius:8px; border:none; background:var(--accent); color:#fff; font-size:13px; font-weight:700; cursor:pointer; font-family:var(--font); margin-bottom:10px;">+ Нов маршрут</button>
+    <div id="routesList"></div>
+  </div>
+</div>
+
+<div class="page" id="page-products">
+  <div class="section-label" style="margin-top:0">Продукти</div>
+  <div class="card">
+    <button onclick="openProductModal()" style="width:100%; padding:10px; border-radius:8px; border:none; background:var(--accent); color:#fff; font-size:13px; font-weight:700; cursor:pointer; font-family:var(--font); margin-bottom:10px;">+ Нов продукт</button>
+    <div id="productsList"></div>
+  </div>
+</div>
 
 <div class="page" id="page-settings">
   <div class="section-label">Връзка</div>
@@ -2976,6 +2992,8 @@ function switchTab(tab) {
   document.getElementById(`page-${tab}`).classList.add('active');
   updateHeaderTitle(tab);
   if (tab === 'accounts') loadAccountsList();
+  if (tab === 'routes') loadRoutesList();
+  if (tab === 'products') loadProductsList();
   document.getElementById(`nav-${tab}`)?.classList.add('active');
   const tabMap = ['restock','cashflow','history','finance','service','stats','settings'];
   document.querySelectorAll('.tab')[tabMap.indexOf(tab)]?.classList.add('active');
@@ -4506,6 +4524,212 @@ async function deleteAccount(id, code) {
   await loadAccountsList();
 }
 
+
+// === МАРШРУТИ CRUD ===
+let editingRouteId = null;
+let routeSelectedObjects = [];
+
+async function loadRoutesList() {
+  const list = document.getElementById('routesList');
+  if (!list) return;
+  list.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  const { data } = await db.from('routes')
+    .select('*')
+    .is('deleted_at', null)
+    .order('name');
+  if (!data || data.length === 0) {
+    list.innerHTML = '<div class="empty"><p>Няма маршрути</p></div>';
+    return;
+  }
+  const objNames = new Map(objects.map(o => [o.id, o.name]));
+  list.innerHTML = data.map(r => {
+    const objs = (r.object_ids || []).map(id => objNames.get(id) || `#${id}`).join(', ');
+    return `
+      <div style="padding:10px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; gap:8px;">
+        <div style="flex:1; min-width:0;">
+          <div style="font-weight:700; font-size:14px;">${r.name}</div>
+          <div style="font-size:11px; color:var(--text2); margin-top:2px;">${objs}</div>
+          <div style="font-size:11px; color:var(--accent); margin-top:2px;">📏 ${r.total_km} km</div>
+        </div>
+        <button onclick="editRoute(${r.id})" style="padding:5px 10px; border-radius:7px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:11px; font-weight:700; cursor:pointer;">✏️</button>
+        <button onclick="deleteRoute(${r.id})" style="padding:5px 10px; border-radius:7px; border:1px solid var(--red); background:transparent; color:var(--red); font-size:11px; font-weight:700; cursor:pointer;">🗑</button>
+      </div>
+    `;
+  }).join('');
+}
+
+function populateRouteObjects(selectedIds = []) {
+  const list = document.getElementById('routeObjectsList');
+  if (!list) return;
+  routeSelectedObjects = [...selectedIds];
+  list.innerHTML = objects.map(o => `
+    <div style="display:flex; align-items:center; gap:8px; padding:4px 0;">
+      <input type="checkbox" class="custom-checkbox" value="${o.id}" ${selectedIds.includes(o.id) ? 'checked' : ''} onchange="toggleRouteObject(${o.id})" style="flex-shrink:0;">
+      <span onclick="document.querySelector('[value=\"${o.id}\"]').click()" style="cursor:pointer; user-select:none;">${o.name}</span>
+    </div>
+  `).join('');
+}
+
+function toggleRouteObject(id) {
+  if (routeSelectedObjects.includes(id)) {
+    routeSelectedObjects = routeSelectedObjects.filter(x => x !== id);
+  } else {
+    routeSelectedObjects.push(id);
+  }
+}
+
+function openRouteModal() {
+  editingRouteId = null;
+  routeSelectedObjects = [];
+  document.getElementById('routeModalTitle').textContent = 'Нов маршрут';
+  document.getElementById('routeName').value = '';
+  document.getElementById('routeTotalKm').value = '';
+  populateRouteObjects([]);
+  document.getElementById('routeModal').style.display = 'flex';
+}
+
+function closeRouteModal() {
+  document.getElementById('routeModal').style.display = 'none';
+}
+
+async function editRoute(id) {
+  const { data: r } = await db.from('routes').select('*').eq('id', id).single();
+  if (!r) return;
+  editingRouteId = id;
+  document.getElementById('routeModalTitle').textContent = 'Редакция на маршрут';
+  document.getElementById('routeName').value = r.name;
+  document.getElementById('routeTotalKm').value = r.total_km;
+  populateRouteObjects(r.object_ids || []);
+  document.getElementById('routeModal').style.display = 'flex';
+}
+
+async function saveRoute() {
+  const name = document.getElementById('routeName').value.trim();
+  const totalKm = parseFloat(document.getElementById('routeTotalKm').value.replace(',', '.')) || 0;
+  if (!name) { showToast('Попълни име!', 'error'); return; }
+  if (routeSelectedObjects.length < 2) { showToast('Избери поне 2 обекта!', 'error'); return; }
+  if (totalKm <= 0) { showToast('Въведи km!', 'error'); return; }
+
+  const sortedIds = [...routeSelectedObjects].sort((a, b) => a - b);
+  const payload = { name, object_ids: sortedIds, total_km: totalKm };
+  let result;
+  if (editingRouteId) {
+    result = await db.from('routes').update(payload).eq('id', editingRouteId);
+  } else {
+    result = await db.from('routes').insert(payload);
+  }
+  if (result.error) { showToast('❌ ' + result.error.message, 'error'); return; }
+  showToast('✅ Запазено', 'success');
+  closeRouteModal();
+  await loadRoutesList();
+}
+
+async function deleteRoute(id) {
+  const ok = await showConfirm('Изтрий маршрут?');
+  if (!ok) return;
+  const { error } = await db.from('routes').update({ deleted_at: new Date().toISOString() }).eq('id', id);
+  if (error) { showToast('❌ ' + error.message, 'error'); return; }
+  showToast('✅ Преместено в кошчето', 'success');
+  await loadRoutesList();
+}
+
+// === ПРОДУКТИ CRUD ===
+let editingProductId = null;
+
+async function loadProductsList() {
+  const list = document.getElementById('productsList');
+  if (!list) return;
+  list.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  const { data } = await db.from('products')
+    .select('*')
+    .is('deleted_at', null)
+    .order('id');
+  if (!data || data.length === 0) {
+    list.innerHTML = '<div class="empty"><p>Няма продукти</p></div>';
+    return;
+  }
+  list.innerHTML = data.map(p => `
+    <div style="padding:10px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; gap:8px;">
+      <div style="flex:1; min-width:0;">
+        <div style="font-weight:700; font-size:14px;">${p.icon || '📦'} ${p.name}</div>
+        <div style="font-size:11px; color:var(--text2); margin-top:2px;">${p.unit || '—'} · ${(p.price || 0).toFixed(2)} EUR${p.auto_add ? ' · <span style="color:var(--amber);">🔄 Авто-добавяне</span>' : ''}</div>
+      </div>
+      <button onclick="editProduct(${p.id})" style="padding:5px 10px; border-radius:7px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:11px; font-weight:700; cursor:pointer;">✏️</button>
+      <button onclick="deleteProduct(${p.id})" style="padding:5px 10px; border-radius:7px; border:1px solid var(--red); background:transparent; color:var(--red); font-size:11px; font-weight:700; cursor:pointer;">🗑</button>
+    </div>
+  `).join('');
+}
+
+function openProductModal() {
+  editingProductId = null;
+  document.getElementById('productModalTitle').textContent = 'Нов продукт';
+  document.getElementById('prodName').value = '';
+  document.getElementById('prodIcon').value = '📦';
+  document.getElementById('prodUnit').value = '';
+  document.getElementById('prodPrice').value = '';
+  document.getElementById('prodAutoAdd').checked = false;
+  document.getElementById('productModal').style.display = 'flex';
+}
+
+function closeProductModal() {
+  document.getElementById('productModal').style.display = 'none';
+}
+
+async function editProduct(id) {
+  const { data: p } = await db.from('products').select('*').eq('id', id).single();
+  if (!p) return;
+  editingProductId = id;
+  document.getElementById('productModalTitle').textContent = 'Редакция на продукт';
+  document.getElementById('prodName').value = p.name;
+  document.getElementById('prodIcon').value = p.icon || '📦';
+  document.getElementById('prodUnit').value = p.unit || '';
+  document.getElementById('prodPrice').value = p.price || 0;
+  document.getElementById('prodAutoAdd').checked = !!p.auto_add;
+  document.getElementById('productModal').style.display = 'flex';
+}
+
+async function saveProduct() {
+  const name = document.getElementById('prodName').value.trim();
+  const icon = document.getElementById('prodIcon').value.trim() || '📦';
+  const unit = document.getElementById('prodUnit').value.trim();
+  const price = parseFloat(document.getElementById('prodPrice').value.replace(',', '.')) || 0;
+  const autoAdd = document.getElementById('prodAutoAdd').checked;
+  if (!name) { showToast('Попълни име!', 'error'); return; }
+
+  const payload = { name, icon, unit, price, auto_add: autoAdd };
+  let result;
+  if (editingProductId) {
+    result = await db.from('products').update(payload).eq('id', editingProductId);
+  } else {
+    result = await db.from('products').insert(payload);
+  }
+  if (result.error) { showToast('❌ ' + result.error.message, 'error'); return; }
+  showToast('✅ Запазено', 'success');
+  closeProductModal();
+  await loadProductsList();
+  await loadProducts();  // обнови карточките в Зареждане
+}
+
+async function deleteProduct(id) {
+  // Провери дали има operations с този продукт
+  const { data: ops } = await db.from('operations')
+    .select('id')
+    .eq('product_id', id)
+    .is('deleted_at', null)
+    .limit(1);
+  if (ops && ops.length > 0) {
+    showToast('❌ Не може да се изтрие - има операции с този продукт', 'error');
+    return;
+  }
+  const ok = await showConfirm('Изтрий продукта?');
+  if (!ok) return;
+  const { error } = await db.from('products').update({ deleted_at: new Date().toISOString() }).eq('id', id);
+  if (error) { showToast('❌ ' + error.message, 'error'); return; }
+  showToast('✅ Преместено в кошчето', 'success');
+  await loadProductsList();
+  await loadProducts();
+}
+
 </script>
 <!-- BOTTOM NAV - shortcuts -->
 <div class="bottom-nav">
@@ -4547,6 +4771,64 @@ async function deleteAccount(id, code) {
     <div class="modal-btns">
       <button class="cancel" onclick="closeAccountModal()">Откажи</button>
       <button onclick="saveAccount()">✓ Запиши</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal за нов/редакция маршрут -->
+<div id="routeModal" class="modal-overlay" style="display:none;">
+  <div class="modal">
+    <div class="modal-title" id="routeModalTitle">Нов маршрут</div>
+    <div class="field">
+      <label>ИМЕ</label>
+      <input type="text" id="routeName" placeholder="напр. Радиево + Бряст">
+    </div>
+    <div class="field">
+      <label>ОБЕКТИ (избери последователно)</label>
+      <div id="routeObjectsList" style="max-height:200px; overflow-y:auto; border:1px solid var(--border); border-radius:8px; padding:8px; background:var(--bg3);"></div>
+      <div style="font-size:11px; color:var(--text3); margin-top:4px;">Чекни обектите които са в маршрута</div>
+    </div>
+    <div class="field">
+      <label>ОБЩО КИЛОМЕТРИ (една посока)</label>
+      <input type="text" id="routeTotalKm" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*" placeholder="напр. 52">
+    </div>
+    <div class="modal-btns">
+      <button class="cancel" onclick="closeRouteModal()">Откажи</button>
+      <button onclick="saveRoute()">✓ Запиши</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal за нов/редакция продукт -->
+<div id="productModal" class="modal-overlay" style="display:none;">
+  <div class="modal">
+    <div class="modal-title" id="productModalTitle">Нов продукт</div>
+    <div class="field">
+      <label>ИМЕ</label>
+      <input type="text" id="prodName" placeholder="напр. Кафе">
+    </div>
+    <div class="field">
+      <label>ИКОНА (emoji)</label>
+      <input type="text" id="prodIcon" placeholder="☕">
+    </div>
+    <div class="field">
+      <label>ЕДИНИЦА</label>
+      <input type="text" id="prodUnit" placeholder="кг / бр / л">
+    </div>
+    <div class="field">
+      <label>ЦЕНА</label>
+      <input type="text" id="prodPrice" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*" placeholder="0.80">
+    </div>
+    <div class="field">
+      <div style="display:flex; align-items:center; gap:10px;">
+        <input type="checkbox" id="prodAutoAdd" class="custom-checkbox" style="flex-shrink:0;">
+        <span onclick="document.getElementById('prodAutoAdd').click()" style="cursor:pointer; user-select:none;">Авто-добавяне при зареждане</span>
+      </div>
+      <div style="font-size:11px; color:var(--text3); margin-top:4px;">Например чаши/бъркалки - добавят се автоматично пропорционално на продадените напитки.</div>
+    </div>
+    <div class="modal-btns">
+      <button class="cancel" onclick="closeProductModal()">Откажи</button>
+      <button onclick="saveProduct()">✓ Запиши</button>
     </div>
   </div>
 </div>
