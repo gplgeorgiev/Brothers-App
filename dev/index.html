@@ -777,12 +777,26 @@ input.qty-big-input {
   <div style="margin-top:72px; padding-top:48px; border-top:2px solid var(--border);"></div><div class="section-label" style="margin-top:0">Последни транзакции</div>
   <div class="card" style="margin-bottom:8px; padding:10px 14px;">
     <div class="field" style="margin-bottom:10px;">
-      <label>ФИЛТЪР ТИП</label>
-      <select id="txFilterType" onchange="loadTxHistory()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; appearance:none; font-family:var(--font);">
+      <label>ОБЕКТ</label>
+      <select id="txFilterObject" onchange="loadTxHistory()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; appearance:none; font-family:var(--font);">
         <option value="">Всички</option>
-        <option value="income">Приходи</option>
-        <option value="expense">Разходи</option>
       </select>
+    </div>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px;">
+      <div class="field" style="margin-bottom:0;">
+        <label>ТИП</label>
+        <select id="txFilterType" onchange="onTxTypeChange()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; appearance:none; font-family:var(--font);">
+          <option value="">Всички</option>
+          <option value="income">Приходи</option>
+          <option value="expense">Разходи</option>
+        </select>
+      </div>
+      <div class="field" style="margin-bottom:0;">
+        <label>КАТЕГОРИЯ</label>
+        <select id="txFilterCategory" onchange="loadTxHistory()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; appearance:none; font-family:var(--font);">
+          <option value="">Всички</option>
+        </select>
+      </div>
     </div>
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
       <div class="field" style="margin-bottom:0;">
@@ -1252,6 +1266,15 @@ async function loadObjects() {
       opt.value = o.id; opt.textContent = o.name; sel.appendChild(opt);
     });
   });
+  // txFilterObject (във Финанси)
+  const txObjSel = document.getElementById('txFilterObject');
+  if (txObjSel) {
+    txObjSel.innerHTML = '<option value="">Всички</option>';
+    data.forEach(o => {
+      const opt = document.createElement('option');
+      opt.value = o.id; opt.textContent = o.name; txObjSel.appendChild(opt);
+    });
+  }
   // statsObjFilter с value=name (за filter по object_name)
   const statsSel = document.getElementById('statsObjFilter');
   if (statsSel) {
@@ -3347,6 +3370,8 @@ async function loadTxHistory() {
   if (!el) return;
   el.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
   const typeFilter = document.getElementById('txFilterType')?.value || '';
+  const categoryFilter = document.getElementById('txFilterCategory')?.value || '';
+  const objectFilter = document.getElementById('txFilterObject')?.value || '';
   const dateFrom = document.getElementById('txFilterDateFrom')?.value || '';
   const dateTo = document.getElementById('txFilterDateTo')?.value || '';
 
@@ -3358,12 +3383,18 @@ async function loadTxHistory() {
     .order('created_at', { ascending: false })
     .limit(40);
   if (typeFilter === 'income') q = q.eq('op_type', 'finance_income');
+  if (objectFilter) q = q.eq('object_id', parseInt(objectFilter));
   if (typeFilter === 'expense') q = q.eq('op_type', 'finance_expense');
   if (dateFrom) q = q.gte('date', dateFrom);
   if (dateTo) q = q.lte('date', dateTo);
 
-  const { data, error } = await q;
+  const { data: rawData, error } = await q;
   if (error) { el.innerHTML = `<div class="empty"><div class="empty-icon">❌</div><p>${error.message}</p></div>`; return; }
+  // Филтрирай по категория ако има
+  let data = rawData;
+  if (categoryFilter && data) {
+    data = data.filter(h => (h.operations || []).some(o => o.account_code === categoryFilter));
+  }
   if (!data?.length) { el.innerHTML = '<div class="empty"><div class="empty-icon">📭</div><p>Няма транзакции</p></div>'; return; }
 
   el.innerHTML = data.map(h => {
@@ -5053,6 +5084,42 @@ async function deleteVehicle(id) {
   if (error) { showToast('❌ ' + error.message, 'error'); return; }
   showToast('✅ Преместено в кошчето', 'success');
   await loadVehiclesList();
+}
+
+
+async function onTxTypeChange() {
+  const type = document.getElementById('txFilterType').value;
+  const catSel = document.getElementById('txFilterCategory');
+  if (!catSel) return;
+  catSel.innerHTML = '<option value="">Всички</option>';
+  if (type) {
+    // Зареди категории от accounts: 7xxx за income, 6xxx за expense
+    const codePrefix = type === 'income' ? '7' : '6';
+    const { data } = await db.from('accounts')
+      .select('code, name')
+      .like('code', codePrefix + '%')
+      .is('deleted_at', null)
+      .order('code');
+    (data || []).forEach(a => {
+      const opt = document.createElement('option');
+      opt.value = a.code;
+      opt.textContent = `${a.code} ${a.name}`;
+      catSel.appendChild(opt);
+    });
+  }
+  await loadTxHistory();
+}
+
+async function populateTxFilterObject() {
+  const sel = document.getElementById('txFilterObject');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">Всички</option>';
+  (objects || []).forEach(o => {
+    const opt = document.createElement('option');
+    opt.value = o.id;
+    opt.textContent = o.name;
+    sel.appendChild(opt);
+  });
 }
 
 </script>
