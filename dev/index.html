@@ -4774,7 +4774,7 @@ async function loadObjectsList() {
     <div style="padding:10px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; gap:8px;">
       <div style="flex:1; min-width:0;">
         <div style="font-weight:700; font-size:14px;">${o.name}</div>
-        <div style="font-size:11px; color:var(--text2); margin-top:2px;">📏 ${o.km_from_base || 0} km · 🏠 ${(o.rent || 0).toFixed(2)} EUR · 🎯 ${(o.target_weekly || 0).toFixed(2)} EUR/седм · К:${o.k_percent || 0}%${o.lat ? ' · 📍' : ''}</div>
+        <div style="font-size:11px; color:var(--text2); margin-top:2px;">📏 ${o.km_from_base || 0} km · 🏠 ${(o.rent || 0).toFixed(2)} EUR · 🎯 ${(o.target_weekly || 0).toFixed(2)} EUR/седм · К:${(o.k_percent || 0).toFixed(2)} EUR${o.lat ? ' · 📍' : ''}</div>
       </div>
       <button onclick="editObject(${o.id})" style="padding:5px 10px; border-radius:7px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:11px; font-weight:700; cursor:pointer;">✏️</button>
       <button onclick="deleteObject(${o.id})" style="padding:5px 10px; border-radius:7px; border:1px solid var(--red); background:transparent; color:var(--red); font-size:11px; font-weight:700; cursor:pointer;">🗑</button>
@@ -5121,8 +5121,8 @@ async function deleteVehicle(id) {
       <input type="text" id="objTargetWeekly" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*" placeholder="напр. 80.00">
     </div>
     <div class="field">
-      <label>КОЕФИЦИЕНТ (%)</label>
-      <input type="text" id="objKPercent" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*" placeholder="напр. 25">
+      <label>КОЕФИЦИЕНТ (EUR)</label>
+      <input type="text" id="objKPercent" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*" placeholder="напр. 0.45">
     </div>
     <div class="field">
       <label>ЛОКАЦИЯ (GPS)</label>
