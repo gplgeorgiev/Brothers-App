@@ -1383,7 +1383,7 @@ function selectProdCard(id) {
 function changePopupQty(delta) {
   popupQty = Math.max(0, popupQty + delta);
   const inp = document.getElementById('popupQtyInput'); if(inp) inp.value = popupQty;
-  // Auto-update basket
+  // Auto-update basket - тук позволено е 0 защото е резултат от -1 бутон
   if (selectedProdId) {
     const existing = basket.find(b => b.product.id === selectedProdId);
     if (popupQty === 0) {
@@ -1400,20 +1400,30 @@ function changePopupQty(delta) {
 }
 
 function updateBasketFromInput(val) {
-  const qty = parseFloat(val) || 0;
+  // Нормализиране - запази оригинал, конвертирай запетая на точка
+  const normalized = String(val).replace(',', '.').trim();
+  // Ако полето е празно или междинно състояние (само точка/тире) → не пипай basket
+  if (normalized === '' || normalized === '.' || normalized === '-' || normalized === '0.') {
+    return;
+  }
+  const qty = parseFloat(normalized);
+  if (isNaN(qty)) return;
   popupQty = qty;
   if (!selectedProdId) return;
   const existing = basket.find(b => b.product.id === selectedProdId);
-  if (qty === 0) {
+  // Само ако точно е 0 (а не междинно състояние) - тогава махни от basket
+  if (qty === 0 && normalized === '0') {
     basket = basket.filter(b => b.product.id !== selectedProdId);
     document.getElementById(`pc-${selectedProdId}`)?.classList.remove('selected');
     document.getElementById('qtyPopup').classList.remove('visible');
     selectedProdId = null;
-  } else if (existing) {
-    existing.qty = qty;
-  } else {
-    const prod = products.find(p => p.id === selectedProdId);
-    if (prod) basket.push({ product: prod, qty });
+  } else if (qty > 0) {
+    if (existing) {
+      existing.qty = qty;
+    } else {
+      const prod = products.find(p => p.id === selectedProdId);
+      if (prod) basket.push({ product: prod, qty });
+    }
   }
   renderBasket();
   updateSummary();
