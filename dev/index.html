@@ -1411,13 +1411,9 @@ function updateBasketFromInput(val) {
   popupQty = qty;
   if (!selectedProdId) return;
   const existing = basket.find(b => b.product.id === selectedProdId);
-  // Само ако точно е 0 (а не междинно състояние) - тогава махни от basket
-  if (qty === 0 && normalized === '0') {
-    basket = basket.filter(b => b.product.id !== selectedProdId);
-    document.getElementById(`pc-${selectedProdId}`)?.classList.remove('selected');
-    document.getElementById('qtyPopup').classList.remove('visible');
-    selectedProdId = null;
-  } else if (qty > 0) {
+  // При qty=0 от input → не правим нищо (потребителят може да продължи да пише, напр. 0.5)
+  // Триене става само през бутона − или ръчно
+  if (qty > 0) {
     if (existing) {
       existing.qty = qty;
     } else {
