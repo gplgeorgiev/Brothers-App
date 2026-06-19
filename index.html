@@ -1003,6 +1003,8 @@ input.qty-big-input {
 
   <div class="section-label" id="statsPeriodLabel" style="margin-top:20px">Текущ месец</div>
   <div class="stats-grid" id="statsGrid"><div class="loading" style="grid-column:1/-1"><div class="spinner"></div></div></div>
+  <div class="section-label" style="margin-top:24px">Графики</div>
+  <div class="card" id="statsCharts" style="padding:12px 14px;"></div>
   <div class="section-label" style="margin-top:24px">По обект</div>
   <div id="objectStats" style="padding-bottom:120px;"></div>
 </div>
@@ -2104,11 +2106,11 @@ async function saveEditCf() {
     const cashHeaderId = cashHeaders?.[0]?.id;
 
     if (cashHeaderId) {
-      // Обнови съществуващите редове
+      // Обнови съществуващите редове (новите кодове са 5-цифрени: 70101, 50101)
       await db.from('operations')
         .update({ amount: cash, cost_value: cash })
         .eq('header_id', cashHeaderId)
-        .in('account_code', ['701', '501']);
+        .in('account_code', ['70101', '50101', '701', '501']);
       await db.from('operation_headers')
         .update({ total_cost: cash })
         .eq('id', cashHeaderId);
@@ -2968,6 +2970,9 @@ async function loadStats() {
       });
     }
   });
+
+  // Render графики
+  renderStatsCharts(sorted);
 
   document.getElementById('objectStats').innerHTML = sorted.map(([name, s]) => {
     const result = s.income - s.expense;
@@ -5125,6 +5130,91 @@ async function populateTxFilterObject() {
     opt.textContent = o.name;
     sel.appendChild(opt);
   });
+}
+
+
+function renderStatsCharts(sorted) {
+  const wrap = document.getElementById('statsCharts');
+  if (!wrap) return;
+  if (!sorted.length) { wrap.innerHTML = '<div style="text-align:center; color:var(--text3); padding:20px 0;">Няма данни</div>'; return; }
+
+  // 1. Прогрес-барове за всеки обект (приходи vs разходи)
+  const maxAbs = Math.max(...sorted.map(([, s]) => Math.max(s.income, s.expense)));
+  
+  // 2. Pie/Donut за разпределение на разходите
+  const expByObj = sorted.filter(([, s]) => s.expense > 0);
+  const totalExp = expByObj.reduce((sum, [, s]) => sum + s.expense, 0);
+  
+  // Цветове за pie
+  const colors = ['#0ea5a0', '#e8622a', '#16a34a', '#d97706', '#dc2626', '#a855f7', '#3b82f6', '#ec4899', '#84cc16', '#f59e0b'];
+  
+  // Build pie (SVG donut)
+  let pieHtml = '';
+  if (totalExp > 0) {
+    const cx = 80, cy = 80, r = 60, strokeWidth = 22;
+    let cumAngle = -Math.PI / 2; // start от 12 часа
+    const slices = expByObj.map(([name, s], i) => {
+      const angle = (s.expense / totalExp) * 2 * Math.PI;
+      const x1 = cx + r * Math.cos(cumAngle);
+      const y1 = cy + r * Math.sin(cumAngle);
+      const x2 = cx + r * Math.cos(cumAngle + angle);
+      const y2 = cy + r * Math.sin(cumAngle + angle);
+      const largeArc = angle > Math.PI ? 1 : 0;
+      const path = `M ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2}`;
+      cumAngle += angle;
+      return {
+        name, value: s.expense, percent: (s.expense / totalExp * 100).toFixed(1),
+        path, color: colors[i % colors.length]
+      };
+    });
+    pieHtml = `
+      <div style="display:flex; gap:16px; align-items:center; margin-bottom:16px;">
+        <svg width="160" height="160" viewBox="0 0 160 160">
+          ${slices.map(s => `<path d="${s.path}" fill="none" stroke="${s.color}" stroke-width="${strokeWidth}"/>`).join('')}
+          <text x="80" y="78" text-anchor="middle" font-size="10" font-weight="700" fill="var(--text2)">РАЗХОДИ</text>
+          <text x="80" y="92" text-anchor="middle" font-size="14" font-weight="800" fill="var(--text)" font-family="var(--mono)">${totalExp.toFixed(0)}</text>
+        </svg>
+        <div style="flex:1; min-width:0;">
+          ${slices.map(s => `
+            <div style="display:flex; align-items:center; gap:6px; font-size:11px; margin-bottom:4px;">
+              <div style="width:10px; height:10px; border-radius:2px; background:${s.color}; flex-shrink:0;"></div>
+              <div style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text2);">${s.name}</div>
+              <div style="font-family:var(--mono); font-weight:700; color:var(--text);">${s.percent}%</div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  // 3. Bar chart - приходи vs разходи за всеки обект
+  let barsHtml = '<div style="margin-top:8px;"><div style="font-size:11px; font-weight:700; color:var(--text3); text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;">Приходи vs Разходи</div>';
+  sorted.slice(0, 10).forEach(([name, s]) => {
+    const incPct = maxAbs > 0 ? (s.income / maxAbs * 100) : 0;
+    const expPct = maxAbs > 0 ? (s.expense / maxAbs * 100) : 0;
+    const profit = s.income - s.expense;
+    barsHtml += `
+      <div style="margin-bottom:12px;">
+        <div style="display:flex; justify-content:space-between; font-size:11px; margin-bottom:3px;">
+          <span style="font-weight:700; color:var(--text);">${name}</span>
+          <span style="font-family:var(--mono); color:${profit >= 0 ? 'var(--green)' : 'var(--red)'}; font-weight:700;">${profit >= 0 ? '+' : ''}${profit.toFixed(0)}</span>
+        </div>
+        <div style="position:relative; height:14px; background:var(--bg3); border-radius:3px; overflow:hidden; margin-bottom:2px;">
+          <div style="position:absolute; left:0; top:0; bottom:0; width:${incPct}%; background:var(--green); border-radius:3px;"></div>
+        </div>
+        <div style="position:relative; height:14px; background:var(--bg3); border-radius:3px; overflow:hidden;">
+          <div style="position:absolute; left:0; top:0; bottom:0; width:${expPct}%; background:var(--red); border-radius:3px;"></div>
+        </div>
+        <div style="display:flex; justify-content:space-between; font-size:10px; color:var(--text3); margin-top:1px;">
+          <span>📈 ${s.income.toFixed(0)}</span>
+          <span>📉 ${s.expense.toFixed(0)}</span>
+        </div>
+      </div>
+    `;
+  });
+  barsHtml += '</div>';
+
+  wrap.innerHTML = pieHtml + barsHtml;
 }
 
 </script>
