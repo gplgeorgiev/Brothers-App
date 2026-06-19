@@ -2107,11 +2107,11 @@ async function saveEditCf() {
     const cashHeaderId = cashHeaders?.[0]?.id;
 
     if (cashHeaderId) {
-      // Обнови съществуващите редове
+      // Обнови съществуващите редове (новите кодове са 5-цифрени: 70101, 50101)
       await db.from('operations')
         .update({ amount: cash, cost_value: cash })
         .eq('header_id', cashHeaderId)
-        .in('account_code', ['701', '501']);
+        .in('account_code', ['70101', '50101', '701', '501']);
       await db.from('operation_headers')
         .update({ total_cost: cash })
         .eq('id', cashHeaderId);
