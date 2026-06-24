@@ -5318,7 +5318,8 @@ function renderStatsCharts(sorted, drinksByObj, stackedByObj) {
             <div style="display:flex; align-items:center; gap:6px; font-size:11px; margin-bottom:4px;">
               <div style="width:10px; height:10px; border-radius:2px; background:${s.color}; flex-shrink:0;"></div>
               <div style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text2);">${s.name}</div>
-              <div style="font-family:var(--mono); font-weight:700; color:var(--text);">${s.percent}%</div>
+              <div style="font-family:var(--mono); font-weight:700; color:var(--text);">${s.value.toFixed(s.value < 100 ? 2 : 0)}</div>
+              <div style="font-family:var(--mono); font-size:10px; color:var(--text3); min-width:34px; text-align:right;">${s.percent}%</div>
             </div>
           `).join('')}
         </div>
