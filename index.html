@@ -5291,26 +5291,23 @@ function renderStatsCharts(sorted, drinksByObj, stackedByObj) {
     const profitPct = maxVal > 0 && profit > 0 ? (profit / maxVal * 100) : 0;
     const lossPct = maxVal > 0 && profit < 0 ? (Math.abs(profit) / maxVal * 100) : 0;
     
-    // Горна лента (Приходи):
-    //   при печалба: синьо = expense, зелено = profit (= income - expense), общо = income
-    //   при загуба: синьо = income, червено = loss (= expense - income), общо = expense
-    let topBar;
+    // Логика:
+    //   При печалба: горна = синьо (цял приход), долна = жълто (разход) + зелено (печалба до края на прихода)
+    //   При загуба: горна = синьо (приход) + червено (загуба до края на разхода), долна = жълто (цял разход)
+    let topBar, bottomBar;
     if (isProfit) {
-      // Синята част е до експенс-нивото, зелена остатък до края на прихода
-      const incBlue = maxVal > 0 ? (s.expense / maxVal * 100) : 0;
-      const incGreen = maxVal > 0 ? (profit / maxVal * 100) : 0;
-      topBar = `<div style="position:absolute; left:0; top:0; bottom:0; width:${incBlue}%; background:${COLOR_INCOME};"></div>
-                <div style="position:absolute; left:${incBlue}%; top:0; bottom:0; width:${incGreen}%; background:${COLOR_PROFIT};"></div>`;
+      topBar = `<div style="position:absolute; left:0; top:0; bottom:0; width:${incPct}%; background:${COLOR_INCOME};"></div>`;
+      const expBlue = maxVal > 0 ? (s.expense / maxVal * 100) : 0;
+      const expGreen = maxVal > 0 ? (profit / maxVal * 100) : 0;
+      bottomBar = `<div style="position:absolute; left:0; top:0; bottom:0; width:${expBlue}%; background:${COLOR_EXPENSE};"></div>
+                   <div style="position:absolute; left:${expBlue}%; top:0; bottom:0; width:${expGreen}%; background:${COLOR_PROFIT};"></div>`;
     } else {
-      // Синята до прихода, червена до края на разхода
       const incBlue = maxVal > 0 ? (s.income / maxVal * 100) : 0;
       const incRed = maxVal > 0 ? (Math.abs(profit) / maxVal * 100) : 0;
       topBar = `<div style="position:absolute; left:0; top:0; bottom:0; width:${incBlue}%; background:${COLOR_INCOME};"></div>
                 <div style="position:absolute; left:${incBlue}%; top:0; bottom:0; width:${incRed}%; background:${COLOR_LOSS};"></div>`;
+      bottomBar = `<div style="position:absolute; left:0; top:0; bottom:0; width:${expPct}%; background:${COLOR_EXPENSE};"></div>`;
     }
-    
-    // Долна лента (Разходи): жълто до края на разхода
-    const bottomBar = `<div style="position:absolute; left:0; top:0; bottom:0; width:${expPct}%; background:${COLOR_EXPENSE};"></div>`;
     
     // Малки иконки - стрелки нагоре/надолу с правилните цветове
     const incomeIcon = `<svg width="11" height="11" viewBox="0 0 24 24" fill="${COLOR_INCOME}" style="vertical-align:middle;"><path d="M12 4l8 8h-5v8h-6v-8H4z"/></svg>`;
