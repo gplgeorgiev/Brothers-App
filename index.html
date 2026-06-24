@@ -5291,16 +5291,25 @@ function renderStatsCharts(sorted, drinksByObj, stackedByObj) {
     const profitPct = maxVal > 0 && profit > 0 ? (profit / maxVal * 100) : 0;
     const lossPct = maxVal > 0 && profit < 0 ? (Math.abs(profit) / maxVal * 100) : 0;
     
-    // Горна лента: 
-    //   при печалба: приход (синьо) + печалба (зелено) до 100% на този ред
-    //   при загуба: приход (синьо) + загуба (червено) до края (= разхода)
-    const topBar = isProfit
-      ? `<div style="position:absolute; left:0; top:0; bottom:0; width:${incPct}%; background:${COLOR_INCOME};"></div>
-         <div style="position:absolute; left:${incPct}%; top:0; bottom:0; width:${profitPct}%; background:${COLOR_PROFIT};"></div>`
-      : `<div style="position:absolute; left:0; top:0; bottom:0; width:${incPct}%; background:${COLOR_INCOME};"></div>
-         <div style="position:absolute; left:${incPct}%; top:0; bottom:0; width:${lossPct}%; background:${COLOR_LOSS};"></div>`;
+    // Горна лента (Приходи):
+    //   при печалба: синьо = expense, зелено = profit (= income - expense), общо = income
+    //   при загуба: синьо = income, червено = loss (= expense - income), общо = expense
+    let topBar;
+    if (isProfit) {
+      // Синята част е до експенс-нивото, зелена остатък до края на прихода
+      const incBlue = maxVal > 0 ? (s.expense / maxVal * 100) : 0;
+      const incGreen = maxVal > 0 ? (profit / maxVal * 100) : 0;
+      topBar = `<div style="position:absolute; left:0; top:0; bottom:0; width:${incBlue}%; background:${COLOR_INCOME};"></div>
+                <div style="position:absolute; left:${incBlue}%; top:0; bottom:0; width:${incGreen}%; background:${COLOR_PROFIT};"></div>`;
+    } else {
+      // Синята до прихода, червена до края на разхода
+      const incBlue = maxVal > 0 ? (s.income / maxVal * 100) : 0;
+      const incRed = maxVal > 0 ? (Math.abs(profit) / maxVal * 100) : 0;
+      topBar = `<div style="position:absolute; left:0; top:0; bottom:0; width:${incBlue}%; background:${COLOR_INCOME};"></div>
+                <div style="position:absolute; left:${incBlue}%; top:0; bottom:0; width:${incRed}%; background:${COLOR_LOSS};"></div>`;
+    }
     
-    // Долна лента: разход (жълто) до края
+    // Долна лента (Разходи): жълто до края на разхода
     const bottomBar = `<div style="position:absolute; left:0; top:0; bottom:0; width:${expPct}%; background:${COLOR_EXPENSE};"></div>`;
     
     // Малки иконки - стрелки нагоре/надолу с правилните цветове
@@ -5368,33 +5377,23 @@ function renderStatsCharts(sorted, drinksByObj, stackedByObj) {
     
     stackedEntries.forEach(([name, d]) => {
       const resultVal = d['Резултат'] || 0;
-      // Total: само положителните компоненти (M-ли, Други, Гориво, Наем, положителен Резултат)
-      // НО: ако Резултат е отрицателен → не го броим в общата сума, показваме го като отделна (червена) ивица отдолу
-      const positiveTotal = compNames.reduce((s, k) => s + Math.max(0, d[k] || 0), 0);
-      const negativeRes = Math.min(0, resultVal); // например -30
-      const total = positiveTotal + Math.abs(negativeRes); // мащабиране включва и загубата
-      const widthPct = maxStackedSum > 0 ? (total / maxStackedSum * 100) : 0;
+      // sumComponents = М-ли + Други + Гориво + Наем + положителен Резултат
+      const sumComponents = compNames.reduce((s, k) => s + Math.max(0, d[k] || 0), 0);
+      const widthPct = maxStackedSum > 0 ? (sumComponents / maxStackedSum * 100) : 0;
       let segments = '';
       let cumPct = 0;
       compNames.forEach(k => {
         const val = Math.max(0, d[k] || 0);
         if (val <= 0) return;
-        const segPct = total > 0 ? (val / total * 100) : 0;
+        const segPct = sumComponents > 0 ? (val / sumComponents * 100) : 0;
         segments += `<div style="position:absolute; left:${cumPct}%; top:0; bottom:0; width:${segPct}%; background:${stackedColors[k]};"></div>`;
         cumPct += segPct;
       });
-      // Ако има отрицателен Резултат → добави червена ивица в края
-      if (negativeRes < 0) {
-        const segPct = total > 0 ? (Math.abs(negativeRes) / total * 100) : 0;
-        segments += `<div style="position:absolute; left:${cumPct}%; top:0; bottom:0; width:${segPct}%; background:#dc2626;"></div>`;
-      }
-      // Total visible value (приход = positiveTotal - |negativeRes|)
-      const displayTotal = positiveTotal + negativeRes; // = positiveTotal - |negativeRes|
       stackedHtml += `
         <div style="margin-bottom:10px;">
           <div style="display:flex; justify-content:space-between; font-size:11px; margin-bottom:3px;">
             <span style="font-weight:700; color:var(--text);">${name}</span>
-            <span style="font-family:var(--mono); color:${resultVal < 0 ? 'var(--red)' : 'var(--text2)'}; font-weight:700;">${resultVal < 0 ? '−' : ''}${Math.abs(displayTotal).toFixed(0)}</span>
+            <span style="font-family:var(--mono); color:${resultVal < 0 ? 'var(--red)' : resultVal > 0 ? 'var(--green)' : 'var(--text2)'}; font-weight:700;">${resultVal >= 0 ? '+' : ''}${resultVal.toFixed(0)}</span>
           </div>
           <div style="position:relative; height:18px; background:var(--bg3); border-radius:3px; overflow:hidden; width:${widthPct}%;">
             ${segments}
@@ -5414,28 +5413,22 @@ function renderStatsCharts(sorted, drinksByObj, stackedByObj) {
     
     stackedEntries.forEach(([name, d]) => {
       const resultVal = d['Резултат'] || 0;
-      const positiveTotal = compNames.reduce((s, k) => s + Math.max(0, d[k] || 0), 0);
-      const negativeRes = Math.min(0, resultVal);
-      const total = positiveTotal + Math.abs(negativeRes);
-      if (total <= 0) return;
+      const sumComponents = compNames.reduce((s, k) => s + Math.max(0, d[k] || 0), 0);
+      if (sumComponents <= 0) return;
       let segments = '';
       let cumPct = 0;
       compNames.forEach(k => {
         const val = Math.max(0, d[k] || 0);
         if (val <= 0) return;
-        const segPct = val / total * 100;
+        const segPct = val / sumComponents * 100;
         segments += `<div style="position:absolute; left:${cumPct}%; top:0; bottom:0; width:${segPct}%; background:${stackedColors[k]};"></div>`;
         cumPct += segPct;
       });
-      if (negativeRes < 0) {
-        const segPct = Math.abs(negativeRes) / total * 100;
-        segments += `<div style="position:absolute; left:${cumPct}%; top:0; bottom:0; width:${segPct}%; background:#dc2626;"></div>`;
-      }
       stackedHtml += `
         <div style="margin-bottom:10px;">
           <div style="display:flex; justify-content:space-between; font-size:11px; margin-bottom:3px;">
             <span style="font-weight:700; color:var(--text);">${name}</span>
-            <span style="font-family:var(--mono); color:${resultVal < 0 ? 'var(--red)' : 'var(--text2)'}; font-size:10px;">${resultVal < 0 ? 'загуба' : ''}</span>
+            <span style="font-family:var(--mono); color:${resultVal < 0 ? 'var(--red)' : resultVal > 0 ? 'var(--green)' : 'var(--text2)'}; font-size:10px; font-weight:700;">${resultVal < 0 ? 'загуба ' + resultVal.toFixed(0) : ''}</span>
           </div>
           <div style="position:relative; height:18px; background:var(--bg3); border-radius:3px; overflow:hidden;">
             ${segments}
