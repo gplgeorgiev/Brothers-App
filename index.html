@@ -5242,16 +5242,19 @@ function renderStatsCharts(sorted, drinksByObj, stackedByObj) {
     `;
   }
 
-  // 2A. Donut: ПЕЧАЛБА ПО ОБЕКТИ (само положителни)
-  const profitByObj = sorted
-    .map(([name, s]) => ({ name, value: s.income - s.expense }))
-    .filter(d => d.value > 0)
-    .sort((a, b) => b.value - a.value);
+  // 2A. Donut: ПЕЧАЛБА ПО ОБЕКТИ (само положителни) + бележка за обектите със загуба
+  const allProfits = sorted.map(([name, s]) => ({ name, value: s.income - s.expense }));
+  const profitByObj = allProfits.filter(d => d.value > 0).sort((a, b) => b.value - a.value);
+  const lossByObj = allProfits.filter(d => d.value < 0).sort((a, b) => a.value - b.value);
   const totalProfit = profitByObj.reduce((sum, d) => sum + d.value, 0);
   let pieHtml = '';
   if (totalProfit > 0) {
     pieHtml += '<div style="font-size:11px; font-weight:700; color:var(--text3); text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;">💰 Печалба по обекти</div>';
     pieHtml += drawDonut(profitByObj, 'ПЕЧАЛБА', totalProfit, 'EUR');
+    if (lossByObj.length > 0) {
+      const lossText = lossByObj.map(d => `${d.name} (${d.value.toFixed(0)} EUR)`).join(', ');
+      pieHtml += `<div style="font-size:11px; color:var(--text3); padding:6px 10px; background:var(--bg3); border-left:3px solid var(--red); border-radius:4px; margin-bottom:12px;"><span style="color:var(--red); font-weight:700;">⚠️ Със загуба:</span> ${lossText}</div>`;
+    }
   }
   
   // 2B. Donut: БРОЙ НАПИТКИ ПО ОБЕКТИ (от drinksByObj подадено отдолу)
