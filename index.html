@@ -2940,6 +2940,55 @@ async function loadStats() {
 
   // DEBUG
   console.log('byObj final state:', JSON.parse(JSON.stringify(byObj)));
+
+  // === Брой напитки от cashflow ===
+  const drinksByObj = {};
+  if (!objFilter) {
+    const { data: cfDrinks } = await db.from('cashflow')
+      .select('object_name, drinks_sold')
+      .gte('date', dateFrom)
+      .lte('date', dateTo)
+      .is('deleted_at', null);
+    (cfDrinks || []).forEach(c => {
+      if (c.drinks_sold) drinksByObj[c.object_name] = (drinksByObj[c.object_name] || 0) + c.drinks_sold;
+    });
+  } else {
+    const { data: cfDrinks } = await db.from('cashflow')
+      .select('object_name, drinks_sold')
+      .gte('date', dateFrom)
+      .lte('date', dateTo)
+      .eq('object_name', objFilter)
+      .is('deleted_at', null);
+    (cfDrinks || []).forEach(c => {
+      if (c.drinks_sold) drinksByObj[c.object_name] = (drinksByObj[c.object_name] || 0) + c.drinks_sold;
+    });
+  }
+
+  // === Stacked Column: M-ли (60101) + Гориво начислено + Наем начислен + Други + Резултат ===
+  const stackedByObj = {};
+  Object.entries(byObj).forEach(([name, s]) => {
+    if (s.income <= 0 && s.expense <= 0) return;
+    stackedByObj[name] = {
+      'М-ли': 0,
+      'Други': 0,
+      'Гориво': s.fuel || 0,
+      'Наем': s.accrued_rent || 0,
+      'Резултат': s.income - s.expense
+    };
+  });
+  // Изчисли M-ли и Други от validOps (60101 vs остатъка)
+  validOps.forEach(op => {
+    const objName = op.object_name || op.operation_headers?.object_name || '—';
+    const acc = op.account_code || '';
+    const entry = op.entry_type;
+    const amt = op.amount || 0;
+    if (!stackedByObj[objName]) return;
+    if (excludedAccountCodes.has(acc)) return;
+    if (!acc.startsWith('6')) return;
+    const signedAmt = entry === 'D' ? amt : -amt;
+    if (acc === '60101') stackedByObj[objName]['М-ли'] += signedAmt;
+    else stackedByObj[objName]['Други'] += signedAmt;
+  });
   // По обект
   const sorted = Object.entries(byObj)
     .filter(([n, s]) => s.income > 0 || s.expense > 0)
@@ -2972,7 +3021,7 @@ async function loadStats() {
   });
 
   // Render графики
-  renderStatsCharts(sorted);
+  renderStatsCharts(sorted, drinksByObj, stackedByObj);
 
   document.getElementById('objectStats').innerHTML = sorted.map(([name, s]) => {
     const result = s.income - s.expense;
@@ -5146,7 +5195,7 @@ async function populateTxFilterObject() {
 }
 
 
-function renderStatsCharts(sorted) {
+function renderStatsCharts(sorted, drinksByObj, stackedByObj) {
   const wrap = document.getElementById('statsCharts');
   if (!wrap) return;
   if (!sorted.length) { wrap.innerHTML = '<div style="text-align:center; color:var(--text3); padding:20px 0;">Няма данни</div>'; return; }
@@ -5154,20 +5203,16 @@ function renderStatsCharts(sorted) {
   // 1. Прогрес-барове за всеки обект (приходи vs разходи)
   const maxAbs = Math.max(...sorted.map(([, s]) => Math.max(s.income, s.expense)));
   
-  // 2. Pie/Donut за разпределение на разходите
-  const expByObj = sorted.filter(([, s]) => s.expense > 0);
-  const totalExp = expByObj.reduce((sum, [, s]) => sum + s.expense, 0);
-  
-  // Цветове за pie
+  // Цветове за donut и stacked
   const colors = ['#0ea5a0', '#e8622a', '#16a34a', '#d97706', '#dc2626', '#a855f7', '#3b82f6', '#ec4899', '#84cc16', '#f59e0b'];
   
-  // Build pie (SVG donut)
-  let pieHtml = '';
-  if (totalExp > 0) {
+  // Helper за рисуване на donut
+  function drawDonut(data, totalLabel, totalValue, totalUnit) {
+    if (!data.length || totalValue <= 0) return '';
     const cx = 80, cy = 80, r = 60, strokeWidth = 22;
-    let cumAngle = -Math.PI / 2; // start от 12 часа
-    const slices = expByObj.map(([name, s], i) => {
-      const angle = (s.expense / totalExp) * 2 * Math.PI;
+    let cumAngle = -Math.PI / 2;
+    const slices = data.map((d, i) => {
+      const angle = (d.value / totalValue) * 2 * Math.PI;
       const x1 = cx + r * Math.cos(cumAngle);
       const y1 = cy + r * Math.sin(cumAngle);
       const x2 = cx + r * Math.cos(cumAngle + angle);
@@ -5175,17 +5220,14 @@ function renderStatsCharts(sorted) {
       const largeArc = angle > Math.PI ? 1 : 0;
       const path = `M ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2}`;
       cumAngle += angle;
-      return {
-        name, value: s.expense, percent: (s.expense / totalExp * 100).toFixed(1),
-        path, color: colors[i % colors.length]
-      };
+      return { ...d, percent: (d.value / totalValue * 100).toFixed(1), path, color: colors[i % colors.length] };
     });
-    pieHtml = `
+    return `
       <div style="display:flex; gap:16px; align-items:center; margin-bottom:16px;">
-        <svg width="160" height="160" viewBox="0 0 160 160">
+        <svg width="160" height="160" viewBox="0 0 160 160" style="flex-shrink:0;">
           ${slices.map(s => `<path d="${s.path}" fill="none" stroke="${s.color}" stroke-width="${strokeWidth}"/>`).join('')}
-          <text x="80" y="78" text-anchor="middle" font-size="10" font-weight="700" fill="var(--text2)">РАЗХОДИ</text>
-          <text x="80" y="92" text-anchor="middle" font-size="14" font-weight="800" fill="var(--text)" font-family="var(--mono)">${totalExp.toFixed(0)}</text>
+          <text x="80" y="78" text-anchor="middle" font-size="10" font-weight="700" fill="var(--text2)">${totalLabel}</text>
+          <text x="80" y="92" text-anchor="middle" font-size="14" font-weight="800" fill="var(--text)" font-family="var(--mono)">${totalValue.toFixed(0)}${totalUnit ? ' ' + totalUnit : ''}</text>
         </svg>
         <div style="flex:1; min-width:0;">
           ${slices.map(s => `
@@ -5200,34 +5242,181 @@ function renderStatsCharts(sorted) {
     `;
   }
 
-  // 3. Bar chart - приходи vs разходи за всеки обект
+  // 2A. Donut: ПЕЧАЛБА ПО ОБЕКТИ (само положителни)
+  const profitByObj = sorted
+    .map(([name, s]) => ({ name, value: s.income - s.expense }))
+    .filter(d => d.value > 0)
+    .sort((a, b) => b.value - a.value);
+  const totalProfit = profitByObj.reduce((sum, d) => sum + d.value, 0);
+  let pieHtml = '';
+  if (totalProfit > 0) {
+    pieHtml += '<div style="font-size:11px; font-weight:700; color:var(--text3); text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;">💰 Печалба по обекти</div>';
+    pieHtml += drawDonut(profitByObj, 'ПЕЧАЛБА', totalProfit, 'EUR');
+  }
+  
+  // 2B. Donut: БРОЙ НАПИТКИ ПО ОБЕКТИ (от drinksByObj подадено отдолу)
+  if (typeof drinksByObj !== 'undefined' && drinksByObj) {
+    const drinksArr = Object.entries(drinksByObj)
+      .map(([name, value]) => ({ name, value }))
+      .filter(d => d.value > 0)
+      .sort((a, b) => b.value - a.value);
+    const totalDrinks = drinksArr.reduce((sum, d) => sum + d.value, 0);
+    if (totalDrinks > 0) {
+      pieHtml += '<div style="font-size:11px; font-weight:700; color:var(--text3); text-transform:uppercase; letter-spacing:1px; margin-bottom:8px; margin-top:8px;">☕ Брой напитки по обекти</div>';
+      pieHtml += drawDonut(drinksArr, 'НАПИТКИ', totalDrinks, '');
+    }
+  }
+
+  // 3. Bar chart - приходи (синьо) + печалба (зелено) | разходи (жълто) + загуба (червено)
+  // Логика:
+  //   Печалба: горна лента = синьо (приход) + зелено (печалба до края), долна = жълто (разход)
+  //   Загуба: горна = синьо (приход) + червено (загуба до края), долна = жълто (разход)
+  // Цветове (CSS):
+  const COLOR_INCOME = '#3b82f6';   // син
+  const COLOR_EXPENSE = '#f59e0b';  // жълт
+  const COLOR_PROFIT = '#16a34a';   // зелен
+  const COLOR_LOSS = '#dc2626';     // червен
+  
   let barsHtml = '<div style="margin-top:8px;"><div style="font-size:11px; font-weight:700; color:var(--text3); text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;">Приходи vs Разходи</div>';
   sorted.slice(0, 10).forEach(([name, s]) => {
-    const incPct = maxAbs > 0 ? (s.income / maxAbs * 100) : 0;
-    const expPct = maxAbs > 0 ? (s.expense / maxAbs * 100) : 0;
     const profit = s.income - s.expense;
+    const isProfit = profit >= 0;
+    // Скалирай към максимума между приход, разход и общата стойност (за случаи на загуба)
+    const maxVal = Math.max(s.income, s.expense, s.income + Math.abs(profit < 0 ? profit : 0));
+    const incPct = maxVal > 0 ? (s.income / maxVal * 100) : 0;
+    const expPct = maxVal > 0 ? (s.expense / maxVal * 100) : 0;
+    const profitPct = maxVal > 0 && profit > 0 ? (profit / maxVal * 100) : 0;
+    const lossPct = maxVal > 0 && profit < 0 ? (Math.abs(profit) / maxVal * 100) : 0;
+    
+    // Горна лента: 
+    //   при печалба: приход (синьо) + печалба (зелено) до 100% на този ред
+    //   при загуба: приход (синьо) + загуба (червено) до края (= разхода)
+    const topBar = isProfit
+      ? `<div style="position:absolute; left:0; top:0; bottom:0; width:${incPct}%; background:${COLOR_INCOME};"></div>
+         <div style="position:absolute; left:${incPct}%; top:0; bottom:0; width:${profitPct}%; background:${COLOR_PROFIT};"></div>`
+      : `<div style="position:absolute; left:0; top:0; bottom:0; width:${incPct}%; background:${COLOR_INCOME};"></div>
+         <div style="position:absolute; left:${incPct}%; top:0; bottom:0; width:${lossPct}%; background:${COLOR_LOSS};"></div>`;
+    
+    // Долна лента: разход (жълто) до края
+    const bottomBar = `<div style="position:absolute; left:0; top:0; bottom:0; width:${expPct}%; background:${COLOR_EXPENSE};"></div>`;
+    
+    // Малки иконки - стрелки нагоре/надолу с правилните цветове
+    const incomeIcon = `<svg width="11" height="11" viewBox="0 0 24 24" fill="${COLOR_INCOME}" style="vertical-align:middle;"><path d="M12 4l8 8h-5v8h-6v-8H4z"/></svg>`;
+    const expenseIcon = `<svg width="11" height="11" viewBox="0 0 24 24" fill="${COLOR_EXPENSE}" style="vertical-align:middle;"><path d="M12 20l-8-8h5V4h6v8h5z"/></svg>`;
+    const resultIcon = isProfit
+      ? `<svg width="11" height="11" viewBox="0 0 24 24" fill="${COLOR_PROFIT}" style="vertical-align:middle;"><path d="M12 4l8 8h-5v8h-6v-8H4z"/></svg>`
+      : `<svg width="11" height="11" viewBox="0 0 24 24" fill="${COLOR_LOSS}" style="vertical-align:middle;"><path d="M12 20l-8-8h5V4h6v8h5z"/></svg>`;
+    
     barsHtml += `
-      <div style="margin-bottom:12px;">
+      <div style="margin-bottom:14px;">
         <div style="display:flex; justify-content:space-between; font-size:11px; margin-bottom:3px;">
           <span style="font-weight:700; color:var(--text);">${name}</span>
-          <span style="font-family:var(--mono); color:${profit >= 0 ? 'var(--green)' : 'var(--red)'}; font-weight:700;">${profit >= 0 ? '+' : ''}${profit.toFixed(0)}</span>
+          <span style="display:flex; align-items:center; gap:3px; font-family:var(--mono); color:${isProfit ? COLOR_PROFIT : COLOR_LOSS}; font-weight:700;">${resultIcon} ${profit >= 0 ? '+' : ''}${profit.toFixed(0)}</span>
         </div>
         <div style="position:relative; height:14px; background:var(--bg3); border-radius:3px; overflow:hidden; margin-bottom:2px;">
-          <div style="position:absolute; left:0; top:0; bottom:0; width:${incPct}%; background:var(--green); border-radius:3px;"></div>
+          ${topBar}
         </div>
         <div style="position:relative; height:14px; background:var(--bg3); border-radius:3px; overflow:hidden;">
-          <div style="position:absolute; left:0; top:0; bottom:0; width:${expPct}%; background:var(--red); border-radius:3px;"></div>
+          ${bottomBar}
         </div>
-        <div style="display:flex; justify-content:space-between; font-size:10px; color:var(--text3); margin-top:1px;">
-          <span>📈 ${s.income.toFixed(0)}</span>
-          <span>📉 ${s.expense.toFixed(0)}</span>
+        <div style="display:flex; justify-content:space-between; font-size:10px; color:var(--text3); margin-top:2px;">
+          <span style="display:flex; align-items:center; gap:3px;">${incomeIcon} ${s.income.toFixed(0)}</span>
+          <span style="display:flex; align-items:center; gap:3px;">${expenseIcon} ${s.expense.toFixed(0)}</span>
         </div>
       </div>
     `;
   });
   barsHtml += '</div>';
 
-  wrap.innerHTML = pieHtml + barsHtml;
+  // 4. Stacked Column - 2 варианта (абсолютни и процентни)
+  let stackedHtml = '';
+  if (stackedByObj && Object.keys(stackedByObj).length > 0) {
+    const stackedColors = {
+      'М-ли': '#3b82f6',
+      'Други': '#a855f7',
+      'Гориво': '#f59e0b',
+      'Наем': '#ec4899',
+      'Резултат': '#16a34a'
+    };
+    const compNames = ['М-ли', 'Други', 'Гориво', 'Наем', 'Резултат'];
+    const stackedEntries = Object.entries(stackedByObj).sort((a, b) => {
+      const sumA = compNames.reduce((s, k) => s + Math.max(0, a[1][k] || 0), 0);
+      const sumB = compNames.reduce((s, k) => s + Math.max(0, b[1][k] || 0), 0);
+      return sumB - sumA;
+    });
+    
+    // Графика 1: Абсолютни суми
+    const maxStackedSum = Math.max(...stackedEntries.map(([, d]) => compNames.reduce((s, k) => s + Math.max(0, d[k] || 0), 0)));
+    
+    stackedHtml += '<div style="margin-top:24px; padding-top:16px; border-top:1px solid var(--border);"><div style="font-size:11px; font-weight:700; color:var(--text3); text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;">📊 Компоненти на прихода (EUR)</div>';
+    // Legend
+    stackedHtml += '<div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px; font-size:10px;">';
+    compNames.forEach(k => {
+      stackedHtml += `<div style="display:flex; align-items:center; gap:3px;"><div style="width:10px; height:10px; border-radius:2px; background:${stackedColors[k]};"></div><span style="color:var(--text2);">${k}</span></div>`;
+    });
+    stackedHtml += '</div>';
+    
+    stackedEntries.slice(0, 10).forEach(([name, d]) => {
+      const total = compNames.reduce((s, k) => s + Math.max(0, d[k] || 0), 0);
+      const widthPct = maxStackedSum > 0 ? (total / maxStackedSum * 100) : 0;
+      let segments = '';
+      let cumPct = 0;
+      compNames.forEach(k => {
+        const val = Math.max(0, d[k] || 0);
+        if (val <= 0) return;
+        const segPct = total > 0 ? (val / total * 100) : 0;
+        segments += `<div style="position:absolute; left:${cumPct}%; top:0; bottom:0; width:${segPct}%; background:${stackedColors[k]};"></div>`;
+        cumPct += segPct;
+      });
+      stackedHtml += `
+        <div style="margin-bottom:10px;">
+          <div style="display:flex; justify-content:space-between; font-size:11px; margin-bottom:3px;">
+            <span style="font-weight:700; color:var(--text);">${name}</span>
+            <span style="font-family:var(--mono); color:var(--text2); font-weight:700;">${total.toFixed(0)}</span>
+          </div>
+          <div style="position:relative; height:18px; background:var(--bg3); border-radius:3px; overflow:hidden; width:${widthPct}%;">
+            ${segments}
+          </div>
+        </div>
+      `;
+    });
+    stackedHtml += '</div>';
+    
+    // Графика 2: Проценти (100% stacked)
+    stackedHtml += '<div style="margin-top:24px; padding-top:16px; border-top:1px solid var(--border);"><div style="font-size:11px; font-weight:700; color:var(--text3); text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;">📊 Компоненти (% от прихода)</div>';
+    stackedHtml += '<div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px; font-size:10px;">';
+    compNames.forEach(k => {
+      stackedHtml += `<div style="display:flex; align-items:center; gap:3px;"><div style="width:10px; height:10px; border-radius:2px; background:${stackedColors[k]};"></div><span style="color:var(--text2);">${k}</span></div>`;
+    });
+    stackedHtml += '</div>';
+    
+    stackedEntries.slice(0, 10).forEach(([name, d]) => {
+      const total = compNames.reduce((s, k) => s + Math.max(0, d[k] || 0), 0);
+      if (total <= 0) return;
+      let segments = '';
+      let cumPct = 0;
+      compNames.forEach(k => {
+        const val = Math.max(0, d[k] || 0);
+        if (val <= 0) return;
+        const segPct = val / total * 100;
+        segments += `<div style="position:absolute; left:${cumPct}%; top:0; bottom:0; width:${segPct}%; background:${stackedColors[k]};"></div>`;
+        cumPct += segPct;
+      });
+      stackedHtml += `
+        <div style="margin-bottom:10px;">
+          <div style="display:flex; justify-content:space-between; font-size:11px; margin-bottom:3px;">
+            <span style="font-weight:700; color:var(--text);">${name}</span>
+          </div>
+          <div style="position:relative; height:18px; background:var(--bg3); border-radius:3px; overflow:hidden;">
+            ${segments}
+          </div>
+        </div>
+      `;
+    });
+    stackedHtml += '</div>';
+  }
+
+  wrap.innerHTML = pieHtml + barsHtml + stackedHtml;
 }
 
 </script>
