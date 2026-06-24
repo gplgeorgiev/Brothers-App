@@ -1003,6 +1003,8 @@ input.qty-big-input {
 
   <div class="section-label" id="statsPeriodLabel" style="margin-top:20px">Текущ месец</div>
   <div class="stats-grid" id="statsGrid"><div class="loading" style="grid-column:1/-1"><div class="spinner"></div></div></div>
+  <div class="section-label" style="margin-top:24px">Категории</div>
+  <div class="card" id="statsCategories" style="padding:12px 14px;"></div>
   <div class="section-label" style="margin-top:24px">Графики</div>
   <div class="card" id="statsCharts" style="padding:12px 14px;"></div>
   <div class="section-label" style="margin-top:24px">По обект</div>
@@ -3021,6 +3023,7 @@ async function loadStats() {
   });
 
   // Render графики
+  renderStatsCategories(validOps, fuelByObj, byObj, excludedAccountCodes);
   renderStatsCharts(sorted, drinksByObj, stackedByObj);
 
   document.getElementById('objectStats').innerHTML = sorted.map(([name, s]) => {
@@ -5195,6 +5198,87 @@ async function populateTxFilterObject() {
 }
 
 
+
+async function renderStatsCategories(validOps, fuelByObj, byObjAll, excludedAccountCodes) {
+  const wrap = document.getElementById('statsCategories');
+  if (!wrap) return;
+
+  // Зареди имената на сметките
+  const { data: accs } = await db.from('accounts').select('code, name').is('deleted_at', null);
+  const accNames = new Map((accs || []).map(a => [a.code, a.name]));
+
+  // Изчисли по сметка (Приход 7xxxx, Разход 6xxxx) + начислените (Гориво, Наем) като виртуални категории
+  const incomeByAccount = {};
+  const expenseByAccount = {};
+  validOps.forEach(op => {
+    const acc = op.account_code || '';
+    if (excludedAccountCodes.has(acc)) return;
+    const amt = op.amount || 0;
+    const entry = op.entry_type;
+    if (acc.startsWith('7')) {
+      const signed = entry === 'C' ? amt : -amt;
+      incomeByAccount[acc] = (incomeByAccount[acc] || 0) + signed;
+    } else if (acc.startsWith('6')) {
+      const signed = entry === 'D' ? amt : -amt;
+      expenseByAccount[acc] = (expenseByAccount[acc] || 0) + signed;
+    }
+  });
+
+  // Добави начислените (Гориво, Наем) от byObjAll
+  let totalFuel = 0, totalRent = 0;
+  Object.values(byObjAll).forEach(s => {
+    totalFuel += s.fuel || 0;
+    totalRent += s.accrued_rent || 0;
+  });
+  if (totalFuel > 0) expenseByAccount['_fuel'] = totalFuel;
+  if (totalRent > 0) expenseByAccount['_rent'] = totalRent;
+
+  const incomeArr = Object.entries(incomeByAccount).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
+  const expenseArr = Object.entries(expenseByAccount).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
+  const totalIncome = incomeArr.reduce((s, [, v]) => s + v, 0);
+  const totalExpense = expenseArr.reduce((s, [, v]) => s + v, 0);
+
+  const colors = ['#3b82f6', '#a855f7', '#16a34a', '#d97706', '#dc2626', '#0ea5a0', '#e8622a', '#ec4899', '#84cc16', '#f59e0b'];
+
+  const renderSection = (arr, total, title, titleColor) => {
+    if (!arr.length) return '';
+    let segments = '';
+    let cumPct = 0;
+    const items = arr.map(([code, value], i) => {
+      const percent = total > 0 ? (value / total * 100) : 0;
+      const color = colors[i % colors.length];
+      const name = code === '_fuel' ? 'Гориво начислено' : code === '_rent' ? 'Наем начислен' : (accNames.get(code) || code);
+      const codeDisplay = code.startsWith('_') ? '' : code;
+      segments += `<div style="position:absolute; left:${cumPct}%; top:0; bottom:0; width:${percent}%; background:${color};"></div>`;
+      cumPct += percent;
+      return { code: codeDisplay, name, value, percent, color };
+    });
+    return `
+      <div style="margin-bottom:18px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+          <div style="font-size:12px; font-weight:800; color:${titleColor}; text-transform:uppercase; letter-spacing:0.5px;">${title}</div>
+          <div style="font-family:var(--mono); font-size:14px; font-weight:800; color:${titleColor};">${total.toFixed(2)} EUR</div>
+        </div>
+        <div style="position:relative; height:14px; background:var(--bg3); border-radius:3px; overflow:hidden; margin-bottom:8px;">${segments}</div>
+        ${items.map(it => `
+          <div style="display:flex; align-items:center; gap:6px; font-size:11px; padding:3px 0;">
+            <div style="width:8px; height:8px; border-radius:2px; background:${it.color}; flex-shrink:0;"></div>
+            <span style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text2);">${it.code ? '<span style="font-family:var(--mono); color:var(--text3); margin-right:4px;">' + it.code + '</span>' : ''}${it.name}</span>
+            <span style="font-family:var(--mono); font-weight:700; color:var(--text);">${it.value.toFixed(2)}</span>
+            <span style="font-family:var(--mono); font-size:10px; color:var(--text3); min-width:34px; text-align:right;">${it.percent.toFixed(0)}%</span>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  };
+
+  let html = '';
+  html += renderSection(incomeArr, totalIncome, '📈 Приходи', 'var(--green)');
+  html += renderSection(expenseArr, totalExpense, '📉 Разходи', 'var(--red)');
+  if (!html) html = '<div style="text-align:center; color:var(--text3); padding:20px 0;">Няма данни</div>';
+  wrap.innerHTML = html;
+}
+
 function renderStatsCharts(sorted, drinksByObj, stackedByObj) {
   const wrap = document.getElementById('statsCharts');
   if (!wrap) return;
@@ -5316,22 +5400,30 @@ function renderStatsCharts(sorted, drinksByObj, stackedByObj) {
       ? `<svg width="11" height="11" viewBox="0 0 24 24" fill="${COLOR_PROFIT}" style="vertical-align:middle;"><path d="M12 4l8 8h-5v8h-6v-8H4z"/></svg>`
       : `<svg width="11" height="11" viewBox="0 0 24 24" fill="${COLOR_LOSS}" style="vertical-align:middle;"><path d="M12 20l-8-8h5V4h6v8h5z"/></svg>`;
     
+    // Логика на разположение:
+    //   При печалба: синята стойност НАД синия бар (вляво), жълтата стойност ПОД горната лента вляво, зелената вдясно
+    //   При загуба: синята стойност НАД синия бар вляво, червената стойност също на първия ред (вдясно), жълтата под долния бар
+    const incomeValueLine = `<div style="display:flex; align-items:center; gap:3px; font-size:10px; color:${COLOR_INCOME}; font-weight:700; font-family:var(--mono);">${incomeIcon} ${s.income.toFixed(0)}</div>`;
+    const expenseValueLine = `<div style="display:flex; align-items:center; gap:3px; font-size:10px; color:${COLOR_EXPENSE}; font-weight:700; font-family:var(--mono);">${expenseIcon} ${s.expense.toFixed(0)}</div>`;
+    const profitValueLine = isProfit
+      ? `<div style="display:flex; align-items:center; gap:3px; font-size:10px; color:${COLOR_PROFIT}; font-weight:700; font-family:var(--mono);">${resultIcon} +${profit.toFixed(0)}</div>`
+      : `<div style="display:flex; align-items:center; gap:3px; font-size:10px; color:${COLOR_LOSS}; font-weight:700; font-family:var(--mono);">${resultIcon} ${profit.toFixed(0)}</div>`;
+
     barsHtml += `
-      <div style="margin-bottom:14px;">
-        <div style="display:flex; justify-content:space-between; font-size:11px; margin-bottom:3px;">
-          <span style="font-weight:700; color:var(--text);">${name}</span>
-          <span style="display:flex; align-items:center; gap:3px; font-family:var(--mono); color:${isProfit ? COLOR_PROFIT : COLOR_LOSS}; font-weight:700;">${resultIcon} ${profit >= 0 ? '+' : ''}${profit.toFixed(0)}</span>
-        </div>
-        <div style="position:relative; height:14px; background:var(--bg3); border-radius:3px; overflow:hidden; margin-bottom:2px;">
+      <div style="margin-bottom:16px;">
+        <div style="font-weight:700; color:var(--text); font-size:12px; margin-bottom:4px;">${name}</div>
+        ${incomeValueLine}
+        <div style="position:relative; height:14px; background:var(--bg3); border-radius:3px; overflow:hidden; margin:2px 0;">
           ${topBar}
         </div>
-        <div style="position:relative; height:14px; background:var(--bg3); border-radius:3px; overflow:hidden;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          ${expenseValueLine}
+          ${isProfit ? profitValueLine : ''}
+        </div>
+        <div style="position:relative; height:14px; background:var(--bg3); border-radius:3px; overflow:hidden; margin:2px 0;">
           ${bottomBar}
         </div>
-        <div style="display:flex; justify-content:space-between; font-size:10px; color:var(--text3); margin-top:2px;">
-          <span style="display:flex; align-items:center; gap:3px;">${incomeIcon} ${s.income.toFixed(0)}</span>
-          <span style="display:flex; align-items:center; gap:3px;">${expenseIcon} ${s.expense.toFixed(0)}</span>
-        </div>
+        ${!isProfit ? `<div style="display:flex; justify-content:flex-end;">${profitValueLine}</div>` : ''}
       </div>
     `;
   });
