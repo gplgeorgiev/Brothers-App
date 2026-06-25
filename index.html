@@ -5588,33 +5588,64 @@ function renderStatsCharts(sorted, drinksByObj, stackedByObj, objsForStats, date
         const targetIcon = `<svg width="11" height="11" viewBox="0 0 24 24" fill="${COLOR_TARGET}" style="vertical-align:middle;"><circle cx="12" cy="12" r="6"/></svg>`;
         const actualIcon = `<svg width="11" height="11" viewBox="0 0 24 24" fill="${actualColor}" style="vertical-align:middle;"><circle cx="12" cy="12" r="6"/></svg>`;
         
-        // Долна лента (Реален):
-        //   Постигнат: първо лилаво (до таргета) + зелено (превишение до края на реалния)
-        //   Непостигнат: само жълто (до реалния), останалото празно
-        let bottomBar;
+        // Цветове за иконите/числата
+        const COLOR_REAL = '#3b82f6';  // синьо за Реално
+        
+        // Аналогично на Пх vs Рх:
+        //   Постигнат (Real ≥ Target): 
+        //     Горна (Реално): синьо до края (= Real)
+        //     Долна (Таргет): лилаво до Target + зелено допълващо до края (= Real)
+        //   Непостигнат (Real < Target):
+        //     Горна (Реално): синьо до Real + червено допълващо до края (= Target)
+        //     Долна (Таргет): лилаво до края (= Target)
+        let topBar, bottomBar;
         if (isOk) {
+          // Постигнат
+          topBar = `<div style="position:absolute; left:0; top:0; bottom:0; width:${actualPct}%; background:${COLOR_REAL};"></div>`;
           const purplePart = maxVal > 0 ? (d.target / maxVal * 100) : 0;
           const greenPart = maxVal > 0 ? ((d.actual - d.target) / maxVal * 100) : 0;
           bottomBar = `<div style="position:absolute; left:0; top:0; bottom:0; width:${purplePart}%; background:${COLOR_TARGET};"></div>
                        <div style="position:absolute; left:${purplePart}%; top:0; bottom:0; width:${greenPart}%; background:${COLOR_ACTUAL_OK};"></div>`;
         } else {
-          bottomBar = `<div style="position:absolute; left:0; top:0; bottom:0; width:${actualPct}%; background:${COLOR_ACTUAL_LOW};"></div>`;
+          // Непостигнат
+          const bluePart = maxVal > 0 ? (d.actual / maxVal * 100) : 0;
+          const redPart = maxVal > 0 ? ((d.target - d.actual) / maxVal * 100) : 0;
+          topBar = `<div style="position:absolute; left:0; top:0; bottom:0; width:${bluePart}%; background:${COLOR_REAL};"></div>
+                    <div style="position:absolute; left:${bluePart}%; top:0; bottom:0; width:${redPart}%; background:#dc2626;"></div>`;
+          bottomBar = `<div style="position:absolute; left:0; top:0; bottom:0; width:${targetPct}%; background:${COLOR_TARGET};"></div>`;
+        }
+        
+        // Icon стрелка за Реално - синя нагоре винаги (просто стойност)
+        const realIcon = `<svg width="11" height="11" viewBox="0 0 24 24" fill="${COLOR_REAL}" style="vertical-align:middle;"><path d="M12 4l8 8h-5v8h-6v-8H4z"/></svg>`;
+        
+        // Числови стойности
+        const realValueLine = `<div style="display:flex; align-items:center; gap:3px; font-size:10px; color:${COLOR_REAL}; font-weight:700; font-family:var(--mono);">${realIcon} ${Math.round(d.actual)}</div>`;
+        const targetValueLine = `<div style="display:flex; align-items:center; gap:3px; font-size:10px; color:${COLOR_TARGET}; font-weight:700; font-family:var(--mono); margin-top:2px;">${targetIcon} ${Math.round(d.target)}</div>`;
+        // Diff line (зелено при +, червено при -) - НАД топ бар (заедно с realValueLine при загуба) или ПОД долен бар (при печалба)
+        const diffValueLine = `<div style="display:flex; align-items:center; gap:3px; font-size:11px; color:${actualColor}; font-weight:700; font-family:var(--mono);">${diffIcon} ${diff >= 0 ? '+' : ''}${Math.round(diff)}</div>`;
+        
+        // При постигнат: Real стойност отгоре, Target+Diff отдолу (зелено)
+        // При непостигнат: Real+Diff (червено) отгоре, Target отдолу
+        let topValuesLine, bottomValuesLine;
+        if (isOk) {
+          topValuesLine = realValueLine;
+          bottomValuesLine = `<div style="display:flex; justify-content:space-between; align-items:center; margin-top:2px;">${targetValueLine}${diffValueLine}</div>`;
+        } else {
+          topValuesLine = `<div style="display:flex; justify-content:space-between; align-items:center;">${realValueLine}${diffValueLine}</div>`;
+          bottomValuesLine = targetValueLine;
         }
         
         targetHtml += `
           <div style="margin-bottom:16px;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:2px;">
-              <span style="font-weight:700; color:var(--text); font-size:12px;">${d.name}</span>
-              <span style="display:flex; align-items:center; gap:3px; font-family:var(--mono); color:${actualColor}; font-weight:700; font-size:11px;">${diffIcon} ${diff >= 0 ? '+' : ''}${Math.round(diff)}</span>
-            </div>
-            <div style="display:flex; align-items:center; gap:3px; font-size:10px; color:${COLOR_TARGET}; font-weight:700; font-family:var(--mono);">${targetIcon} ${Math.round(d.target)}</div>
+            <div style="font-weight:700; color:var(--text); font-size:12px; margin-bottom:2px;">${d.name}</div>
+            ${topValuesLine}
             <div style="position:relative; height:14px; background:var(--bg3); border-radius:3px; overflow:hidden;">
-              <div style="position:absolute; left:0; top:0; bottom:0; width:${targetPct}%; background:${COLOR_TARGET};"></div>
+              ${topBar}
             </div>
             <div style="position:relative; height:14px; background:var(--bg3); border-radius:3px; overflow:hidden;">
               ${bottomBar}
             </div>
-            <div style="display:flex; align-items:center; gap:3px; font-size:10px; color:${actualColor}; font-weight:700; font-family:var(--mono); margin-top:2px;">${actualIcon} ${Math.round(d.actual)}</div>
+            ${bottomValuesLine}
           </div>
         `;
       });
