@@ -2793,7 +2793,7 @@ async function loadStats() {
   const objFilter = document.getElementById('statsObjFilter')?.value || '';
 
   // Зареди обектите с rent и km_from_base + vehicles
-  const { data: objsForStats } = await db.from('objects').select('id, name, rent').is('deleted_at', null);
+  const { data: objsForStats } = await db.from('objects').select('id, name, rent, target_weekly').is('deleted_at', null);
   const { data: vehiclesForStats } = await db.from('vehicles').select('id, fuel_consumption, fuel_price').is('deleted_at', null);
   const vehMap = new Map((vehiclesForStats || []).map(v => [v.id, v]));
 
@@ -3024,7 +3024,7 @@ async function loadStats() {
 
   // Render графики
   renderStatsCategories(validOps, fuelByObj, byObj, excludedAccountCodes);
-  renderStatsCharts(sorted, drinksByObj, stackedByObj);
+  renderStatsCharts(sorted, drinksByObj, stackedByObj, objsForStats, dateFrom, dateTo);
 
   document.getElementById('objectStats').innerHTML = sorted.map(([name, s]) => {
     const result = s.income - s.expense;
@@ -5281,7 +5281,7 @@ async function renderStatsCategories(validOps, fuelByObj, byObjAll, excludedAcco
   wrap.innerHTML = html;
 }
 
-function renderStatsCharts(sorted, drinksByObj, stackedByObj) {
+function renderStatsCharts(sorted, drinksByObj, stackedByObj, objsForStats, dateFrom, dateTo) {
   const wrap = document.getElementById('statsCharts');
   if (!wrap) return;
   if (!sorted.length) { wrap.innerHTML = '<div style="text-align:center; color:var(--text3); padding:20px 0;">Няма данни</div>'; return; }
@@ -5540,7 +5540,89 @@ function renderStatsCharts(sorted, drinksByObj, stackedByObj) {
     stackedHtml += '</div>';
   }
 
-  wrap.innerHTML = pieHtml + barsHtml + stackedHtml;
+  // 5. Таргет vs Реален приход
+  let targetHtml = '';
+  if (objsForStats && objsForStats.length > 0 && dateFrom && dateTo) {
+    const from = new Date(dateFrom);
+    const to = new Date(dateTo);
+    const daysInPeriod = Math.floor((to - from) / (1000*60*60*24)) + 1;
+    
+    const targetData = [];
+    objsForStats.forEach(o => {
+      if (!o.target_weekly || o.target_weekly <= 0) return;
+      const targetForPeriod = (o.target_weekly / 7) * daysInPeriod;
+      const sObj = sorted.find(([n,]) => n === o.name);
+      const actual = sObj ? sObj[1].income : 0;
+      if (targetForPeriod <= 0 && actual <= 0) return;
+      targetData.push({ name: o.name, target: targetForPeriod, actual });
+    });
+    
+    if (targetData.length > 0) {
+      targetData.sort((a, b) => (b.actual - b.target) - (a.actual - a.target));
+      const maxVal = Math.max(...targetData.map(d => Math.max(d.target, d.actual)));
+      
+      const COLOR_TARGET = '#a855f7';   // лилаво за таргет
+      const COLOR_ACTUAL_OK = '#16a34a'; // зелено когато достигнат
+      const COLOR_ACTUAL_LOW = '#f59e0b'; // жълто когато под таргета
+      
+      targetHtml += '<div style="margin-top:24px; padding-top:16px; border-top:1px solid var(--border);"><div style="font-size:11px; font-weight:700; color:var(--text3); text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;">🎯 Таргет vs Реален Приход</div>';
+      
+      // Legend
+      targetHtml += `<div style="display:flex; flex-wrap:wrap; gap:12px; margin-bottom:10px; font-size:10px;">
+        <div style="display:flex; align-items:center; gap:4px;"><div style="width:10px; height:10px; border-radius:2px; background:${COLOR_TARGET};"></div><span style="color:var(--text2);">Таргет</span></div>
+        <div style="display:flex; align-items:center; gap:4px;"><div style="width:10px; height:10px; border-radius:2px; background:${COLOR_ACTUAL_OK};"></div><span style="color:var(--text2);">Реален ≥ Таргет</span></div>
+        <div style="display:flex; align-items:center; gap:4px;"><div style="width:10px; height:10px; border-radius:2px; background:${COLOR_ACTUAL_LOW};"></div><span style="color:var(--text2);">Реален &lt; Таргет</span></div>
+      </div>`;
+      
+      targetData.forEach(d => {
+        const diff = d.actual - d.target;
+        const isOk = diff >= 0;
+        const actualColor = isOk ? COLOR_ACTUAL_OK : COLOR_ACTUAL_LOW;
+        const targetPct = maxVal > 0 ? (d.target / maxVal * 100) : 0;
+        const actualPct = maxVal > 0 ? (d.actual / maxVal * 100) : 0;
+        
+        const diffIcon = isOk
+          ? `<svg width="11" height="11" viewBox="0 0 24 24" fill="${COLOR_ACTUAL_OK}" style="vertical-align:middle;"><path d="M12 4l8 8h-5v8h-6v-8H4z"/></svg>`
+          : `<svg width="11" height="11" viewBox="0 0 24 24" fill="${COLOR_ACTUAL_LOW}" style="vertical-align:middle;"><path d="M12 20l-8-8h5V4h6v8h5z"/></svg>`;
+        
+        const targetIcon = `<svg width="11" height="11" viewBox="0 0 24 24" fill="${COLOR_TARGET}" style="vertical-align:middle;"><circle cx="12" cy="12" r="6"/></svg>`;
+        const actualIcon = `<svg width="11" height="11" viewBox="0 0 24 24" fill="${actualColor}" style="vertical-align:middle;"><circle cx="12" cy="12" r="6"/></svg>`;
+        
+        // Долна лента (Реален):
+        //   Постигнат: първо лилаво (до таргета) + зелено (превишение до края на реалния)
+        //   Непостигнат: само жълто (до реалния), останалото празно
+        let bottomBar;
+        if (isOk) {
+          const purplePart = maxVal > 0 ? (d.target / maxVal * 100) : 0;
+          const greenPart = maxVal > 0 ? ((d.actual - d.target) / maxVal * 100) : 0;
+          bottomBar = `<div style="position:absolute; left:0; top:0; bottom:0; width:${purplePart}%; background:${COLOR_TARGET};"></div>
+                       <div style="position:absolute; left:${purplePart}%; top:0; bottom:0; width:${greenPart}%; background:${COLOR_ACTUAL_OK};"></div>`;
+        } else {
+          bottomBar = `<div style="position:absolute; left:0; top:0; bottom:0; width:${actualPct}%; background:${COLOR_ACTUAL_LOW};"></div>`;
+        }
+        
+        targetHtml += `
+          <div style="margin-bottom:16px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:2px;">
+              <span style="font-weight:700; color:var(--text); font-size:12px;">${d.name}</span>
+              <span style="display:flex; align-items:center; gap:3px; font-family:var(--mono); color:${actualColor}; font-weight:700; font-size:11px;">${diffIcon} ${diff >= 0 ? '+' : ''}${Math.round(diff)}</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:3px; font-size:10px; color:${COLOR_TARGET}; font-weight:700; font-family:var(--mono);">${targetIcon} ${Math.round(d.target)}</div>
+            <div style="position:relative; height:14px; background:var(--bg3); border-radius:3px; overflow:hidden;">
+              <div style="position:absolute; left:0; top:0; bottom:0; width:${targetPct}%; background:${COLOR_TARGET};"></div>
+            </div>
+            <div style="position:relative; height:14px; background:var(--bg3); border-radius:3px; overflow:hidden;">
+              ${bottomBar}
+            </div>
+            <div style="display:flex; align-items:center; gap:3px; font-size:10px; color:${actualColor}; font-weight:700; font-family:var(--mono); margin-top:2px;">${actualIcon} ${Math.round(d.actual)}</div>
+          </div>
+        `;
+      });
+      targetHtml += '</div>';
+    }
+  }
+
+  wrap.innerHTML = pieHtml + barsHtml + stackedHtml + targetHtml;
 }
 
 </script>
