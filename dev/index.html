@@ -1004,6 +1004,8 @@ input.qty-big-input {
 
   <div class="section-label" id="statsPeriodLabel" style="margin-top:20px">Текущ месец</div>
   <div class="stats-grid" id="statsGrid"><div class="loading" style="grid-column:1/-1"><div class="spinner"></div></div></div>
+  <div class="section-label" style="margin-top:24px">Категории</div>
+  <div class="card" id="statsCategories" style="padding:12px 14px;"></div>
   <div class="section-label" style="margin-top:24px">Графики</div>
   <div class="card" id="statsCharts" style="padding:12px 14px;"></div>
   <div class="section-label" style="margin-top:24px">По обект</div>
@@ -2128,7 +2130,8 @@ async function saveEditCf() {
         total_cost: cash,
         week_number: getWeekNumber(new Date(cf.date)),
         period: new Date(cf.date).getFullYear() + '.' + String(new Date(cf.date).getMonth()+1).padStart(2,'0'),
-        comment: `Вендинг cash — ${cf.object_name}`
+        comment: `Вендинг cash — ${cf.object_name}`,
+        cashflow_id: currentEditCfId
       }).select().single();
 
       if (newHeader?.id) {
@@ -2792,7 +2795,7 @@ async function loadStats() {
   const objFilter = document.getElementById('statsObjFilter')?.value || '';
 
   // Зареди обектите с rent и km_from_base + vehicles
-  const { data: objsForStats } = await db.from('objects').select('id, name, rent').is('deleted_at', null);
+  const { data: objsForStats } = await db.from('objects').select('id, name, rent, target_weekly').is('deleted_at', null);
   const { data: vehiclesForStats } = await db.from('vehicles').select('id, fuel_consumption, fuel_price').is('deleted_at', null);
   const vehMap = new Map((vehiclesForStats || []).map(v => [v.id, v]));
 
@@ -2941,6 +2944,55 @@ async function loadStats() {
 
   // DEBUG
   console.log('byObj final state:', JSON.parse(JSON.stringify(byObj)));
+
+  // === Брой напитки от cashflow ===
+  const drinksByObj = {};
+  if (!objFilter) {
+    const { data: cfDrinks } = await db.from('cashflow')
+      .select('object_name, drinks_sold')
+      .gte('date', dateFrom)
+      .lte('date', dateTo)
+      .is('deleted_at', null);
+    (cfDrinks || []).forEach(c => {
+      if (c.drinks_sold) drinksByObj[c.object_name] = (drinksByObj[c.object_name] || 0) + c.drinks_sold;
+    });
+  } else {
+    const { data: cfDrinks } = await db.from('cashflow')
+      .select('object_name, drinks_sold')
+      .gte('date', dateFrom)
+      .lte('date', dateTo)
+      .eq('object_name', objFilter)
+      .is('deleted_at', null);
+    (cfDrinks || []).forEach(c => {
+      if (c.drinks_sold) drinksByObj[c.object_name] = (drinksByObj[c.object_name] || 0) + c.drinks_sold;
+    });
+  }
+
+  // === Stacked Column: M-ли (60101) + Гориво начислено + Наем начислен + Други + Резултат ===
+  const stackedByObj = {};
+  Object.entries(byObj).forEach(([name, s]) => {
+    if (s.income <= 0 && s.expense <= 0) return;
+    stackedByObj[name] = {
+      'М-ли': 0,
+      'Други': 0,
+      'Гориво': s.fuel || 0,
+      'Наем': s.accrued_rent || 0,
+      'Резултат': s.income - s.expense
+    };
+  });
+  // Изчисли M-ли и Други от validOps (60101 vs остатъка)
+  validOps.forEach(op => {
+    const objName = op.object_name || op.operation_headers?.object_name || '—';
+    const acc = op.account_code || '';
+    const entry = op.entry_type;
+    const amt = op.amount || 0;
+    if (!stackedByObj[objName]) return;
+    if (excludedAccountCodes.has(acc)) return;
+    if (!acc.startsWith('6')) return;
+    const signedAmt = entry === 'D' ? amt : -amt;
+    if (acc === '60101') stackedByObj[objName]['М-ли'] += signedAmt;
+    else stackedByObj[objName]['Други'] += signedAmt;
+  });
   // По обект
   const sorted = Object.entries(byObj)
     .filter(([n, s]) => s.income > 0 || s.expense > 0)
@@ -2973,7 +3025,8 @@ async function loadStats() {
   });
 
   // Render графики
-  renderStatsCharts(sorted);
+  renderStatsCategories(validOps, fuelByObj, byObj, excludedAccountCodes);
+  renderStatsCharts(sorted, drinksByObj, stackedByObj, objsForStats, dateFrom, dateTo);
 
   document.getElementById('objectStats').innerHTML = sorted.map(([name, s]) => {
     const result = s.income - s.expense;
@@ -5147,7 +5200,90 @@ async function populateTxFilterObject() {
 }
 
 
-function renderStatsCharts(sorted) {
+
+async function renderStatsCategories(validOps, fuelByObj, byObjAll, excludedAccountCodes) {
+  const wrap = document.getElementById('statsCategories');
+  if (!wrap) return;
+
+  // Зареди имената на сметките
+  const { data: accs } = await db.from('accounts').select('code, name').is('deleted_at', null);
+  const accNames = new Map((accs || []).map(a => [a.code, a.name]));
+
+  // Изчисли по сметка (Приход 7xxxx, Разход 6xxxx) + начислените (Гориво, Наем) като виртуални категории
+  const incomeByAccount = {};
+  const expenseByAccount = {};
+  validOps.forEach(op => {
+    const acc = op.account_code || '';
+    if (excludedAccountCodes.has(acc)) return;
+    const amt = op.amount || 0;
+    const entry = op.entry_type;
+    if (acc.startsWith('7')) {
+      const signed = entry === 'C' ? amt : -amt;
+      incomeByAccount[acc] = (incomeByAccount[acc] || 0) + signed;
+    } else if (acc.startsWith('6')) {
+      const signed = entry === 'D' ? amt : -amt;
+      expenseByAccount[acc] = (expenseByAccount[acc] || 0) + signed;
+    }
+  });
+
+  // Добави начислените (Гориво, Наем) от byObjAll
+  let totalFuel = 0, totalRent = 0;
+  Object.values(byObjAll).forEach(s => {
+    totalFuel += s.fuel || 0;
+    totalRent += s.accrued_rent || 0;
+  });
+  if (totalFuel > 0) expenseByAccount['_fuel'] = totalFuel;
+  if (totalRent > 0) expenseByAccount['_rent'] = totalRent;
+
+  const incomeArr = Object.entries(incomeByAccount).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
+  const expenseArr = Object.entries(expenseByAccount).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
+  const totalIncome = incomeArr.reduce((s, [, v]) => s + v, 0);
+  const totalExpense = expenseArr.reduce((s, [, v]) => s + v, 0);
+
+  const colors = ['#3b82f6', '#a855f7', '#16a34a', '#d97706', '#dc2626', '#0ea5a0', '#e8622a', '#ec4899', '#84cc16', '#f59e0b'];
+
+  const renderSection = (arr, total, title, titleColor) => {
+    if (!arr.length) return '';
+    let segments = '';
+    let cumPct = 0;
+    const items = arr.map(([code, value], i) => {
+      const percent = total > 0 ? (value / total * 100) : 0;
+      const color = colors[i % colors.length];
+      const name = code === '_fuel' ? 'Гориво начислено' : code === '_rent' ? 'Наем начислен' : (accNames.get(code) || code);
+      const codeDisplay = code.startsWith('_') ? '' : code;
+      segments += `<div style="position:absolute; left:${cumPct}%; top:0; bottom:0; width:${percent}%; background:${color};"></div>`;
+      cumPct += percent;
+      return { code: codeDisplay, name, value, percent, color };
+    });
+    return `
+      <div style="margin-bottom:18px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+          <div style="font-size:12px; font-weight:800; color:${titleColor}; text-transform:uppercase; letter-spacing:0.5px;">${title}</div>
+          <div style="font-family:var(--mono); font-size:14px; font-weight:800; color:${titleColor};">${total.toFixed(2)} EUR</div>
+        </div>
+        <div style="position:relative; height:14px; background:var(--bg3); border-radius:3px; overflow:hidden; margin-bottom:8px;">${segments}</div>
+        ${items.map(it => `
+          <div style="display:flex; align-items:center; gap:6px; font-size:11px; padding:3px 0;">
+            <div style="width:8px; height:8px; border-radius:2px; background:${it.color}; flex-shrink:0;"></div>
+            <span style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text2);">${it.code ? '<span style="font-family:var(--mono); color:var(--text3); margin-right:4px;">' + it.code + '</span>' : ''}${it.name}</span>
+            <span style="font-family:var(--mono); font-weight:700; color:var(--text);">${it.value.toFixed(2)}</span>
+            <span style="font-family:var(--mono); font-size:10px; color:var(--text3); min-width:34px; text-align:right;">${it.percent.toFixed(0)}%</span>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  };
+
+  let html = '';
+  const incIcon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle; margin-right:4px;"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>';
+  html += renderSection(incomeArr, totalIncome, incIcon + 'Приходи', 'var(--green)');
+  const expIcon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle; margin-right:4px;"><polyline points="22 17 13.5 8.5 8.5 13.5 2 7"/><polyline points="16 17 22 17 22 11"/></svg>';
+  html += renderSection(expenseArr, totalExpense, expIcon + 'Разходи', 'var(--red)');
+  if (!html) html = '<div style="text-align:center; color:var(--text3); padding:20px 0;">Няма данни</div>';
+  wrap.innerHTML = html;
+}
+
+function renderStatsCharts(sorted, drinksByObj, stackedByObj, objsForStats, dateFrom, dateTo) {
   const wrap = document.getElementById('statsCharts');
   if (!wrap) return;
   if (!sorted.length) { wrap.innerHTML = '<div style="text-align:center; color:var(--text3); padding:20px 0;">Няма данни</div>'; return; }
@@ -5155,20 +5291,16 @@ function renderStatsCharts(sorted) {
   // 1. Прогрес-барове за всеки обект (приходи vs разходи)
   const maxAbs = Math.max(...sorted.map(([, s]) => Math.max(s.income, s.expense)));
   
-  // 2. Pie/Donut за разпределение на разходите
-  const expByObj = sorted.filter(([, s]) => s.expense > 0);
-  const totalExp = expByObj.reduce((sum, [, s]) => sum + s.expense, 0);
-  
-  // Цветове за pie
+  // Цветове за donut и stacked
   const colors = ['#0ea5a0', '#e8622a', '#16a34a', '#d97706', '#dc2626', '#a855f7', '#3b82f6', '#ec4899', '#84cc16', '#f59e0b'];
   
-  // Build pie (SVG donut)
-  let pieHtml = '';
-  if (totalExp > 0) {
+  // Helper за рисуване на donut
+  function drawDonut(data, totalLabel, totalValue, totalUnit) {
+    if (!data.length || totalValue <= 0) return '';
     const cx = 80, cy = 80, r = 60, strokeWidth = 22;
-    let cumAngle = -Math.PI / 2; // start от 12 часа
-    const slices = expByObj.map(([name, s], i) => {
-      const angle = (s.expense / totalExp) * 2 * Math.PI;
+    let cumAngle = -Math.PI / 2;
+    const slices = data.map((d, i) => {
+      const angle = (d.value / totalValue) * 2 * Math.PI;
       const x1 = cx + r * Math.cos(cumAngle);
       const y1 = cy + r * Math.sin(cumAngle);
       const x2 = cx + r * Math.cos(cumAngle + angle);
@@ -5176,24 +5308,21 @@ function renderStatsCharts(sorted) {
       const largeArc = angle > Math.PI ? 1 : 0;
       const path = `M ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2}`;
       cumAngle += angle;
-      return {
-        name, value: s.expense, percent: (s.expense / totalExp * 100).toFixed(1),
-        path, color: colors[i % colors.length]
-      };
+      return { ...d, percent: (d.value / totalValue * 100).toFixed(1), path, color: colors[i % colors.length] };
     });
-    pieHtml = `
+    return `
       <div style="display:flex; gap:16px; align-items:center; margin-bottom:16px;">
-        <svg width="160" height="160" viewBox="0 0 160 160">
+        <svg width="160" height="160" viewBox="0 0 160 160" style="flex-shrink:0;">
           ${slices.map(s => `<path d="${s.path}" fill="none" stroke="${s.color}" stroke-width="${strokeWidth}"/>`).join('')}
-          <text x="80" y="78" text-anchor="middle" font-size="10" font-weight="700" fill="var(--text2)">РАЗХОДИ</text>
-          <text x="80" y="92" text-anchor="middle" font-size="14" font-weight="800" fill="var(--text)" font-family="var(--mono)">${totalExp.toFixed(0)}</text>
+          <text x="80" y="78" text-anchor="middle" font-size="10" font-weight="700" fill="var(--text2)">${totalLabel}</text>
+          <text x="80" y="92" text-anchor="middle" font-size="14" font-weight="800" fill="var(--text)" font-family="var(--mono)">${totalValue.toFixed(0)}${totalUnit ? ' ' + totalUnit : ''}</text>
         </svg>
         <div style="flex:1; min-width:0;">
           ${slices.map(s => `
             <div style="display:flex; align-items:center; gap:6px; font-size:11px; margin-bottom:4px;">
               <div style="width:10px; height:10px; border-radius:2px; background:${s.color}; flex-shrink:0;"></div>
               <div style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text2);">${s.name}</div>
-              <div style="font-family:var(--mono); font-weight:700; color:var(--text);">${s.percent}%</div>
+              <div style="font-family:var(--mono); font-weight:700; color:var(--text);">${Math.round(s.value)}</div>
             </div>
           `).join('')}
         </div>
@@ -5201,34 +5330,334 @@ function renderStatsCharts(sorted) {
     `;
   }
 
-  // 3. Bar chart - приходи vs разходи за всеки обект
+  // 2A. Donut: ПЕЧАЛБА ПО ОБЕКТИ (само положителни) + бележка за обектите със загуба
+  const allProfits = sorted.map(([name, s]) => ({ name, value: s.income - s.expense }));
+  const profitByObj = allProfits.filter(d => d.value > 0).sort((a, b) => b.value - a.value);
+  const lossByObj = allProfits.filter(d => d.value < 0).sort((a, b) => a.value - b.value);
+  const totalProfit = profitByObj.reduce((sum, d) => sum + d.value, 0);
+  let pieHtml = '';
+  if (totalProfit > 0) {
+    pieHtml += '<div style="font-size:11px; font-weight:700; color:var(--text3); text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;">💰 Печалба по обекти</div>';
+    pieHtml += drawDonut(profitByObj, 'ПЕЧАЛБА', totalProfit, 'EUR');
+    if (lossByObj.length > 0) {
+      const lossText = lossByObj.map(d => `${d.name} (${d.value.toFixed(0)} EUR)`).join(', ');
+      pieHtml += `<div style="font-size:11px; color:var(--text3); padding:6px 10px; background:var(--bg3); border-left:3px solid var(--red); border-radius:4px; margin-bottom:12px;"><span style="color:var(--red); font-weight:700;">⚠️ Със загуба:</span> ${lossText}</div>`;
+    }
+  }
+  
+  // 2B. Donut: БРОЙ НАПИТКИ ПО ОБЕКТИ (от drinksByObj подадено отдолу)
+  if (typeof drinksByObj !== 'undefined' && drinksByObj) {
+    const drinksArr = Object.entries(drinksByObj)
+      .map(([name, value]) => ({ name, value }))
+      .filter(d => d.value > 0)
+      .sort((a, b) => b.value - a.value);
+    const totalDrinks = drinksArr.reduce((sum, d) => sum + d.value, 0);
+    if (totalDrinks > 0) {
+      pieHtml += '<div style="font-size:11px; font-weight:700; color:var(--text3); text-transform:uppercase; letter-spacing:1px; margin-bottom:8px; margin-top:8px;">☕ Брой напитки по обекти</div>';
+      pieHtml += drawDonut(drinksArr, 'НАПИТКИ', totalDrinks, '');
+    }
+  }
+
+  // 3. Bar chart - приходи (синьо) + печалба (зелено) | разходи (жълто) + загуба (червено)
+  // Логика:
+  //   Печалба: горна лента = синьо (приход) + зелено (печалба до края), долна = жълто (разход)
+  //   Загуба: горна = синьо (приход) + червено (загуба до края), долна = жълто (разход)
+  // Цветове (CSS):
+  const COLOR_INCOME = '#3b82f6';   // син
+  const COLOR_EXPENSE = '#f59e0b';  // жълт
+  const COLOR_PROFIT = '#16a34a';   // зелен
+  const COLOR_LOSS = '#dc2626';     // червен
+  
   let barsHtml = '<div style="margin-top:8px;"><div style="font-size:11px; font-weight:700; color:var(--text3); text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;">Приходи vs Разходи</div>';
-  sorted.slice(0, 10).forEach(([name, s]) => {
-    const incPct = maxAbs > 0 ? (s.income / maxAbs * 100) : 0;
-    const expPct = maxAbs > 0 ? (s.expense / maxAbs * 100) : 0;
+  sorted.forEach(([name, s]) => {
     const profit = s.income - s.expense;
+    const isProfit = profit >= 0;
+    // Скалирай към максимума между приход, разход и общата стойност (за случаи на загуба)
+    const maxVal = Math.max(s.income, s.expense, s.income + Math.abs(profit < 0 ? profit : 0));
+    const incPct = maxVal > 0 ? (s.income / maxVal * 100) : 0;
+    const expPct = maxVal > 0 ? (s.expense / maxVal * 100) : 0;
+    const profitPct = maxVal > 0 && profit > 0 ? (profit / maxVal * 100) : 0;
+    const lossPct = maxVal > 0 && profit < 0 ? (Math.abs(profit) / maxVal * 100) : 0;
+    
+    // Логика:
+    //   При печалба: горна = синьо (цял приход), долна = жълто (разход) + зелено (печалба до края на прихода)
+    //   При загуба: горна = синьо (приход) + червено (загуба до края на разхода), долна = жълто (цял разход)
+    let topBar, bottomBar;
+    if (isProfit) {
+      topBar = `<div style="position:absolute; left:0; top:0; bottom:0; width:${incPct}%; background:${COLOR_INCOME};"></div>`;
+      const expBlue = maxVal > 0 ? (s.expense / maxVal * 100) : 0;
+      const expGreen = maxVal > 0 ? (profit / maxVal * 100) : 0;
+      bottomBar = `<div style="position:absolute; left:0; top:0; bottom:0; width:${expBlue}%; background:${COLOR_EXPENSE};"></div>
+                   <div style="position:absolute; left:${expBlue}%; top:0; bottom:0; width:${expGreen}%; background:${COLOR_PROFIT};"></div>`;
+    } else {
+      const incBlue = maxVal > 0 ? (s.income / maxVal * 100) : 0;
+      const incRed = maxVal > 0 ? (Math.abs(profit) / maxVal * 100) : 0;
+      topBar = `<div style="position:absolute; left:0; top:0; bottom:0; width:${incBlue}%; background:${COLOR_INCOME};"></div>
+                <div style="position:absolute; left:${incBlue}%; top:0; bottom:0; width:${incRed}%; background:${COLOR_LOSS};"></div>`;
+      bottomBar = `<div style="position:absolute; left:0; top:0; bottom:0; width:${expPct}%; background:${COLOR_EXPENSE};"></div>`;
+    }
+    
+    // Малки иконки - стрелки нагоре/надолу с правилните цветове
+    const incomeIcon = `<svg width="11" height="11" viewBox="0 0 24 24" fill="${COLOR_INCOME}" style="vertical-align:middle;"><path d="M12 4l8 8h-5v8h-6v-8H4z"/></svg>`;
+    const expenseIcon = `<svg width="11" height="11" viewBox="0 0 24 24" fill="${COLOR_EXPENSE}" style="vertical-align:middle;"><path d="M12 20l-8-8h5V4h6v8h5z"/></svg>`;
+    const resultIcon = isProfit
+      ? `<svg width="11" height="11" viewBox="0 0 24 24" fill="${COLOR_PROFIT}" style="vertical-align:middle;"><path d="M12 4l8 8h-5v8h-6v-8H4z"/></svg>`
+      : `<svg width="11" height="11" viewBox="0 0 24 24" fill="${COLOR_LOSS}" style="vertical-align:middle;"><path d="M12 20l-8-8h5V4h6v8h5z"/></svg>`;
+    
+    // Логика на разположение:
+    //   При печалба: синята стойност НАД синия бар (вляво), жълтата стойност ПОД горната лента вляво, зелената вдясно
+    //   При загуба: синята стойност НАД синия бар вляво, червената стойност също на първия ред (вдясно), жълтата под долния бар
+    const incomeValueLine = `<div style="display:flex; align-items:center; gap:3px; font-size:10px; color:${COLOR_INCOME}; font-weight:700; font-family:var(--mono);">${incomeIcon} ${s.income.toFixed(0)}</div>`;
+    const expenseValueLine = `<div style="display:flex; align-items:center; gap:3px; font-size:10px; color:${COLOR_EXPENSE}; font-weight:700; font-family:var(--mono);">${expenseIcon} ${s.expense.toFixed(0)}</div>`;
+    const profitValueLine = isProfit
+      ? `<div style="display:flex; align-items:center; gap:3px; font-size:10px; color:${COLOR_PROFIT}; font-weight:700; font-family:var(--mono);">${resultIcon} +${profit.toFixed(0)}</div>`
+      : `<div style="display:flex; align-items:center; gap:3px; font-size:10px; color:${COLOR_LOSS}; font-weight:700; font-family:var(--mono);">${resultIcon} ${profit.toFixed(0)}</div>`;
+
+    // Bottom row: жълтата стойност от ляво, зелената (или червена) от дясно
+    const bottomValuesLine = isProfit
+      ? `<div style="display:flex; justify-content:space-between; align-items:center; margin-top:2px;">${expenseValueLine}${profitValueLine}</div>`
+      : `<div style="display:flex; justify-content:space-between; align-items:center; margin-top:2px;">${expenseValueLine}${profitValueLine}</div>`;
+    
+    // При печалба: синьо НАД топбар, жълто+зелено ПОД долбар
+    // При загуба: синьо+червено НАД топбар, жълто ПОД долбар
+    const topValuesLine = isProfit
+      ? incomeValueLine
+      : `<div style="display:flex; justify-content:space-between; align-items:center;">${incomeValueLine}${profitValueLine}</div>`;
+    const finalBottomValuesLine = isProfit
+      ? `<div style="display:flex; justify-content:space-between; align-items:center; margin-top:2px;">${expenseValueLine}${profitValueLine}</div>`
+      : `<div style="margin-top:2px;">${expenseValueLine}</div>`;
+    
     barsHtml += `
-      <div style="margin-bottom:12px;">
-        <div style="display:flex; justify-content:space-between; font-size:11px; margin-bottom:3px;">
-          <span style="font-weight:700; color:var(--text);">${name}</span>
-          <span style="font-family:var(--mono); color:${profit >= 0 ? 'var(--green)' : 'var(--red)'}; font-weight:700;">${profit >= 0 ? '+' : ''}${profit.toFixed(0)}</span>
-        </div>
-        <div style="position:relative; height:14px; background:var(--bg3); border-radius:3px; overflow:hidden; margin-bottom:2px;">
-          <div style="position:absolute; left:0; top:0; bottom:0; width:${incPct}%; background:var(--green); border-radius:3px;"></div>
+      <div style="margin-bottom:16px;">
+        <div style="font-weight:700; color:var(--text); font-size:12px; margin-bottom:2px;">${name}</div>
+        ${topValuesLine}
+        <div style="position:relative; height:14px; background:var(--bg3); border-radius:3px; overflow:hidden;">
+          ${topBar}
         </div>
         <div style="position:relative; height:14px; background:var(--bg3); border-radius:3px; overflow:hidden;">
-          <div style="position:absolute; left:0; top:0; bottom:0; width:${expPct}%; background:var(--red); border-radius:3px;"></div>
+          ${bottomBar}
         </div>
-        <div style="display:flex; justify-content:space-between; font-size:10px; color:var(--text3); margin-top:1px;">
-          <span>📈 ${s.income.toFixed(0)}</span>
-          <span>📉 ${s.expense.toFixed(0)}</span>
-        </div>
+        ${finalBottomValuesLine}
       </div>
     `;
   });
   barsHtml += '</div>';
 
-  wrap.innerHTML = pieHtml + barsHtml;
+  // 4. Stacked Column - 2 варианта (абсолютни и процентни)
+  let stackedHtml = '';
+  if (stackedByObj && Object.keys(stackedByObj).length > 0) {
+    const stackedColors = {
+      'М-ли': '#3b82f6',
+      'Други': '#a855f7',
+      'Гориво': '#f59e0b',
+      'Наем': '#ec4899',
+      'Резултат': '#16a34a'
+    };
+    const compNames = ['М-ли', 'Други', 'Гориво', 'Наем', 'Резултат'];
+    // Сортирай по приход (M-ли + Други + Гориво + Наем + Резултат, ако положителен)
+    // Положителен резултат отгоре, отрицателен (загуба) отдолу
+    const stackedEntries = Object.entries(stackedByObj).sort((a, b) => {
+      const resultA = a[1]['Резултат'] || 0;
+      const resultB = b[1]['Резултат'] || 0;
+      // Първо положителни (по убыв), после отрицателни (по убыв на абс)
+      if (resultA >= 0 && resultB < 0) return -1;
+      if (resultA < 0 && resultB >= 0) return 1;
+      const sumA = compNames.reduce((s, k) => s + Math.max(0, a[1][k] || 0), 0);
+      const sumB = compNames.reduce((s, k) => s + Math.max(0, b[1][k] || 0), 0);
+      return sumB - sumA;
+    });
+    
+    // Графика 1: Абсолютни суми
+    const maxStackedSum = Math.max(...stackedEntries.map(([, d]) => compNames.reduce((s, k) => s + Math.max(0, d[k] || 0), 0)));
+    
+    stackedHtml += '<div style="margin-top:24px; padding-top:16px; border-top:1px solid var(--border);"><div style="font-size:11px; font-weight:700; color:var(--text3); text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;">📊 Компоненти на прихода (EUR)</div>';
+    // Legend
+    stackedHtml += '<div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px; font-size:10px;">';
+    compNames.forEach(k => {
+      stackedHtml += `<div style="display:flex; align-items:center; gap:3px;"><div style="width:10px; height:10px; border-radius:2px; background:${stackedColors[k]};"></div><span style="color:var(--text2);">${k}</span></div>`;
+    });
+    stackedHtml += '</div>';
+    
+    stackedEntries.forEach(([name, d]) => {
+      const resultVal = d['Резултат'] || 0;
+      // sumComponents = М-ли + Други + Гориво + Наем + положителен Резултат
+      const sumComponents = compNames.reduce((s, k) => s + Math.max(0, d[k] || 0), 0);
+      const widthPct = maxStackedSum > 0 ? (sumComponents / maxStackedSum * 100) : 0;
+      let segments = '';
+      let cumPct = 0;
+      compNames.forEach(k => {
+        const val = Math.max(0, d[k] || 0);
+        if (val <= 0) return;
+        const segPct = sumComponents > 0 ? (val / sumComponents * 100) : 0;
+        segments += `<div style="position:absolute; left:${cumPct}%; top:0; bottom:0; width:${segPct}%; background:${stackedColors[k]};"></div>`;
+        cumPct += segPct;
+      });
+      stackedHtml += `
+        <div style="margin-bottom:10px;">
+          <div style="display:flex; justify-content:space-between; font-size:11px; margin-bottom:3px;">
+            <span style="font-weight:700; color:var(--text);">${name}</span>
+            <span style="font-family:var(--mono); color:${resultVal < 0 ? 'var(--red)' : resultVal > 0 ? 'var(--green)' : 'var(--text2)'}; font-weight:700;">${resultVal >= 0 ? '+' : ''}${resultVal.toFixed(0)}</span>
+          </div>
+          <div style="position:relative; height:18px; background:var(--bg3); border-radius:3px; overflow:hidden; width:${widthPct}%;">
+            ${segments}
+          </div>
+        </div>
+      `;
+    });
+    stackedHtml += '</div>';
+    
+    // Графика 2: Проценти (100% stacked)
+    stackedHtml += '<div style="margin-top:24px; padding-top:16px; border-top:1px solid var(--border);"><div style="font-size:11px; font-weight:700; color:var(--text3); text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;">📊 Компоненти (% от прихода)</div>';
+    stackedHtml += '<div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px; font-size:10px;">';
+    compNames.forEach(k => {
+      stackedHtml += `<div style="display:flex; align-items:center; gap:3px;"><div style="width:10px; height:10px; border-radius:2px; background:${stackedColors[k]};"></div><span style="color:var(--text2);">${k}</span></div>`;
+    });
+    stackedHtml += '</div>';
+    
+    stackedEntries.forEach(([name, d]) => {
+      const resultVal = d['Резултат'] || 0;
+      const sumComponents = compNames.reduce((s, k) => s + Math.max(0, d[k] || 0), 0);
+      if (sumComponents <= 0) return;
+      let segments = '';
+      let cumPct = 0;
+      compNames.forEach(k => {
+        const val = Math.max(0, d[k] || 0);
+        if (val <= 0) return;
+        const segPct = val / sumComponents * 100;
+        segments += `<div style="position:absolute; left:${cumPct}%; top:0; bottom:0; width:${segPct}%; background:${stackedColors[k]};"></div>`;
+        cumPct += segPct;
+      });
+      stackedHtml += `
+        <div style="margin-bottom:10px;">
+          <div style="display:flex; justify-content:space-between; font-size:11px; margin-bottom:3px;">
+            <span style="font-weight:700; color:var(--text);">${name}</span>
+            <span style="font-family:var(--mono); color:${resultVal < 0 ? 'var(--red)' : resultVal > 0 ? 'var(--green)' : 'var(--text2)'}; font-size:10px; font-weight:700;">${resultVal < 0 ? 'загуба ' + resultVal.toFixed(0) : ''}</span>
+          </div>
+          <div style="position:relative; height:18px; background:var(--bg3); border-radius:3px; overflow:hidden;">
+            ${segments}
+          </div>
+        </div>
+      `;
+    });
+    stackedHtml += '</div>';
+  }
+
+  // 5. Таргет vs Реален приход
+  let targetHtml = '';
+  if (objsForStats && objsForStats.length > 0 && dateFrom && dateTo) {
+    const from = new Date(dateFrom);
+    const to = new Date(dateTo);
+    const daysInPeriod = Math.floor((to - from) / (1000*60*60*24)) + 1;
+    
+    const targetData = [];
+    objsForStats.forEach(o => {
+      if (!o.target_weekly || o.target_weekly <= 0) return;
+      const targetForPeriod = (o.target_weekly / 7) * daysInPeriod;
+      const sObj = sorted.find(([n,]) => n === o.name);
+      const actual = sObj ? sObj[1].income : 0;
+      if (targetForPeriod <= 0 && actual <= 0) return;
+      targetData.push({ name: o.name, target: targetForPeriod, actual });
+    });
+    
+    if (targetData.length > 0) {
+      targetData.sort((a, b) => b.actual - a.actual);
+      // Всеки обект има свой own maxVal (по-голямото между Real и Target) → бара е 100%
+      
+      const COLOR_TARGET = '#a855f7';   // лилаво за таргет
+      const COLOR_ACTUAL_OK = '#16a34a'; // зелено когато достигнат
+      const COLOR_ACTUAL_LOW = '#f59e0b'; // жълто когато под таргета
+      
+      targetHtml += '<div style="margin-top:24px; padding-top:16px; border-top:1px solid var(--border);"><div style="font-size:11px; font-weight:700; color:var(--text3); text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;">🎯 Таргет vs Реален Приход</div>';
+      
+      // Legend
+      targetHtml += `<div style="display:flex; flex-wrap:wrap; gap:12px; margin-bottom:10px; font-size:10px;">
+        <div style="display:flex; align-items:center; gap:4px;"><div style="width:10px; height:10px; border-radius:2px; background:${COLOR_TARGET};"></div><span style="color:var(--text2);">Таргет</span></div>
+        <div style="display:flex; align-items:center; gap:4px;"><div style="width:10px; height:10px; border-radius:2px; background:${COLOR_ACTUAL_OK};"></div><span style="color:var(--text2);">Реален ≥ Таргет</span></div>
+        <div style="display:flex; align-items:center; gap:4px;"><div style="width:10px; height:10px; border-radius:2px; background:${COLOR_ACTUAL_LOW};"></div><span style="color:var(--text2);">Реален &lt; Таргет</span></div>
+      </div>`;
+      
+      targetData.forEach(d => {
+        const diff = d.actual - d.target;
+        const isOk = diff >= 0;
+        const actualColor = isOk ? COLOR_ACTUAL_OK : COLOR_ACTUAL_LOW;
+        // maxVal за обекта - по-голямото между Real и Target → бара е до 100%
+        const maxVal = Math.max(d.target, d.actual);
+        const targetPct = maxVal > 0 ? (d.target / maxVal * 100) : 0;
+        const actualPct = maxVal > 0 ? (d.actual / maxVal * 100) : 0;
+        
+        const diffIcon = isOk
+          ? `<svg width="11" height="11" viewBox="0 0 24 24" fill="${COLOR_ACTUAL_OK}" style="vertical-align:middle;"><path d="M12 4l8 8h-5v8h-6v-8H4z"/></svg>`
+          : `<svg width="11" height="11" viewBox="0 0 24 24" fill="${COLOR_ACTUAL_LOW}" style="vertical-align:middle;"><path d="M12 20l-8-8h5V4h6v8h5z"/></svg>`;
+        
+        const targetIcon = `<svg width="11" height="11" viewBox="0 0 24 24" fill="${COLOR_TARGET}" style="vertical-align:middle;"><circle cx="12" cy="12" r="6"/></svg>`;
+        const actualIcon = `<svg width="11" height="11" viewBox="0 0 24 24" fill="${actualColor}" style="vertical-align:middle;"><circle cx="12" cy="12" r="6"/></svg>`;
+        
+        // Цветове за иконите/числата
+        const COLOR_REAL = '#3b82f6';  // синьо за Реално
+        
+        // Аналогично на Пх vs Рх:
+        //   Постигнат (Real ≥ Target): 
+        //     Горна (Реално): синьо до края (= Real)
+        //     Долна (Таргет): лилаво до Target + зелено допълващо до края (= Real)
+        //   Непостигнат (Real < Target):
+        //     Горна (Реално): синьо до Real + червено допълващо до края (= Target)
+        //     Долна (Таргет): лилаво до края (= Target)
+        let topBar, bottomBar;
+        if (isOk) {
+          // Постигнат
+          topBar = `<div style="position:absolute; left:0; top:0; bottom:0; width:${actualPct}%; background:${COLOR_REAL};"></div>`;
+          const purplePart = maxVal > 0 ? (d.target / maxVal * 100) : 0;
+          const greenPart = maxVal > 0 ? ((d.actual - d.target) / maxVal * 100) : 0;
+          bottomBar = `<div style="position:absolute; left:0; top:0; bottom:0; width:${purplePart}%; background:${COLOR_TARGET};"></div>
+                       <div style="position:absolute; left:${purplePart}%; top:0; bottom:0; width:${greenPart}%; background:${COLOR_ACTUAL_OK};"></div>`;
+        } else {
+          // Непостигнат
+          const bluePart = maxVal > 0 ? (d.actual / maxVal * 100) : 0;
+          const redPart = maxVal > 0 ? ((d.target - d.actual) / maxVal * 100) : 0;
+          topBar = `<div style="position:absolute; left:0; top:0; bottom:0; width:${bluePart}%; background:${COLOR_REAL};"></div>
+                    <div style="position:absolute; left:${bluePart}%; top:0; bottom:0; width:${redPart}%; background:#dc2626;"></div>`;
+          bottomBar = `<div style="position:absolute; left:0; top:0; bottom:0; width:${targetPct}%; background:${COLOR_TARGET};"></div>`;
+        }
+        
+        // Icon стрелка за Реално - синя нагоре винаги (просто стойност)
+        const realIcon = `<svg width="11" height="11" viewBox="0 0 24 24" fill="${COLOR_REAL}" style="vertical-align:middle;"><path d="M12 4l8 8h-5v8h-6v-8H4z"/></svg>`;
+        
+        // Числови стойности
+        const realValueLine = `<div style="display:flex; align-items:center; gap:3px; font-size:10px; color:${COLOR_REAL}; font-weight:700; font-family:var(--mono);">${realIcon} ${Math.round(d.actual)}</div>`;
+        const targetValueLine = `<div style="display:flex; align-items:center; gap:3px; font-size:10px; color:${COLOR_TARGET}; font-weight:700; font-family:var(--mono); margin-top:2px;">${targetIcon} ${Math.round(d.target)}</div>`;
+        // Diff line (зелено при +, червено при -) - НАД топ бар (заедно с realValueLine при загуба) или ПОД долен бар (при печалба)
+        const diffValueLine = `<div style="display:flex; align-items:center; gap:3px; font-size:11px; color:${actualColor}; font-weight:700; font-family:var(--mono);">${diffIcon} ${diff >= 0 ? '+' : ''}${Math.round(diff)}</div>`;
+        
+        // При постигнат: Real стойност отгоре, Target+Diff отдолу (зелено)
+        // При непостигнат: Real+Diff (червено) отгоре, Target отдолу
+        let topValuesLine, bottomValuesLine;
+        if (isOk) {
+          topValuesLine = realValueLine;
+          bottomValuesLine = `<div style="display:flex; justify-content:space-between; align-items:center; margin-top:2px;">${targetValueLine}${diffValueLine}</div>`;
+        } else {
+          topValuesLine = `<div style="display:flex; justify-content:space-between; align-items:center;">${realValueLine}${diffValueLine}</div>`;
+          bottomValuesLine = targetValueLine;
+        }
+        
+        targetHtml += `
+          <div style="margin-bottom:16px;">
+            <div style="font-weight:700; color:var(--text); font-size:12px; margin-bottom:2px;">${d.name}</div>
+            ${topValuesLine}
+            <div style="position:relative; height:14px; background:var(--bg3); border-radius:3px; overflow:hidden;">
+              ${topBar}
+            </div>
+            <div style="position:relative; height:14px; background:var(--bg3); border-radius:3px; overflow:hidden;">
+              ${bottomBar}
+            </div>
+            ${bottomValuesLine}
+          </div>
+        `;
+      });
+      targetHtml += '</div>';
+    }
+  }
+
+  wrap.innerHTML = pieHtml + barsHtml + stackedHtml + targetHtml;
 }
 
 </script>
