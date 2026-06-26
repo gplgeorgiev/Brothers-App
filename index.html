@@ -2129,7 +2129,8 @@ async function saveEditCf() {
         total_cost: cash,
         week_number: getWeekNumber(new Date(cf.date)),
         period: new Date(cf.date).getFullYear() + '.' + String(new Date(cf.date).getMonth()+1).padStart(2,'0'),
-        comment: `Вендинг cash — ${cf.object_name}`
+        comment: `Вендинг cash — ${cf.object_name}`,
+        cashflow_id: currentEditCfId
       }).select().single();
 
       if (newHeader?.id) {
