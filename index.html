@@ -566,6 +566,12 @@ input.qty-big-input {
       <label>CASH (EUR)</label>
       <input type="number" inputmode="decimal" id="editCfCash" placeholder="0.00" step="0.01">
     </div>
+    <div class="field">
+      <label>ТЕХНИК</label>
+      <select id="editCfTech" style="width:100%; padding:12px; border:1px solid var(--border); border-radius:8px; background:var(--bg3); color:var(--text); font-size:14px; outline:none; font-family:var(--font);">
+        <option value="">—</option>
+      </select>
+    </div>
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:8px;">
       <button onclick="closeEditCfModal()" style="padding:14px; border-radius:12px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:15px; font-weight:700; cursor:pointer;">Отказ</button>
       <button onclick="saveEditCf()" style="padding:14px; border-radius:12px; border:none; background:var(--accent); color:#fff; font-size:15px; font-weight:700; cursor:pointer;">✓ Запази</button>
@@ -1007,7 +1013,10 @@ input.qty-big-input {
   <div class="card" id="statsCategories" style="padding:12px 14px;"></div>
   <div class="section-label" style="margin-top:24px">Графики</div>
   <div class="card" id="statsCharts" style="padding:12px 14px;"></div>
-  <div class="section-label" style="margin-top:24px">По обект</div>
+  <div class="section-label" style="margin-top:24px; display:flex; justify-content:space-between; align-items:center;">
+    <span>По обект</span>
+    <button onclick="exportStatsByObject()" style="padding:5px 10px; border-radius:7px; border:1px solid var(--accent); background:transparent; color:var(--accent); font-size:11px; font-weight:700; cursor:pointer; font-family:var(--font); text-transform:none; letter-spacing:0;">📥 CSV</button>
+  </div>
   <div id="objectStats" style="padding-bottom:120px;"></div>
 </div>
 
@@ -1693,12 +1702,15 @@ async function submitRestock() {
   // Защита срещу double-click
   const submitBtn = document.querySelector('button.submit-btn');
   if (submitBtn?.disabled) return;
+  let _submitOrigText = '';
   if (submitBtn) { 
     submitBtn.disabled = true; 
-    const origText = submitBtn.innerHTML;
+    _submitOrigText = submitBtn.innerHTML;
     submitBtn.innerHTML = '⏳ Запазва...';
-    setTimeout(() => { if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = origText; } }, 5000);
   }
+  const reenable = () => {
+    if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = _submitOrigText || '✓ Запиши'; }
+  };
   // Проверка за дубликат в последните 5 секунди
   const _objId = parseInt(document.getElementById('objectSelect').value);
   const _techId = parseInt(document.getElementById('techSelect').value);
@@ -1706,7 +1718,7 @@ async function submitRestock() {
   const _total = parseFloat(_lines.reduce((s, l) => s + (l.cost_value || 0), 0).toFixed(2));
   if (_objId && _techId && await checkDuplicate('restock', _objId, _total, _techId)) {
     showToast('⚠️ Вече има идентичен запис в последните секунди', 'error');
-    if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = '✓ Запиши'; }
+    reenable();
     return;
   }
   const techId = document.getElementById('techSelect').value;
@@ -1885,10 +1897,8 @@ async function submitRestock() {
   window.scrollTo(0, 0);
   console.log('Calling loadRestockHistory after submit');
   await loadRestockHistory();
+  reenable();
 }
-
-// ── CASHFLOW ──
-let currentCashflowId = null;
 
 async function createCashflowEntry(counter, obj, tech, date, operationId) {
   // Намери предишния запис за обекта — максималния брояч преди текущия
@@ -2043,12 +2053,22 @@ function closeEditCfModal() {
 
 async function saveEditCf() {
   if (!currentEditCfId) return;
+  // Защита срещу double-click
+  const editBtn = document.querySelector('button[onclick="saveEditCf()"]');
+  if (editBtn?.disabled) return;
+  if (editBtn) { 
+    editBtn.disabled = true; 
+    editBtn.dataset.origText = editBtn.innerHTML;
+    editBtn.innerHTML = '⏳ Запазва...';
+  }
+  const newTechId = parseInt(document.getElementById('editCfTech').value) || null;
+  const newTech = newTechId ? technicians.find(t => t.id === newTechId) : null;
   const cash = parseFloat(document.getElementById('editCfCash').value) || null;
   const counter = parseInt(document.getElementById('editCfCounter').value) || null;
 
   // Вземи текущия запис
   const { data: cf } = await db.from('cashflow').select('*').eq('id', currentEditCfId).is('deleted_at', null).single();
-  if (!cf) return;
+  if (!cf) { if (editBtn) { editBtn.disabled = false; editBtn.innerHTML = editBtn.dataset.origText || '✓ Запиши'; } return; }
 
   const obj = objects.find(o => o.id === cf.object_id);
   const update = {};
@@ -2087,7 +2107,7 @@ async function saveEditCf() {
     update.completed_at = new Date().toISOString();
   }
 
-  const { error } = await db.from('cashflow').update(update).eq('id', currentEditCfId);
+  const { error } = await db.from('cashflow').update(newTech ? { ...update, technician_id: newTechId, technician_name: newTech.name } : update).eq('id', currentEditCfId);
   if (error) { showToast('❌ ' + error.message, 'error'); return; }
 
   // Каскадно обнови следващите записи ако има брояч
@@ -2199,10 +2219,31 @@ async function saveEditCf() {
     }
   }
 
+  // Ако има смяна на техник - обнови operations и хедърите свързани с този cashflow
+  if (newTech) {
+    // Restock хедъра (cf.operation_id)
+    if (cf.operation_id) {
+      await db.from('operation_headers').update({ technician_id: newTechId, technician_name: newTech.name }).eq('id', cf.operation_id);
+      await db.from('operations').update({ technician_name: newTech.name }).eq('header_id', cf.operation_id);
+    }
+    // Cash_income хедъри свързани с cashflow
+    const { data: cashHdrs } = await db.from('operation_headers')
+      .select('id')
+      .eq('cashflow_id', currentEditCfId)
+      .eq('op_type', 'cash_income')
+      .is('deleted_at', null);
+    if (cashHdrs && cashHdrs.length > 0) {
+      const hdrIds = cashHdrs.map(h => h.id);
+      await db.from('operation_headers').update({ technician_id: newTechId, technician_name: newTech.name }).in('id', hdrIds);
+      await db.from('operations').update({ technician_name: newTech.name }).in('header_id', hdrIds);
+    }
+  }
+
   closeEditCfModal();
   showToast('✅ Записът е обновен!', 'success');
   loadCashflow();
   if (typeof loadRestockHistory === 'function') loadRestockHistory();
+  if (editBtn) { editBtn.disabled = false; editBtn.innerHTML = editBtn.dataset.origText || '✓ Запиши'; }
 }
 
 async function recalcNextCashflow(objectId, fromDate, newPrevCounter, fromId) {
@@ -3344,7 +3385,15 @@ async function saveFinance() {
   // Защита срещу double-click
   const finBtn = document.querySelector('button[onclick="saveFinance()"]');
   if (finBtn?.disabled) return;
-  if (finBtn) { finBtn.disabled = true; setTimeout(() => { if (finBtn) finBtn.disabled = false; }, 5000); }
+  let _finOrigText = '';
+  if (finBtn) { 
+    finBtn.disabled = true; 
+    _finOrigText = finBtn.innerHTML;
+    finBtn.innerHTML = '⏳ Запазва...';
+  }
+  const reenableFin = () => {
+    if (finBtn) { finBtn.disabled = false; finBtn.innerHTML = _finOrigText || '✓ Запиши'; }
+  };
 
   const objId = document.getElementById('finObjectSelect').value;
   const techId = document.getElementById('finTechSelect').value;
@@ -3439,6 +3488,7 @@ async function saveFinance() {
   if (finDateEl) finDateEl.value = getLocalDateString();
   loadTxHistory();
   window.scrollTo(0, 0);
+  reenableFin();
 }
 
 async function loadTxHistory() {
@@ -3751,7 +3801,7 @@ async function loadBalanceSummary() {
       </div>
     </div>
     <div class="card">
-      <div style="font-size:11px; font-weight:700; letter-spacing:1px; color:var(--text3); text-transform:uppercase; margin-bottom:10px;">По техник (каса)</div>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;"><div style="font-size:11px; font-weight:700; letter-spacing:1px; color:var(--text3); text-transform:uppercase;">По техник (каса)</div><button onclick="exportCashByTechnician()" style="padding:4px 8px; border-radius:6px; border:1px solid var(--accent); background:transparent; color:var(--accent); font-size:10px; font-weight:700; cursor:pointer; font-family:var(--font); text-transform:none;">📥 CSV</button></div>
       ${Object.entries(byTech).map(([name, bal]) => {
         const safeId = btoa(unescape(encodeURIComponent(name))).replace(/[^a-zA-Z0-9]/g, '_').substring(0, 30);
         const moves = (movesByTech[name] || []).sort((a, b) => (a.date || '').localeCompare(b.date || ''));
@@ -4275,10 +4325,15 @@ async function saveCapital() {
   // Защита срещу double-click
   const capBtn = document.querySelector('button[onclick="saveCapital()"]');
   if (capBtn?.disabled) return;
+  let _capOrigText = '';
   if (capBtn) {
     capBtn.disabled = true;
-    setTimeout(() => { if (capBtn) capBtn.disabled = false; }, 5000);
+    _capOrigText = capBtn.innerHTML;
+    capBtn.innerHTML = '⏳ Запазва...';
   }
+  const reenableCap = () => {
+    if (capBtn) { capBtn.disabled = false; capBtn.innerHTML = _capOrigText || '✓ Запиши'; }
+  };
   // Провери дали вече има opening_balance (трябва да е единствен!)
   const { data: existingOB } = await db.from('operation_headers')
     .select('id')
@@ -4287,7 +4342,7 @@ async function saveCapital() {
     .limit(1);
   if (existingOB && existingOB.length > 0) {
     showToast('⚠️ Вече има начално салдо. Изтрий го преди да създадеш ново.', 'error');
-    if (capBtn) capBtn.disabled = false;
+    reenableCap();
     return;
   }
   const date = document.getElementById('capitalDate').value;
@@ -4386,6 +4441,7 @@ async function saveCapital() {
 
   showToast('✅ Началното салдо е записано!', 'success');
   closeCapitalModal();
+  reenableCap();
 }
 
 async function loadUnknownRoutes() {
@@ -5657,6 +5713,276 @@ function renderStatsCharts(sorted, drinksByObj, stackedByObj, objsForStats, date
   }
 
   wrap.innerHTML = pieHtml + barsHtml + stackedHtml + targetHtml;
+}
+
+
+// === CSV EXPORT ===
+function downloadCSV(filename, rows) {
+  // BOM за UTF-8 (за кирилица в Excel)
+  const BOM = '\ufeff';
+  // Escape: ако стойност съдържа ; или " или нов ред → обвий в кавички
+  const escape = (val) => {
+    if (val === null || val === undefined) return '';
+    let str = String(val);
+    // Ако е число (формат -0.00 или 0.00) → замени точка със запетая (BG Excel)
+    if (/^-?\d+\.\d+$/.test(str)) {
+      str = str.replace('.', ',');
+    }
+    if (str.includes(';') || str.includes('"') || str.includes('\n')) {
+      return '"' + str.replace(/"/g, '""') + '"';
+    }
+    return str;
+  };
+  const csv = BOM + rows.map(row => row.map(escape).join(';')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+async function exportStatsByObject() {
+  const dateFrom = document.getElementById('statsDateFrom')?.value || '';
+  const dateTo = document.getElementById('statsDateTo')?.value || '';
+  const objFilter = document.getElementById('statsObjFilter')?.value || '';
+  
+  // Headers + summary rows
+  const rows = [];
+  rows.push(['Приходи и Разходи по обекти']);
+  rows.push(['Период от:', dateFrom, 'до:', dateTo]);
+  if (objFilter) rows.push(['Филтър обект:', objFilter]);
+  rows.push([]);
+  rows.push(['Обект', 'Приход (EUR)', 'Разход (EUR)', 'Резултат (EUR)']);
+
+  // Зареди обектите и operations за обобщение
+  const { data: objsForStats } = await db.from('objects').select('id, name, rent').is('deleted_at', null);
+  const { data: excludedAccs } = await db.from('accounts').select('code').eq('exclude_from_stats', true).is('deleted_at', null);
+  const excludedSet = new Set((excludedAccs || []).map(a => a.code));
+  const { data: vehs } = await db.from('vehicles').select('id, fuel_consumption, fuel_price').is('deleted_at', null);
+  const vehMap = new Map((vehs || []).map(v => [v.id, v]));
+  const { data: hdrsForStats } = await db.from('operation_headers')
+    .select('id, date, object_name, km, vehicle_id, op_type')
+    .gte('date', dateFrom).lte('date', dateTo)
+    .in('op_type', ['restock', 'service'])
+    .is('deleted_at', null);
+  const { data: ops } = await db.from('operations')
+    .select('account_code, amount, entry_type, object_name, product_name, header_id, operation_headers!inner(date, op_type, deleted_at, object_name, contractor, comment, document_ref)')
+    .gte('operation_headers.date', dateFrom)
+    .lte('operation_headers.date', dateTo)
+    .is('deleted_at', null);
+
+  let validOps = (ops || []).filter(o => !o.operation_headers?.deleted_at);
+  if (objFilter) validOps = validOps.filter(o => (o.object_name || o.operation_headers?.object_name) === objFilter);
+
+  // Начислени fuel и rent
+  const fuelByObj = {};
+  (hdrsForStats || []).forEach(h => {
+    if (!h.km || !h.vehicle_id) return;
+    if (objFilter && h.object_name !== objFilter) return;
+    const v = vehMap.get(h.vehicle_id);
+    if (!v || !v.fuel_consumption || !v.fuel_price) return;
+    fuelByObj[h.object_name] = (fuelByObj[h.object_name] || 0) + h.km * (v.fuel_consumption / 100) * v.fuel_price;
+  });
+
+  function calcRent(monthlyRent, fromStr, toStr) {
+    if (!monthlyRent || monthlyRent <= 0) return 0;
+    const from = new Date(fromStr); const to = new Date(toStr);
+    let total = 0;
+    let cursor = new Date(from.getFullYear(), from.getMonth(), 1);
+    while (cursor <= to) {
+      const year = cursor.getFullYear(); const month = cursor.getMonth();
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+      const monthStart = new Date(year, month, 1); const monthEnd = new Date(year, month + 1, 0);
+      const ps = from > monthStart ? from : monthStart;
+      const pe = to < monthEnd ? to : monthEnd;
+      const dp = Math.floor((pe - ps) / 86400000) + 1;
+      total += monthlyRent * (dp / daysInMonth);
+      cursor = new Date(year, month + 1, 1);
+    }
+    return total;
+  }
+
+  const byObj = {};
+  (objsForStats || []).forEach(o => {
+    if (objFilter && o.name !== objFilter) return;
+    byObj[o.name] = { income: 0, expense: 0 };
+    if (o.rent > 0) byObj[o.name].expense += calcRent(o.rent, dateFrom, dateTo);
+  });
+  Object.entries(fuelByObj).forEach(([name, fuel]) => {
+    if (byObj[name]) byObj[name].expense += fuel;
+  });
+  validOps.forEach(op => {
+    const objName = op.object_name || op.operation_headers?.object_name || '—';
+    if (!byObj[objName]) byObj[objName] = { income: 0, expense: 0 };
+    const acc = op.account_code || '';
+    if (excludedSet.has(acc)) return;
+    const amt = op.amount || 0;
+    if (acc.startsWith('7')) {
+      byObj[objName].income += op.entry_type === 'C' ? amt : -amt;
+    } else if (acc.startsWith('6')) {
+      byObj[objName].expense += op.entry_type === 'D' ? amt : -amt;
+    }
+  });
+
+  const sorted = Object.entries(byObj)
+    .filter(([, s]) => s.income > 0 || s.expense > 0)
+    .sort((a, b) => (b[1].income - b[1].expense) - (a[1].income - a[1].expense));
+  
+  let totalIncome = 0, totalExpense = 0;
+  sorted.forEach(([name, s]) => {
+    rows.push([name, s.income.toFixed(2), s.expense.toFixed(2), (s.income - s.expense).toFixed(2)]);
+    totalIncome += s.income;
+    totalExpense += s.expense;
+  });
+  rows.push(['ОБЩО', totalIncome.toFixed(2), totalExpense.toFixed(2), (totalIncome - totalExpense).toFixed(2)]);
+  
+  // Детайли по обект
+  rows.push([]);
+  rows.push(['ДЕТАЙЛИ ПО ОБЕКТ']);
+  rows.push(['Обект', 'Дата', 'Тип', 'Категория', 'Контрагент', 'Документ', 'Коментар', 'Сума']);
+
+  const opLabels = {
+    'restock': 'Зареждане',
+    'cash_income': 'Cash отчет',
+    'finance_expense': 'Разход',
+    'finance_income': 'Приход',
+    'opening_balance': 'Нач. салдо',
+    'service': 'Сервиз'
+  };
+
+  // Накачи имена на сметки
+  const { data: accs } = await db.from('accounts').select('code, name').is('deleted_at', null);
+  const accNames = new Map((accs || []).map(a => [a.code, a.name]));
+
+  sorted.forEach(([objName]) => {
+    const objOps = validOps
+      .filter(o => (o.object_name || o.operation_headers?.object_name) === objName)
+      .filter(o => !excludedSet.has(o.account_code || ''))
+      .filter(o => (o.account_code || '').startsWith('6') || (o.account_code || '').startsWith('7'))
+      .sort((a, b) => (a.operation_headers?.date || '').localeCompare(b.operation_headers?.date || ''));
+    objOps.forEach(o => {
+      const isIncome = (o.account_code || '').startsWith('7');
+      const signedAmt = isIncome
+        ? (o.entry_type === 'C' ? (o.amount || 0) : -(o.amount || 0))
+        : (o.entry_type === 'D' ? (o.amount || 0) : -(o.amount || 0));
+      // Приходи положителни, разходи отрицателни
+      const finalAmt = isIncome ? signedAmt : -signedAmt;
+      rows.push([
+        objName,
+        o.operation_headers?.date || '',
+        opLabels[o.operation_headers?.op_type] || o.operation_headers?.op_type || '',
+        accNames.get(o.account_code) || '',
+        o.operation_headers?.contractor || '',
+        o.operation_headers?.document_ref || '',
+        o.operation_headers?.comment || '',
+        finalAmt.toFixed(2)
+      ]);
+    });
+  });
+
+  downloadCSV(`stats_obects_${dateFrom}_${dateTo}.csv`, rows);
+}
+
+async function exportCashByTechnician() {
+  const dateFrom = document.getElementById('statsDateFrom')?.value || '';
+  const dateTo = document.getElementById('statsDateTo')?.value || '';
+  const rows = [];
+  rows.push(['Каса по техници']);
+  rows.push(['Период от:', dateFrom, 'до:', dateTo]);
+  rows.push([]);
+
+  const { data } = await db.from('operations')
+    .select('account_code, amount, technician_name, entry_type, header_id, operation_headers!inner(date, payment_method, op_type, deleted_at, object_name, comment, contractor)')
+    .eq('account_code', '50101')
+    .is('deleted_at', null);
+
+  const cashOps = (data || []).filter(o => !o.operation_headers?.deleted_at);
+
+  // Категория от партньорския 6xxx/7xxx ред
+  const headerIds = [...new Set(cashOps.map(o => o.header_id).filter(Boolean))];
+  const categoryByHeader = {};
+  if (headerIds.length > 0) {
+    const { data: catOps } = await db.from('operations')
+      .select('header_id, account_code, product_name')
+      .in('header_id', headerIds)
+      .is('deleted_at', null);
+    (catOps || []).forEach(o => {
+      const acc = o.account_code || '';
+      if ((acc.startsWith('6') || acc.startsWith('7')) && !categoryByHeader[o.header_id]) {
+        categoryByHeader[o.header_id] = o.product_name;
+      }
+    });
+  }
+
+  const opLabels = {
+    'restock': 'Зареждане',
+    'cash_income': 'Cash отчет',
+    'finance_expense': 'Разход',
+    'finance_income': 'Приход',
+    'opening_balance': 'Нач. салдо',
+    'service': 'Сервиз'
+  };
+
+  // Балансиране
+  const byTech = {};
+  const startBalByTech = {};
+  cashOps.forEach(o => {
+    const name = o.technician_name || 'Неизвестен';
+    if (!byTech[name]) { byTech[name] = 0; startBalByTech[name] = 0; }
+    const sign = o.entry_type === 'D' ? 1 : -1;
+    const amt = (o.amount || 0) * sign;
+    byTech[name] += amt;
+    const opDate = o.operation_headers?.date;
+    if (opDate && dateFrom && opDate < dateFrom) startBalByTech[name] += amt;
+  });
+  
+  rows.push(['Техник', 'Начално салдо', 'Оборот в периода', 'Текущ баланс']);
+  Object.entries(byTech).forEach(([name, bal]) => {
+    const start = startBalByTech[name] || 0;
+    const period = cashOps
+      .filter(o => o.technician_name === name)
+      .filter(o => {
+        const d = o.operation_headers?.date;
+        return d && (!dateFrom || d >= dateFrom) && (!dateTo || d <= dateTo);
+      })
+      .reduce((s, o) => s + (o.amount || 0) * (o.entry_type === 'D' ? 1 : -1), 0);
+    rows.push([name, start.toFixed(2), period.toFixed(2), bal.toFixed(2)]);
+  });
+
+  rows.push([]);
+  rows.push(['ДЕТАЙЛИ - ДВИЖЕНИЯ В ПЕРИОДА']);
+  rows.push(['Техник', 'Дата', 'Операция', 'Обект', 'Категория', 'Контрагент', 'Коментар', 'Сума']);
+  
+  Object.keys(byTech).forEach(techName => {
+    const moves = cashOps
+      .filter(o => o.technician_name === techName)
+      .filter(o => {
+        const d = o.operation_headers?.date;
+        return d && (!dateFrom || d >= dateFrom) && (!dateTo || d <= dateTo);
+      })
+      .sort((a, b) => (a.operation_headers?.date || '').localeCompare(b.operation_headers?.date || ''));
+    
+    moves.forEach(o => {
+      const sign = o.entry_type === 'D' ? 1 : -1;
+      const amt = (o.amount || 0) * sign;
+      rows.push([
+        techName,
+        o.operation_headers?.date || '',
+        opLabels[o.operation_headers?.op_type] || o.operation_headers?.op_type || '',
+        o.operation_headers?.object_name || '',
+        categoryByHeader[o.header_id] || '',
+        o.operation_headers?.contractor || '',
+        o.operation_headers?.comment || '',
+        amt.toFixed(2)
+      ]);
+    });
+  });
+
+  downloadCSV(`cash_by_tech_${dateFrom}_${dateTo}.csv`, rows);
 }
 
 </script>
