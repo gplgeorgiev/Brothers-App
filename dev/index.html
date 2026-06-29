@@ -567,6 +567,12 @@ input.qty-big-input {
       <label>CASH (EUR)</label>
       <input type="number" inputmode="decimal" id="editCfCash" placeholder="0.00" step="0.01">
     </div>
+    <div class="field">
+      <label>ТЕХНИК</label>
+      <select id="editCfTech" style="width:100%; padding:12px; border:1px solid var(--border); border-radius:8px; background:var(--bg3); color:var(--text); font-size:14px; outline:none; font-family:var(--font);">
+        <option value="">—</option>
+      </select>
+    </div>
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:8px;">
       <button onclick="closeEditCfModal()" style="padding:14px; border-radius:12px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:15px; font-weight:700; cursor:pointer;">Отказ</button>
       <button onclick="saveEditCf()" style="padding:14px; border-radius:12px; border:none; background:var(--accent); color:#fff; font-size:15px; font-weight:700; cursor:pointer;">✓ Запази</button>
@@ -1697,12 +1703,15 @@ async function submitRestock() {
   // Защита срещу double-click
   const submitBtn = document.querySelector('button.submit-btn');
   if (submitBtn?.disabled) return;
+  let _submitOrigText = '';
   if (submitBtn) { 
     submitBtn.disabled = true; 
-    const origText = submitBtn.innerHTML;
+    _submitOrigText = submitBtn.innerHTML;
     submitBtn.innerHTML = '⏳ Запазва...';
-    setTimeout(() => { if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = origText; } }, 5000);
   }
+  const reenable = () => {
+    if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = _submitOrigText || '✓ Запиши'; }
+  };
   // Проверка за дубликат в последните 5 секунди
   const _objId = parseInt(document.getElementById('objectSelect').value);
   const _techId = parseInt(document.getElementById('techSelect').value);
@@ -1710,7 +1719,7 @@ async function submitRestock() {
   const _total = parseFloat(_lines.reduce((s, l) => s + (l.cost_value || 0), 0).toFixed(2));
   if (_objId && _techId && await checkDuplicate('restock', _objId, _total, _techId)) {
     showToast('⚠️ Вече има идентичен запис в последните секунди', 'error');
-    if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = '✓ Запиши'; }
+    reenable();
     return;
   }
   const techId = document.getElementById('techSelect').value;
@@ -1889,10 +1898,8 @@ async function submitRestock() {
   window.scrollTo(0, 0);
   console.log('Calling loadRestockHistory after submit');
   await loadRestockHistory();
+  reenable();
 }
-
-// ── CASHFLOW ──
-let currentCashflowId = null;
 
 async function createCashflowEntry(counter, obj, tech, date, operationId) {
   // Намери предишния запис за обекта — максималния брояч преди текущия
@@ -2047,12 +2054,22 @@ function closeEditCfModal() {
 
 async function saveEditCf() {
   if (!currentEditCfId) return;
+  // Защита срещу double-click
+  const editBtn = document.querySelector('button[onclick="saveEditCf()"]');
+  if (editBtn?.disabled) return;
+  if (editBtn) { 
+    editBtn.disabled = true; 
+    editBtn.dataset.origText = editBtn.innerHTML;
+    editBtn.innerHTML = '⏳ Запазва...';
+  }
+  const newTechId = parseInt(document.getElementById('editCfTech').value) || null;
+  const newTech = newTechId ? technicians.find(t => t.id === newTechId) : null;
   const cash = parseFloat(document.getElementById('editCfCash').value) || null;
   const counter = parseInt(document.getElementById('editCfCounter').value) || null;
 
   // Вземи текущия запис
   const { data: cf } = await db.from('cashflow').select('*').eq('id', currentEditCfId).is('deleted_at', null).single();
-  if (!cf) return;
+  if (!cf) { if (editBtn) { editBtn.disabled = false; editBtn.innerHTML = editBtn.dataset.origText || '✓ Запиши'; } return; }
 
   const obj = objects.find(o => o.id === cf.object_id);
   const update = {};
@@ -2091,7 +2108,7 @@ async function saveEditCf() {
     update.completed_at = new Date().toISOString();
   }
 
-  const { error } = await db.from('cashflow').update(update).eq('id', currentEditCfId);
+  const { error } = await db.from('cashflow').update(newTech ? { ...update, technician_id: newTechId, technician_name: newTech.name } : update).eq('id', currentEditCfId);
   if (error) { showToast('❌ ' + error.message, 'error'); return; }
 
   // Каскадно обнови следващите записи ако има брояч
@@ -2203,10 +2220,31 @@ async function saveEditCf() {
     }
   }
 
+  // Ако има смяна на техник - обнови operations и хедърите свързани с този cashflow
+  if (newTech) {
+    // Restock хедъра (cf.operation_id)
+    if (cf.operation_id) {
+      await db.from('operation_headers').update({ technician_id: newTechId, technician_name: newTech.name }).eq('id', cf.operation_id);
+      await db.from('operations').update({ technician_name: newTech.name }).eq('header_id', cf.operation_id);
+    }
+    // Cash_income хедъри свързани с cashflow
+    const { data: cashHdrs } = await db.from('operation_headers')
+      .select('id')
+      .eq('cashflow_id', currentEditCfId)
+      .eq('op_type', 'cash_income')
+      .is('deleted_at', null);
+    if (cashHdrs && cashHdrs.length > 0) {
+      const hdrIds = cashHdrs.map(h => h.id);
+      await db.from('operation_headers').update({ technician_id: newTechId, technician_name: newTech.name }).in('id', hdrIds);
+      await db.from('operations').update({ technician_name: newTech.name }).in('header_id', hdrIds);
+    }
+  }
+
   closeEditCfModal();
   showToast('✅ Записът е обновен!', 'success');
   loadCashflow();
   if (typeof loadRestockHistory === 'function') loadRestockHistory();
+  if (editBtn) { editBtn.disabled = false; editBtn.innerHTML = editBtn.dataset.origText || '✓ Запиши'; }
 }
 
 async function recalcNextCashflow(objectId, fromDate, newPrevCounter, fromId) {
@@ -3348,7 +3386,15 @@ async function saveFinance() {
   // Защита срещу double-click
   const finBtn = document.querySelector('button[onclick="saveFinance()"]');
   if (finBtn?.disabled) return;
-  if (finBtn) { finBtn.disabled = true; setTimeout(() => { if (finBtn) finBtn.disabled = false; }, 5000); }
+  let _finOrigText = '';
+  if (finBtn) { 
+    finBtn.disabled = true; 
+    _finOrigText = finBtn.innerHTML;
+    finBtn.innerHTML = '⏳ Запазва...';
+  }
+  const reenableFin = () => {
+    if (finBtn) { finBtn.disabled = false; finBtn.innerHTML = _finOrigText || '✓ Запиши'; }
+  };
 
   const objId = document.getElementById('finObjectSelect').value;
   const techId = document.getElementById('finTechSelect').value;
@@ -3443,6 +3489,7 @@ async function saveFinance() {
   if (finDateEl) finDateEl.value = getLocalDateString();
   loadTxHistory();
   window.scrollTo(0, 0);
+  reenableFin();
 }
 
 async function loadTxHistory() {
@@ -4279,10 +4326,15 @@ async function saveCapital() {
   // Защита срещу double-click
   const capBtn = document.querySelector('button[onclick="saveCapital()"]');
   if (capBtn?.disabled) return;
+  let _capOrigText = '';
   if (capBtn) {
     capBtn.disabled = true;
-    setTimeout(() => { if (capBtn) capBtn.disabled = false; }, 5000);
+    _capOrigText = capBtn.innerHTML;
+    capBtn.innerHTML = '⏳ Запазва...';
   }
+  const reenableCap = () => {
+    if (capBtn) { capBtn.disabled = false; capBtn.innerHTML = _capOrigText || '✓ Запиши'; }
+  };
   // Провери дали вече има opening_balance (трябва да е единствен!)
   const { data: existingOB } = await db.from('operation_headers')
     .select('id')
@@ -4291,7 +4343,7 @@ async function saveCapital() {
     .limit(1);
   if (existingOB && existingOB.length > 0) {
     showToast('⚠️ Вече има начално салдо. Изтрий го преди да създадеш ново.', 'error');
-    if (capBtn) capBtn.disabled = false;
+    reenableCap();
     return;
   }
   const date = document.getElementById('capitalDate').value;
@@ -4390,6 +4442,7 @@ async function saveCapital() {
 
   showToast('✅ Началното салдо е записано!', 'success');
   closeCapitalModal();
+  reenableCap();
 }
 
 async function loadUnknownRoutes() {
