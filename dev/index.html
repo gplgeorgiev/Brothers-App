@@ -1008,7 +1008,10 @@ input.qty-big-input {
   <div class="card" id="statsCategories" style="padding:12px 14px;"></div>
   <div class="section-label" style="margin-top:24px">Графики</div>
   <div class="card" id="statsCharts" style="padding:12px 14px;"></div>
-  <div class="section-label" style="margin-top:24px">По обект</div>
+  <div class="section-label" style="margin-top:24px; display:flex; justify-content:space-between; align-items:center;">
+    <span>По обект</span>
+    <button onclick="exportStatsByObject()" style="padding:5px 10px; border-radius:7px; border:1px solid var(--accent); background:transparent; color:var(--accent); font-size:11px; font-weight:700; cursor:pointer; font-family:var(--font); text-transform:none; letter-spacing:0;">📥 CSV</button>
+  </div>
   <div id="objectStats" style="padding-bottom:120px;"></div>
 </div>
 
@@ -3752,7 +3755,7 @@ async function loadBalanceSummary() {
       </div>
     </div>
     <div class="card">
-      <div style="font-size:11px; font-weight:700; letter-spacing:1px; color:var(--text3); text-transform:uppercase; margin-bottom:10px;">По техник (каса)</div>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;"><div style="font-size:11px; font-weight:700; letter-spacing:1px; color:var(--text3); text-transform:uppercase;">По техник (каса)</div><button onclick="exportCashByTechnician()" style="padding:4px 8px; border-radius:6px; border:1px solid var(--accent); background:transparent; color:var(--accent); font-size:10px; font-weight:700; cursor:pointer; font-family:var(--font); text-transform:none;">📥 CSV</button></div>
       ${Object.entries(byTech).map(([name, bal]) => {
         const safeId = btoa(unescape(encodeURIComponent(name))).replace(/[^a-zA-Z0-9]/g, '_').substring(0, 30);
         const moves = (movesByTech[name] || []).sort((a, b) => (a.date || '').localeCompare(b.date || ''));
@@ -5658,6 +5661,267 @@ function renderStatsCharts(sorted, drinksByObj, stackedByObj, objsForStats, date
   }
 
   wrap.innerHTML = pieHtml + barsHtml + stackedHtml + targetHtml;
+}
+
+
+// === CSV EXPORT ===
+function downloadCSV(filename, rows) {
+  // BOM за UTF-8 (за кирилица в Excel)
+  const BOM = '\ufeff';
+  // Escape: ако стойност съдържа ; или " или нов ред → обвий в кавички
+  const escape = (val) => {
+    if (val === null || val === undefined) return '';
+    const str = String(val);
+    if (str.includes(';') || str.includes('"') || str.includes('\n')) {
+      return '"' + str.replace(/"/g, '""') + '"';
+    }
+    return str;
+  };
+  const csv = BOM + rows.map(row => row.map(escape).join(';')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+async function exportStatsByObject() {
+  const dateFrom = document.getElementById('statsDateFrom')?.value || '';
+  const dateTo = document.getElementById('statsDateTo')?.value || '';
+  const objFilter = document.getElementById('statsObjFilter')?.value || '';
+  
+  // Headers + summary rows
+  const rows = [];
+  rows.push(['Приходи и Разходи по обекти']);
+  rows.push(['Период от:', dateFrom, 'до:', dateTo]);
+  if (objFilter) rows.push(['Филтър обект:', objFilter]);
+  rows.push([]);
+  rows.push(['Обект', 'Приход (EUR)', 'Разход (EUR)', 'Резултат (EUR)']);
+
+  // Зареди обектите и operations за обобщение
+  const { data: objsForStats } = await db.from('objects').select('id, name, rent').is('deleted_at', null);
+  const { data: excludedAccs } = await db.from('accounts').select('code').eq('exclude_from_stats', true).is('deleted_at', null);
+  const excludedSet = new Set((excludedAccs || []).map(a => a.code));
+  const { data: vehs } = await db.from('vehicles').select('id, fuel_consumption, fuel_price').is('deleted_at', null);
+  const vehMap = new Map((vehs || []).map(v => [v.id, v]));
+  const { data: hdrsForStats } = await db.from('operation_headers')
+    .select('id, date, object_name, km, vehicle_id, op_type')
+    .gte('date', dateFrom).lte('date', dateTo)
+    .in('op_type', ['restock', 'service'])
+    .is('deleted_at', null);
+  const { data: ops } = await db.from('operations')
+    .select('account_code, amount, entry_type, object_name, product_name, header_id, operation_headers!inner(date, op_type, deleted_at, object_name, contractor, comment, document_ref)')
+    .gte('operation_headers.date', dateFrom)
+    .lte('operation_headers.date', dateTo)
+    .is('deleted_at', null);
+
+  let validOps = (ops || []).filter(o => !o.operation_headers?.deleted_at);
+  if (objFilter) validOps = validOps.filter(o => (o.object_name || o.operation_headers?.object_name) === objFilter);
+
+  // Начислени fuel и rent
+  const fuelByObj = {};
+  (hdrsForStats || []).forEach(h => {
+    if (!h.km || !h.vehicle_id) return;
+    if (objFilter && h.object_name !== objFilter) return;
+    const v = vehMap.get(h.vehicle_id);
+    if (!v || !v.fuel_consumption || !v.fuel_price) return;
+    fuelByObj[h.object_name] = (fuelByObj[h.object_name] || 0) + h.km * (v.fuel_consumption / 100) * v.fuel_price;
+  });
+
+  function calcRent(monthlyRent, fromStr, toStr) {
+    if (!monthlyRent || monthlyRent <= 0) return 0;
+    const from = new Date(fromStr); const to = new Date(toStr);
+    let total = 0;
+    let cursor = new Date(from.getFullYear(), from.getMonth(), 1);
+    while (cursor <= to) {
+      const year = cursor.getFullYear(); const month = cursor.getMonth();
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+      const monthStart = new Date(year, month, 1); const monthEnd = new Date(year, month + 1, 0);
+      const ps = from > monthStart ? from : monthStart;
+      const pe = to < monthEnd ? to : monthEnd;
+      const dp = Math.floor((pe - ps) / 86400000) + 1;
+      total += monthlyRent * (dp / daysInMonth);
+      cursor = new Date(year, month + 1, 1);
+    }
+    return total;
+  }
+
+  const byObj = {};
+  (objsForStats || []).forEach(o => {
+    if (objFilter && o.name !== objFilter) return;
+    byObj[o.name] = { income: 0, expense: 0 };
+    if (o.rent > 0) byObj[o.name].expense += calcRent(o.rent, dateFrom, dateTo);
+  });
+  Object.entries(fuelByObj).forEach(([name, fuel]) => {
+    if (byObj[name]) byObj[name].expense += fuel;
+  });
+  validOps.forEach(op => {
+    const objName = op.object_name || op.operation_headers?.object_name || '—';
+    if (!byObj[objName]) byObj[objName] = { income: 0, expense: 0 };
+    const acc = op.account_code || '';
+    if (excludedSet.has(acc)) return;
+    const amt = op.amount || 0;
+    if (acc.startsWith('7')) {
+      byObj[objName].income += op.entry_type === 'C' ? amt : -amt;
+    } else if (acc.startsWith('6')) {
+      byObj[objName].expense += op.entry_type === 'D' ? amt : -amt;
+    }
+  });
+
+  const sorted = Object.entries(byObj)
+    .filter(([, s]) => s.income > 0 || s.expense > 0)
+    .sort((a, b) => (b[1].income - b[1].expense) - (a[1].income - a[1].expense));
+  
+  let totalIncome = 0, totalExpense = 0;
+  sorted.forEach(([name, s]) => {
+    rows.push([name, s.income.toFixed(2), s.expense.toFixed(2), (s.income - s.expense).toFixed(2)]);
+    totalIncome += s.income;
+    totalExpense += s.expense;
+  });
+  rows.push(['ОБЩО', totalIncome.toFixed(2), totalExpense.toFixed(2), (totalIncome - totalExpense).toFixed(2)]);
+  
+  // Детайли по обект
+  rows.push([]);
+  rows.push(['ДЕТАЙЛИ ПО ОБЕКТ']);
+  rows.push(['Обект', 'Дата', 'Тип', 'Сметка', 'Контрагент', 'Документ', 'Коментар', 'Сума', 'D/C']);
+
+  const opLabels = {
+    'restock': 'Зареждане',
+    'cash_income': 'Cash отчет',
+    'finance_expense': 'Разход',
+    'finance_income': 'Приход',
+    'opening_balance': 'Нач. салдо',
+    'service': 'Сервиз'
+  };
+
+  // Накачи имена на сметки
+  const { data: accs } = await db.from('accounts').select('code, name').is('deleted_at', null);
+  const accNames = new Map((accs || []).map(a => [a.code, a.name]));
+
+  sorted.forEach(([objName]) => {
+    const objOps = validOps
+      .filter(o => (o.object_name || o.operation_headers?.object_name) === objName)
+      .filter(o => !excludedSet.has(o.account_code || ''))
+      .filter(o => (o.account_code || '').startsWith('6') || (o.account_code || '').startsWith('7'))
+      .sort((a, b) => (a.operation_headers?.date || '').localeCompare(b.operation_headers?.date || ''));
+    objOps.forEach(o => {
+      rows.push([
+        objName,
+        o.operation_headers?.date || '',
+        opLabels[o.operation_headers?.op_type] || o.operation_headers?.op_type || '',
+        (o.account_code || '') + ' ' + (accNames.get(o.account_code) || ''),
+        o.operation_headers?.contractor || '',
+        o.operation_headers?.document_ref || '',
+        o.operation_headers?.comment || '',
+        (o.amount || 0).toFixed(2),
+        o.entry_type
+      ]);
+    });
+  });
+
+  downloadCSV(`stats_obects_${dateFrom}_${dateTo}.csv`, rows);
+}
+
+async function exportCashByTechnician() {
+  const dateFrom = document.getElementById('statsDateFrom')?.value || '';
+  const dateTo = document.getElementById('statsDateTo')?.value || '';
+  const rows = [];
+  rows.push(['Каса по техници']);
+  rows.push(['Период от:', dateFrom, 'до:', dateTo]);
+  rows.push([]);
+
+  const { data } = await db.from('operations')
+    .select('account_code, amount, technician_name, entry_type, header_id, operation_headers!inner(date, payment_method, op_type, deleted_at, object_name, comment, contractor)')
+    .eq('account_code', '50101')
+    .is('deleted_at', null);
+
+  const cashOps = (data || []).filter(o => !o.operation_headers?.deleted_at);
+
+  // Категория от партньорския 6xxx/7xxx ред
+  const headerIds = [...new Set(cashOps.map(o => o.header_id).filter(Boolean))];
+  const categoryByHeader = {};
+  if (headerIds.length > 0) {
+    const { data: catOps } = await db.from('operations')
+      .select('header_id, account_code, product_name')
+      .in('header_id', headerIds)
+      .is('deleted_at', null);
+    (catOps || []).forEach(o => {
+      const acc = o.account_code || '';
+      if ((acc.startsWith('6') || acc.startsWith('7')) && !categoryByHeader[o.header_id]) {
+        categoryByHeader[o.header_id] = o.product_name;
+      }
+    });
+  }
+
+  const opLabels = {
+    'restock': 'Зареждане',
+    'cash_income': 'Cash отчет',
+    'finance_expense': 'Разход',
+    'finance_income': 'Приход',
+    'opening_balance': 'Нач. салдо',
+    'service': 'Сервиз'
+  };
+
+  // Балансиране
+  const byTech = {};
+  const startBalByTech = {};
+  cashOps.forEach(o => {
+    const name = o.technician_name || 'Неизвестен';
+    if (!byTech[name]) { byTech[name] = 0; startBalByTech[name] = 0; }
+    const sign = o.entry_type === 'D' ? 1 : -1;
+    const amt = (o.amount || 0) * sign;
+    byTech[name] += amt;
+    const opDate = o.operation_headers?.date;
+    if (opDate && dateFrom && opDate < dateFrom) startBalByTech[name] += amt;
+  });
+  
+  rows.push(['Техник', 'Начално салдо', 'Оборот в периода', 'Текущ баланс']);
+  Object.entries(byTech).forEach(([name, bal]) => {
+    const start = startBalByTech[name] || 0;
+    const period = cashOps
+      .filter(o => o.technician_name === name)
+      .filter(o => {
+        const d = o.operation_headers?.date;
+        return d && (!dateFrom || d >= dateFrom) && (!dateTo || d <= dateTo);
+      })
+      .reduce((s, o) => s + (o.amount || 0) * (o.entry_type === 'D' ? 1 : -1), 0);
+    rows.push([name, start.toFixed(2), period.toFixed(2), bal.toFixed(2)]);
+  });
+
+  rows.push([]);
+  rows.push(['ДЕТАЙЛИ - ДВИЖЕНИЯ В ПЕРИОДА']);
+  rows.push(['Техник', 'Дата', 'Операция', 'Обект', 'Категория', 'Контрагент', 'Коментар', 'Сума']);
+  
+  Object.keys(byTech).forEach(techName => {
+    const moves = cashOps
+      .filter(o => o.technician_name === techName)
+      .filter(o => {
+        const d = o.operation_headers?.date;
+        return d && (!dateFrom || d >= dateFrom) && (!dateTo || d <= dateTo);
+      })
+      .sort((a, b) => (a.operation_headers?.date || '').localeCompare(b.operation_headers?.date || ''));
+    
+    moves.forEach(o => {
+      const sign = o.entry_type === 'D' ? 1 : -1;
+      const amt = (o.amount || 0) * sign;
+      rows.push([
+        techName,
+        o.operation_headers?.date || '',
+        opLabels[o.operation_headers?.op_type] || o.operation_headers?.op_type || '',
+        o.operation_headers?.object_name || '',
+        categoryByHeader[o.header_id] || '',
+        o.operation_headers?.contractor || '',
+        o.operation_headers?.comment || '',
+        amt.toFixed(2)
+      ]);
+    });
+  });
+
+  downloadCSV(`cash_by_tech_${dateFrom}_${dateTo}.csv`, rows);
 }
 
 </script>
