@@ -2042,6 +2042,12 @@ async function openEditCfModal(id) {
   document.getElementById('editCfTitle').textContent = `✏️ ${data.object_name} · ${data.date}`;
   document.getElementById('editCfCounter').value = data.counter || '';
   document.getElementById('editCfCash').value = data.cash || '';
+  // Попълни dropdown за техник
+  const techSel = document.getElementById('editCfTech');
+  if (techSel && technicians && technicians.length > 0) {
+    techSel.innerHTML = '<option value="">—</option>' + 
+      technicians.map(t => `<option value="${t.id}" ${t.id === data.technician_id ? 'selected' : ''}>${t.name}</option>`).join('');
+  }
   document.getElementById('editCfModal').style.display = 'flex';
   setTimeout(() => document.getElementById('editCfCash').focus(), 100);
 }
