@@ -5671,7 +5671,11 @@ function downloadCSV(filename, rows) {
   // Escape: ако стойност съдържа ; или " или нов ред → обвий в кавички
   const escape = (val) => {
     if (val === null || val === undefined) return '';
-    const str = String(val);
+    let str = String(val);
+    // Ако е число (формат -0.00 или 0.00) → замени точка със запетая (BG Excel)
+    if (/^-?\d+\.\d+$/.test(str)) {
+      str = str.replace('.', ',');
+    }
     if (str.includes(';') || str.includes('"') || str.includes('\n')) {
       return '"' + str.replace(/"/g, '""') + '"';
     }
@@ -5787,7 +5791,7 @@ async function exportStatsByObject() {
   // Детайли по обект
   rows.push([]);
   rows.push(['ДЕТАЙЛИ ПО ОБЕКТ']);
-  rows.push(['Обект', 'Дата', 'Тип', 'Сметка', 'Контрагент', 'Документ', 'Коментар', 'Сума', 'D/C']);
+  rows.push(['Обект', 'Дата', 'Тип', 'Категория', 'Контрагент', 'Документ', 'Коментар', 'Сума']);
 
   const opLabels = {
     'restock': 'Зареждане',
@@ -5809,16 +5813,21 @@ async function exportStatsByObject() {
       .filter(o => (o.account_code || '').startsWith('6') || (o.account_code || '').startsWith('7'))
       .sort((a, b) => (a.operation_headers?.date || '').localeCompare(b.operation_headers?.date || ''));
     objOps.forEach(o => {
+      const isIncome = (o.account_code || '').startsWith('7');
+      const signedAmt = isIncome
+        ? (o.entry_type === 'C' ? (o.amount || 0) : -(o.amount || 0))
+        : (o.entry_type === 'D' ? (o.amount || 0) : -(o.amount || 0));
+      // Приходи положителни, разходи отрицателни
+      const finalAmt = isIncome ? signedAmt : -signedAmt;
       rows.push([
         objName,
         o.operation_headers?.date || '',
         opLabels[o.operation_headers?.op_type] || o.operation_headers?.op_type || '',
-        (o.account_code || '') + ' ' + (accNames.get(o.account_code) || ''),
+        accNames.get(o.account_code) || '',
         o.operation_headers?.contractor || '',
         o.operation_headers?.document_ref || '',
         o.operation_headers?.comment || '',
-        (o.amount || 0).toFixed(2),
-        o.entry_type
+        finalAmt.toFixed(2)
       ]);
     });
   });
