@@ -782,6 +782,20 @@ input.qty-big-input {
   <!-- История -->
   <div style="margin-top:72px; padding-top:48px; border-top:2px solid var(--border);"></div><div class="section-label" style="margin-top:0">Последни транзакции</div>
   <div class="card" style="margin-bottom:8px; padding:10px 14px;">
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px;">
+      <button onclick="setTxPeriodCurrent()" style="padding:8px; border-radius:8px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:12px; font-weight:700; cursor:pointer; font-family:var(--font);">📅 Текущ месец</button>
+      <button onclick="setTxPeriodPrevious()" style="padding:8px; border-radius:8px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:12px; font-weight:700; cursor:pointer; font-family:var(--font);">📅 Предходен месец</button>
+    </div>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px;">
+      <div class="field" style="margin-bottom:0;">
+        <label>ДАТА ОТ</label>
+        <input type="date" id="txFilterDateFrom" onchange="loadTxHistory()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; font-family:var(--font);">
+      </div>
+      <div class="field" style="margin-bottom:0;">
+        <label>ДО</label>
+        <input type="date" id="txFilterDateTo" onchange="loadTxHistory()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; font-family:var(--font);">
+      </div>
+    </div>
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px;">
       <div class="field" style="margin-bottom:0;">
         <label>ТИП</label>
@@ -805,20 +819,6 @@ input.qty-big-input {
         <option value="cash">Каса</option>
         <option value="bank">Банка</option>
       </select>
-    </div>
-    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
-      <div class="field" style="margin-bottom:0;">
-        <label>ДАТА ОТ</label>
-        <input type="date" id="txFilterDateFrom" onchange="loadTxHistory()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; font-family:var(--font);">
-      </div>
-      <div class="field" style="margin-bottom:0;">
-        <label>ДО</label>
-        <input type="date" id="txFilterDateTo" onchange="loadTxHistory()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; font-family:var(--font);">
-      </div>
-    </div>
-    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:8px; margin-bottom:10px;">
-      <button onclick="setTxPeriodCurrent()" style="padding:8px; border-radius:8px; border:1px solid var(--accent); background:transparent; color:var(--accent); font-size:12px; font-weight:700; cursor:pointer; font-family:var(--font);">Текущ месец</button>
-      <button onclick="setTxPeriodPrevious()" style="padding:8px; border-radius:8px; border:1px solid var(--border); background:transparent; color:var(--text2); font-size:12px; font-weight:700; cursor:pointer; font-family:var(--font);">Предходен месец</button>
     </div>
     <div class="field" style="margin-bottom:0;">
       <label>ОБЕКТ</label>
@@ -1002,6 +1002,10 @@ input.qty-big-input {
   <div class="section-label" style="margin-top:20px">Период</div>
   <div class="card" style="padding:10px 14px;">
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px;">
+      <button onclick="statsResetMonth()" style="padding:8px; border-radius:8px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:12px; font-weight:700; cursor:pointer; font-family:var(--font);">📅 Текущ месец</button>
+      <button onclick="statsPreviousMonth()" style="padding:8px; border-radius:8px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:12px; font-weight:700; cursor:pointer; font-family:var(--font);">📅 Предходен месец</button>
+    </div>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px;">
       <div class="field" style="margin-bottom:0;">
         <label>ДАТА ОТ</label>
         <input type="date" id="statsDateFrom" onchange="loadStats(); loadBalanceSummary();" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; font-family:var(--font);">
@@ -1010,10 +1014,6 @@ input.qty-big-input {
         <label>ДО</label>
         <input type="date" id="statsDateTo" onchange="loadStats(); loadBalanceSummary();" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; font-family:var(--font);">
       </div>
-    </div>
-    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px;">
-      <button onclick="statsResetMonth()" style="padding:8px; border-radius:8px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:12px; font-weight:700; cursor:pointer; font-family:var(--font);">📅 Текущ месец</button>
-      <button onclick="statsPreviousMonth()" style="padding:8px; border-radius:8px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:12px; font-weight:700; cursor:pointer; font-family:var(--font);">📅 Предходен месец</button>
     </div>
     <div class="field" style="margin-bottom:0;">
       <label>ОБЕКТ</label>
@@ -3867,11 +3867,8 @@ async function loadBalanceSummary() {
           </div>
         </div>`;
       }).join('') || '<div style="color:var(--text3); font-size:13px;">Няма данни</div>'}
-    </div>
-    <div class="card" style="margin-top:8px;">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-        <div style="font-size:11px; font-weight:700; letter-spacing:1px; color:var(--text3); text-transform:uppercase;">Банка</div>
-      </div>
+      <div style="border-top:1px dashed var(--border); margin:12px 0 10px;"></div>
+      <div style="font-size:11px; font-weight:700; letter-spacing:1px; color:var(--text3); text-transform:uppercase; margin-bottom:10px;">Банка</div>
       <div id="bankCard">
         <div class="info-row" style="cursor:pointer;" onclick="toggleBankDetails()">
           <span class="key">🏦 Общ баланс <span id="bankArrow" style="font-size:10px; color:var(--text2);">▼</span></span>
