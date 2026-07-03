@@ -315,6 +315,13 @@ input.qty-big-input {
 .custom-checkbox:hover {
   border-color: var(--accent);
 }
+
+/* Скрий labels за филтри в Статистика и Финанси (label-ите са inline в placeholder-ите) */
+#page-stats .card .field > label,
+#page-finance .card .field > label {
+  font-size: 9px !important;
+  letter-spacing: 0.5px !important;
+}
 </style>
 </head>
 <body>
@@ -782,8 +789,8 @@ input.qty-big-input {
   <div style="margin-top:72px; padding-top:48px; border-top:2px solid var(--border);"></div><div class="section-label" style="margin-top:0">Последни транзакции</div>
   <div class="card" style="margin-bottom:8px; padding:10px 14px;">
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px;">
-      <button onclick="setTxPeriodCurrent()" style="padding:8px; border-radius:8px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:12px; font-weight:700; cursor:pointer; font-family:var(--font);">📅 Текущ месец</button>
-      <button onclick="setTxPeriodPrevious()" style="padding:8px; border-radius:8px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:12px; font-weight:700; cursor:pointer; font-family:var(--font);">📅 Предходен месец</button>
+      <button onclick="setTxPeriodCurrent()" style="padding:8px; border-radius:8px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:14px; font-weight:700; cursor:pointer; font-family:var(--font);">📅 Текущ месец</button>
+      <button onclick="setTxPeriodPrevious()" style="padding:8px; border-radius:8px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:14px; font-weight:700; cursor:pointer; font-family:var(--font);">📅 Предходен месец</button>
     </div>
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px;">
       <div class="field" style="margin-bottom:0;">
@@ -796,35 +803,23 @@ input.qty-big-input {
       </div>
     </div>
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px;">
-      <div class="field" style="margin-bottom:0;">
-        <label>ТИП</label>
-        <select id="txFilterType" onchange="onTxTypeChange()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; appearance:none; font-family:var(--font);">
-          <option value="">Всички</option>
-          <option value="income">Приходи</option>
-          <option value="expense">Разходи</option>
-        </select>
-      </div>
-      <div class="field" style="margin-bottom:0;">
-        <label>КАТЕГОРИЯ</label>
-        <select id="txFilterCategory" onchange="loadTxHistory()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; appearance:none; font-family:var(--font);">
-          <option value="">Всички</option>
-        </select>
-      </div>
-    </div>
-    <div class="field" style="margin-bottom:10px;">
-      <label>НАЧИН НА ПЛАЩАНЕ</label>
-      <select id="txFilterPayment" onchange="loadTxHistory()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; appearance:none; font-family:var(--font);">
-        <option value="">Всички</option>
-        <option value="cash">Каса</option>
-        <option value="bank">Банка</option>
+      <select id="txFilterType" onchange="onTxTypeChange()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; appearance:none; font-family:var(--font);">
+        <option value="">Тип: Всички</option>
+        <option value="income">Приходи</option>
+        <option value="expense">Разходи</option>
+      </select>
+      <select id="txFilterCategory" onchange="loadTxHistory()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; appearance:none; font-family:var(--font);">
+        <option value="">Категория: Всички</option>
       </select>
     </div>
-    <div class="field" style="margin-bottom:0;">
-      <label>ОБЕКТ</label>
-      <select id="txFilterObject" onchange="loadTxHistory()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; appearance:none; font-family:var(--font);">
-        <option value="">Всички</option>
-      </select>
-    </div>
+    <select id="txFilterPayment" onchange="loadTxHistory()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; appearance:none; font-family:var(--font); margin-bottom:10px;">
+      <option value="">Начин на плащане: Всички</option>
+      <option value="cash">Каса</option>
+      <option value="bank">Банка</option>
+    </select>
+    <select id="txFilterObject" onchange="loadTxHistory()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; appearance:none; font-family:var(--font);">
+      <option value="">Обект: Всички</option>
+    </select>
   </div>
   <div id="txHistory"><div class="loading"><div class="spinner"></div></div></div>
 </div>
@@ -1001,8 +996,8 @@ input.qty-big-input {
   <div class="section-label" style="margin-top:20px">Период</div>
   <div class="card" style="padding:10px 14px;">
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px;">
-      <button onclick="statsResetMonth()" style="padding:8px; border-radius:8px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:12px; font-weight:700; cursor:pointer; font-family:var(--font);">📅 Текущ месец</button>
-      <button onclick="statsPreviousMonth()" style="padding:8px; border-radius:8px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:12px; font-weight:700; cursor:pointer; font-family:var(--font);">📅 Предходен месец</button>
+      <button onclick="statsResetMonth()" style="padding:8px; border-radius:8px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:14px; font-weight:700; cursor:pointer; font-family:var(--font);">📅 Текущ месец</button>
+      <button onclick="statsPreviousMonth()" style="padding:8px; border-radius:8px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:14px; font-weight:700; cursor:pointer; font-family:var(--font);">📅 Предходен месец</button>
     </div>
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px;">
       <div class="field" style="margin-bottom:0;">
@@ -1014,12 +1009,9 @@ input.qty-big-input {
         <input type="date" id="statsDateTo" onchange="loadStats(); loadBalanceSummary();" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; font-family:var(--font);">
       </div>
     </div>
-    <div class="field" style="margin-bottom:0;">
-      <label>ОБЕКТ</label>
-      <select id="statsObjFilter" onchange="loadStats()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; appearance:none; font-family:var(--font);">
-        <option value="">Всички</option>
-      </select>
-    </div>
+    <select id="statsObjFilter" onchange="loadStats()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; appearance:none; font-family:var(--font);">
+      <option value="">Обект: Всички</option>
+    </select>
   </div>
 
   <div class="section-label" id="statsPeriodLabel" style="margin-top:20px">Текущ месец</div>
@@ -1296,7 +1288,7 @@ async function loadObjects() {
   // txFilterObject (във Финанси)
   const txObjSel = document.getElementById('txFilterObject');
   if (txObjSel) {
-    txObjSel.innerHTML = '<option value="">Всички</option>';
+    txObjSel.innerHTML = '<option value="">Обект: Всички</option>';
     data.forEach(o => {
       const opt = document.createElement('option');
       opt.value = o.id; opt.textContent = o.name; txObjSel.appendChild(opt);
@@ -3377,6 +3369,17 @@ function getGPSFinance() {
 }
 
 async function loadFinance() {
+  // По подразбиране - текущ месец
+  const dateFromEl = document.getElementById('txFilterDateFrom');
+  const dateToEl = document.getElementById('txFilterDateTo');
+  if (dateFromEl && !dateFromEl.value) {
+    const now = new Date();
+    const first = new Date(now.getFullYear(), now.getMonth(), 1);
+    const last = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    const fmt = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    dateFromEl.value = fmt(first);
+    if (dateToEl) dateToEl.value = fmt(last);
+  }
   await Promise.all([loadTxHistory(), populateFinanceSelects()]);
   renderFinCategories();
 }
@@ -3866,8 +3869,10 @@ async function loadBalanceSummary() {
           </div>
         </div>`;
       }).join('') || '<div style="color:var(--text3); font-size:13px;">Няма данни</div>'}
-      <div style="border-top:1px dashed var(--border); margin:12px 0 10px;"></div>
-      <div style="font-size:11px; font-weight:700; letter-spacing:1px; color:var(--text3); text-transform:uppercase; margin-bottom:10px;">Банка</div>
+      <div style="margin-top:12px; display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+        <div style="font-size:11px; font-weight:700; letter-spacing:1px; color:var(--text3); text-transform:uppercase;">Банка</div>
+        <button onclick="exportBankMovements()" style="padding:4px 8px; border-radius:6px; border:1px solid var(--accent); background:transparent; color:var(--accent); font-size:10px; font-weight:700; cursor:pointer; font-family:var(--font); text-transform:none;">📥 CSV</button>
+      </div>
       <div id="bankCard">
         <div class="info-row" style="cursor:pointer;" onclick="toggleBankDetails()">
           <span class="key">🏦 Общ баланс <span id="bankArrow" style="font-size:10px; color:var(--text2);">▼</span></span>
@@ -5281,7 +5286,7 @@ async function onTxTypeChange() {
   const type = document.getElementById('txFilterType').value;
   const catSel = document.getElementById('txFilterCategory');
   if (!catSel) return;
-  catSel.innerHTML = '<option value="">Всички</option>';
+  catSel.innerHTML = '<option value="">Категория: Всички</option>';
   if (type) {
     // Зареди категории от accounts: 7xxx за income, 6xxx за expense
     const codePrefix = type === 'income' ? '7' : '6';
@@ -5303,7 +5308,7 @@ async function onTxTypeChange() {
 async function populateTxFilterObject() {
   const sel = document.getElementById('txFilterObject');
   if (!sel) return;
-  sel.innerHTML = '<option value="">Всички</option>';
+  sel.innerHTML = '<option value="">Обект: Всички</option>';
   (objects || []).forEach(o => {
     const opt = document.createElement('option');
     opt.value = o.id;
