@@ -782,12 +782,6 @@ input.qty-big-input {
   <!-- История -->
   <div style="margin-top:72px; padding-top:48px; border-top:2px solid var(--border);"></div><div class="section-label" style="margin-top:0">Последни транзакции</div>
   <div class="card" style="margin-bottom:8px; padding:10px 14px;">
-    <div class="field" style="margin-bottom:10px;">
-      <label>ОБЕКТ</label>
-      <select id="txFilterObject" onchange="loadTxHistory()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; appearance:none; font-family:var(--font);">
-        <option value="">Всички</option>
-      </select>
-    </div>
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px;">
       <div class="field" style="margin-bottom:0;">
         <label>ТИП</label>
@@ -804,6 +798,14 @@ input.qty-big-input {
         </select>
       </div>
     </div>
+    <div class="field" style="margin-bottom:10px;">
+      <label>НАЧИН НА ПЛАЩАНЕ</label>
+      <select id="txFilterPayment" onchange="loadTxHistory()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; appearance:none; font-family:var(--font);">
+        <option value="">Всички</option>
+        <option value="cash">Каса</option>
+        <option value="bank">Банка</option>
+      </select>
+    </div>
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
       <div class="field" style="margin-bottom:0;">
         <label>ДАТА ОТ</label>
@@ -813,6 +815,16 @@ input.qty-big-input {
         <label>ДО</label>
         <input type="date" id="txFilterDateTo" onchange="loadTxHistory()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; font-family:var(--font);">
       </div>
+    </div>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:8px; margin-bottom:10px;">
+      <button onclick="setTxPeriodCurrent()" style="padding:8px; border-radius:8px; border:1px solid var(--accent); background:transparent; color:var(--accent); font-size:12px; font-weight:700; cursor:pointer; font-family:var(--font);">Текущ месец</button>
+      <button onclick="setTxPeriodPrevious()" style="padding:8px; border-radius:8px; border:1px solid var(--border); background:transparent; color:var(--text2); font-size:12px; font-weight:700; cursor:pointer; font-family:var(--font);">Предходен месец</button>
+    </div>
+    <div class="field" style="margin-bottom:0;">
+      <label>ОБЕКТ</label>
+      <select id="txFilterObject" onchange="loadTxHistory()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; appearance:none; font-family:var(--font);">
+        <option value="">Всички</option>
+      </select>
     </div>
   </div>
   <div id="txHistory"><div class="loading"><div class="spinner"></div></div></div>
@@ -999,7 +1011,10 @@ input.qty-big-input {
         <input type="date" id="statsDateTo" onchange="loadStats(); loadBalanceSummary();" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; font-family:var(--font);">
       </div>
     </div>
-    <button onclick="statsResetMonth()" style="width:100%; padding:8px; border-radius:8px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:12px; font-weight:700; cursor:pointer; font-family:var(--font); margin-bottom:8px;">📅 Текущ месец</button>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px;">
+      <button onclick="statsResetMonth()" style="padding:8px; border-radius:8px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:12px; font-weight:700; cursor:pointer; font-family:var(--font);">📅 Текущ месец</button>
+      <button onclick="statsPreviousMonth()" style="padding:8px; border-radius:8px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:12px; font-weight:700; cursor:pointer; font-family:var(--font);">📅 Предходен месец</button>
+    </div>
     <div class="field" style="margin-bottom:0;">
       <label>ОБЕКТ</label>
       <select id="statsObjFilter" onchange="loadStats()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; appearance:none; font-family:var(--font);">
@@ -3164,7 +3179,7 @@ function switchTab(tab) {
   if(tab==='service') loadService();
   if(tab==='settings') { loadUnknownRoutes(); loadTrashRetention(); loadThemeSetting(); }
   if(tab==='trash') loadTrash();
-  if(tab==='stats') loadStats();
+  if(tab==='stats') { loadStats(); loadBalanceSummary(); }
 }
 
 // ── HELPERS ──
@@ -3505,6 +3520,7 @@ async function loadTxHistory() {
   const typeFilter = document.getElementById('txFilterType')?.value || '';
   const categoryFilter = document.getElementById('txFilterCategory')?.value || '';
   const objectFilter = document.getElementById('txFilterObject')?.value || '';
+  const paymentFilter = document.getElementById('txFilterPayment')?.value || '';
   const dateFrom = document.getElementById('txFilterDateFrom')?.value || '';
   const dateTo = document.getElementById('txFilterDateTo')?.value || '';
 
@@ -3516,6 +3532,7 @@ async function loadTxHistory() {
     .order('created_at', { ascending: false })
     .limit(40);
   if (typeFilter === 'income') q = q.eq('op_type', 'finance_income');
+  if (paymentFilter) q = q.eq('payment_method', paymentFilter);
   if (objectFilter) q = q.eq('object_id', parseInt(objectFilter));
   if (typeFilter === 'expense') q = q.eq('op_type', 'finance_expense');
   if (dateFrom) q = q.gte('date', dateFrom);
@@ -3796,6 +3813,30 @@ async function loadBalanceSummary() {
     </div>`;
   };
 
+  // Банкови движения за drill-down
+  let bankStartBal = 0;
+  const bankMoves = [];
+  bankOps.forEach(o => {
+    const sign = o.entry_type === 'D' ? 1 : -1;
+    const amt = (o.amount || 0) * sign;
+    const opDate = o.operation_headers?.date;
+    if (opDate && periodFrom && opDate < periodFrom) {
+      bankStartBal += amt;
+    } else if (opDate && (!periodFrom || opDate >= periodFrom) && (!periodTo || opDate <= periodTo)) {
+      bankMoves.push({
+        date: opDate,
+        amount: amt,
+        op_type: o.operation_headers?.op_type,
+        object_name: o.operation_headers?.object_name,
+        category: categoryByHeader[o.header_id] || null,
+        contractor: o.operation_headers?.contractor,
+        comment: o.operation_headers?.comment
+      });
+    }
+  });
+  bankMoves.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+  const bankPeriodSum = bankMoves.reduce((s, m) => s + m.amount, 0);
+
   el.innerHTML = `
     <div class="stats-grid" style="margin-bottom:12px;">
       <div class="stat-card">
@@ -3826,7 +3867,31 @@ async function loadBalanceSummary() {
           </div>
         </div>`;
       }).join('') || '<div style="color:var(--text3); font-size:13px;">Няма данни</div>'}
+    </div>
+    <div class="card" style="margin-top:8px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+        <div style="font-size:11px; font-weight:700; letter-spacing:1px; color:var(--text3); text-transform:uppercase;">Банка</div>
+      </div>
+      <div id="bankCard">
+        <div class="info-row" style="cursor:pointer;" onclick="toggleBankDetails()">
+          <span class="key">🏦 Общ баланс <span id="bankArrow" style="font-size:10px; color:var(--text2);">▼</span></span>
+          <span class="val" style="color:${totalBank >= 0 ? 'var(--green)' : 'var(--red)'}">${totalBank.toFixed(2)} EUR</span>
+        </div>
+        <div id="bankDetails" style="display:none; padding:8px 0; border-top:1px dashed var(--border); margin-top:6px;">
+          <div style="font-size:11px; font-weight:700; color:var(--text2); margin-bottom:6px; display:flex; justify-content:space-between;"><span>🏁 Начално салдо:</span><span style="font-family:var(--mono); color:${bankStartBal >= 0 ? 'var(--green)' : 'var(--red)'};">${bankStartBal.toFixed(2)}</span></div>
+          ${bankMoves.length ? `<div style="font-size:11px; font-weight:700; color:var(--text2); margin-bottom:6px; display:flex; justify-content:space-between;"><span>📊 Оборот за периода:</span><span style="font-family:var(--mono); color:${bankPeriodSum >= 0 ? 'var(--green)' : 'var(--red)'};">${bankPeriodSum >= 0 ? '+' : ''}${bankPeriodSum.toFixed(2)}</span></div>${bankMoves.map(renderMove).join('')}` : '<div style="font-size:11px; color:var(--text3); font-style:italic;">Няма движения в периода</div>'}
+        </div>
+      </div>
     </div>`;
+}
+
+function toggleBankDetails() {
+  const el = document.getElementById('bankDetails');
+  const arrow = document.getElementById('bankArrow');
+  if (!el) return;
+  const visible = el.style.display !== 'none';
+  el.style.display = visible ? 'none' : 'block';
+  if (arrow) arrow.textContent = visible ? '▼' : '▲';
 }
 
 function toggleTechDetails(safeId) {
@@ -4341,17 +4406,7 @@ async function saveCapital() {
   const reenableCap = () => {
     if (capBtn) { capBtn.disabled = false; capBtn.innerHTML = _capOrigText || '✓ Запиши'; }
   };
-  // Провери дали вече има opening_balance (трябва да е единствен!)
-  const { data: existingOB } = await db.from('operation_headers')
-    .select('id')
-    .eq('op_type', 'opening_balance')
-    .is('deleted_at', null)
-    .limit(1);
-  if (existingOB && existingOB.length > 0) {
-    showToast('⚠️ Вече има начално салдо. Изтрий го преди да създадеш ново.', 'error');
-    reenableCap();
-    return;
-  }
+  // Проверката за единствен opening_balance е премахната
   const date = document.getElementById('capitalDate').value;
   if (!date) { showToast('Избери дата!', 'error'); return; }
 
@@ -5990,6 +6045,18 @@ async function exportCashByTechnician() {
   });
 
   downloadCSV(`cash_by_tech_${dateFrom}_${dateTo}.csv`, rows);
+}
+
+
+function statsPreviousMonth() {
+  const now = new Date();
+  const first = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const last = new Date(now.getFullYear(), now.getMonth(), 0);
+  const fmt = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  document.getElementById('statsDateFrom').value = fmt(first);
+  document.getElementById('statsDateTo').value = fmt(last);
+  loadStats();
+  loadBalanceSummary();
 }
 
 </script>
