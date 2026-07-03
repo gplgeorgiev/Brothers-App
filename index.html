@@ -6132,6 +6132,27 @@ async function exportBankMovements() {
   downloadCSV(`bank_movements_${dateFrom}_${dateTo}.csv`, rows);
 }
 
+
+function setTxPeriodCurrent() {
+  const now = new Date();
+  const first = new Date(now.getFullYear(), now.getMonth(), 1);
+  const last = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  const fmt = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  document.getElementById('txFilterDateFrom').value = fmt(first);
+  document.getElementById('txFilterDateTo').value = fmt(last);
+  loadTxHistory();
+}
+
+function setTxPeriodPrevious() {
+  const now = new Date();
+  const first = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const last = new Date(now.getFullYear(), now.getMonth(), 0);
+  const fmt = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  document.getElementById('txFilterDateFrom').value = fmt(first);
+  document.getElementById('txFilterDateTo').value = fmt(last);
+  loadTxHistory();
+}
+
 </script>
 <!-- BOTTOM NAV - shortcuts -->
 <div class="bottom-nav">
