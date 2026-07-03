@@ -804,21 +804,21 @@ input.qty-big-input {
     </div>
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px;">
       <select id="txFilterType" onchange="onTxTypeChange()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; appearance:none; font-family:var(--font);">
-        <option value="">Тип: Всички</option>
+        <option value="">Тип</option>
         <option value="income">Приходи</option>
         <option value="expense">Разходи</option>
       </select>
       <select id="txFilterCategory" onchange="loadTxHistory()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; appearance:none; font-family:var(--font);">
-        <option value="">Категория: Всички</option>
+        <option value="">Категория</option>
       </select>
     </div>
     <select id="txFilterPayment" onchange="loadTxHistory()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; appearance:none; font-family:var(--font); margin-bottom:10px;">
-      <option value="">Начин на плащане: Всички</option>
+      <option value="">Начин на плащане</option>
       <option value="cash">Каса</option>
       <option value="bank">Банка</option>
     </select>
     <select id="txFilterObject" onchange="loadTxHistory()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; appearance:none; font-family:var(--font);">
-      <option value="">Обект: Всички</option>
+      <option value="">Обект</option>
     </select>
   </div>
   <div id="txHistory"><div class="loading"><div class="spinner"></div></div></div>
@@ -1010,7 +1010,7 @@ input.qty-big-input {
       </div>
     </div>
     <select id="statsObjFilter" onchange="loadStats()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; appearance:none; font-family:var(--font);">
-      <option value="">Обект: Всички</option>
+      <option value="">Обект</option>
     </select>
   </div>
 
@@ -1288,7 +1288,7 @@ async function loadObjects() {
   // txFilterObject (във Финанси)
   const txObjSel = document.getElementById('txFilterObject');
   if (txObjSel) {
-    txObjSel.innerHTML = '<option value="">Обект: Всички</option>';
+    txObjSel.innerHTML = '<option value="">Обект</option>';
     data.forEach(o => {
       const opt = document.createElement('option');
       opt.value = o.id; opt.textContent = o.name; txObjSel.appendChild(opt);
@@ -1297,7 +1297,7 @@ async function loadObjects() {
   // statsObjFilter с value=name (за filter по object_name)
   const statsSel = document.getElementById('statsObjFilter');
   if (statsSel) {
-    statsSel.innerHTML = '<option value="">Всички</option>';
+    statsSel.innerHTML = '<option value="">Обект</option>';
     data.forEach(o => {
       const opt = document.createElement('option');
       opt.value = o.name; opt.textContent = o.name; statsSel.appendChild(opt);
@@ -5286,7 +5286,7 @@ async function onTxTypeChange() {
   const type = document.getElementById('txFilterType').value;
   const catSel = document.getElementById('txFilterCategory');
   if (!catSel) return;
-  catSel.innerHTML = '<option value="">Категория: Всички</option>';
+  catSel.innerHTML = '<option value="">Категория</option>';
   if (type) {
     // Зареди категории от accounts: 7xxx за income, 6xxx за expense
     const codePrefix = type === 'income' ? '7' : '6';
@@ -5308,7 +5308,7 @@ async function onTxTypeChange() {
 async function populateTxFilterObject() {
   const sel = document.getElementById('txFilterObject');
   if (!sel) return;
-  sel.innerHTML = '<option value="">Обект: Всички</option>';
+  sel.innerHTML = '<option value="">Обект</option>';
   (objects || []).forEach(o => {
     const opt = document.createElement('option');
     opt.value = o.id;
@@ -6058,6 +6058,78 @@ function statsPreviousMonth() {
   document.getElementById('statsDateTo').value = fmt(last);
   loadStats();
   loadBalanceSummary();
+}
+
+
+async function exportBankMovements() {
+  const dateFrom = document.getElementById('statsDateFrom')?.value || '';
+  const dateTo = document.getElementById('statsDateTo')?.value || '';
+  const rows = [];
+  rows.push(['Движения по банка']);
+  rows.push(['Период от:', dateFrom, 'до:', dateTo]);
+  rows.push([]);
+
+  const { data } = await db.from('operations')
+    .select('account_code, amount, entry_type, header_id, operation_headers!inner(date, op_type, deleted_at, object_name, comment, contractor)')
+    .eq('account_code', '50301')
+    .is('deleted_at', null);
+
+  const bankOps = (data || []).filter(o => !o.operation_headers?.deleted_at);
+
+  const headerIds = [...new Set(bankOps.map(o => o.header_id).filter(Boolean))];
+  const categoryByHeader = {};
+  if (headerIds.length > 0) {
+    const { data: catOps } = await db.from('operations')
+      .select('header_id, account_code, product_name')
+      .in('header_id', headerIds)
+      .is('deleted_at', null);
+    (catOps || []).forEach(o => {
+      const acc = o.account_code || '';
+      if ((acc.startsWith('6') || acc.startsWith('7')) && !categoryByHeader[o.header_id]) {
+        categoryByHeader[o.header_id] = o.product_name;
+      }
+    });
+  }
+
+  const opLabels = {
+    'restock': 'Зареждане', 'cash_income': 'Cash отчет',
+    'finance_expense': 'Разход', 'finance_income': 'Приход',
+    'opening_balance': 'Нач. салдо', 'service': 'Сервиз'
+  };
+
+  let startBal = 0, periodSum = 0;
+  const inPeriod = [];
+  bankOps.forEach(o => {
+    const sign = o.entry_type === 'D' ? 1 : -1;
+    const amt = (o.amount || 0) * sign;
+    const d = o.operation_headers?.date;
+    if (d && dateFrom && d < dateFrom) startBal += amt;
+    else if (d && (!dateFrom || d >= dateFrom) && (!dateTo || d <= dateTo)) {
+      periodSum += amt;
+      inPeriod.push({ o, amt, d });
+    }
+  });
+  inPeriod.sort((a, b) => (a.d || '').localeCompare(b.d || ''));
+
+  rows.push(['Начално салдо', startBal.toFixed(2)]);
+  rows.push(['Оборот в периода', periodSum.toFixed(2)]);
+  rows.push(['Текущ баланс', (startBal + periodSum).toFixed(2)]);
+  rows.push([]);
+  rows.push(['Дата', 'Операция', 'Обект', 'Категория', 'Контрагент', 'Коментар', 'Сума']);
+
+  inPeriod.forEach(({ o, amt, d }) => {
+    rows.push([
+      d,
+      opLabels[o.operation_headers?.op_type] || o.operation_headers?.op_type || '',
+      o.operation_headers?.object_name || '',
+      categoryByHeader[o.header_id] || '',
+      o.operation_headers?.contractor || '',
+      o.operation_headers?.comment || '',
+      amt.toFixed(2)
+    ]);
+  });
+
+  downloadCSV(`bank_movements_${dateFrom}_${dateTo}.csv`, rows);
 }
 
 </script>
