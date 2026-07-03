@@ -496,21 +496,12 @@ input.qty-big-input {
   <!-- История на зарежданията -->
   <div style="margin-top:72px; padding-top:48px; border-top:2px solid var(--border);"></div><div class="section-label" style="margin-top:0">Последни зареждания</div>
   <div class="card" style="margin-bottom:8px; padding:10px 14px;">
-    <div class="field" style="margin-bottom:10px;">
-      <label>ОБЕКТ</label>
-      <select id="restockFilterObject" onchange="loadRestockHistory()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; appearance:none; font-family:var(--font);">
-        <option value="">Всички</option>
-      </select>
-    </div>
+    <select id="restockFilterObject" onchange="loadRestockHistory()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; appearance:none; font-family:var(--font); margin-bottom:10px;">
+      <option value="">Обект</option>
+    </select>
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
-      <div class="field" style="margin-bottom:0;">
-        <label>ДАТА ОТ</label>
-        <input type="date" id="restockFilterDateFrom" onchange="loadRestockHistory()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; font-family:var(--font);">
-      </div>
-      <div class="field" style="margin-bottom:0;">
-        <label>ДО</label>
-        <input type="date" id="restockFilterDateTo" onchange="loadRestockHistory()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; font-family:var(--font);">
-      </div>
+      <input type="date" id="restockFilterDateFrom" onchange="loadRestockHistory()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; font-family:var(--font);">
+      <input type="date" id="restockFilterDateTo" onchange="loadRestockHistory()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; font-family:var(--font);">
     </div>
   </div>
   <div id="restockHistory"><div class="loading"><div class="spinner"></div></div></div>
@@ -521,21 +512,12 @@ input.qty-big-input {
   <!-- Филтри -->
   <div class="section-label">Филтър</div>
   <div class="card">
-    <div class="field" style="margin-bottom:10px;">
-      <label>ОБЕКТ</label>
-      <select id="cfFilterObject" onchange="loadCashflow()">
-        <option value="">Всички</option>
-      </select>
-    </div>
+    <select id="cfFilterObject" onchange="loadCashflow()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; appearance:none; font-family:var(--font); margin-bottom:10px;">
+      <option value="">Обект</option>
+    </select>
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
-      <div class="field" style="margin-bottom:0">
-        <label>ДАТА ОТ</label>
-        <input type="date" id="cfFilterDateFrom" onchange="loadCashflow()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; font-family:var(--font);">
-      </div>
-      <div class="field" style="margin-bottom:0">
-        <label>ДО</label>
-        <input type="date" id="cfFilterDateTo" onchange="loadCashflow()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; font-family:var(--font);">
-      </div>
+      <input type="date" id="cfFilterDateFrom" onchange="loadCashflow()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; font-family:var(--font);">
+      <input type="date" id="cfFilterDateTo" onchange="loadCashflow()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; font-family:var(--font);">
     </div>
   </div>
   <div class="section-label">Чакащи отчитане</div>
@@ -793,14 +775,8 @@ input.qty-big-input {
       <button onclick="setTxPeriodPrevious()" style="padding:8px; border-radius:8px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:14px; font-weight:700; cursor:pointer; font-family:var(--font);">📅 Предходен месец</button>
     </div>
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px;">
-      <div class="field" style="margin-bottom:0;">
-        <label>ДАТА ОТ</label>
-        <input type="date" id="txFilterDateFrom" onchange="loadTxHistory()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; font-family:var(--font);">
-      </div>
-      <div class="field" style="margin-bottom:0;">
-        <label>ДО</label>
-        <input type="date" id="txFilterDateTo" onchange="loadTxHistory()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; font-family:var(--font);">
-      </div>
+      <input type="date" id="txFilterDateFrom" onchange="loadTxHistory()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; font-family:var(--font);">
+      <input type="date" id="txFilterDateTo" onchange="loadTxHistory()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; font-family:var(--font);">
     </div>
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px;">
       <select id="txFilterType" onchange="onTxTypeChange()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; appearance:none; font-family:var(--font);">
@@ -1000,14 +976,8 @@ input.qty-big-input {
       <button onclick="statsPreviousMonth()" style="padding:8px; border-radius:8px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:14px; font-weight:700; cursor:pointer; font-family:var(--font);">📅 Предходен месец</button>
     </div>
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px;">
-      <div class="field" style="margin-bottom:0;">
-        <label>ДАТА ОТ</label>
-        <input type="date" id="statsDateFrom" onchange="loadStats(); loadBalanceSummary();" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; font-family:var(--font);">
-      </div>
-      <div class="field" style="margin-bottom:0;">
-        <label>ДО</label>
-        <input type="date" id="statsDateTo" onchange="loadStats(); loadBalanceSummary();" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; font-family:var(--font);">
-      </div>
+      <input type="date" id="statsDateFrom" onchange="loadStats(); loadBalanceSummary();" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; font-family:var(--font);">
+      <input type="date" id="statsDateTo" onchange="loadStats(); loadBalanceSummary();" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; font-family:var(--font);">
     </div>
     <select id="statsObjFilter" onchange="loadStats()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; appearance:none; font-family:var(--font);">
       <option value="">Обект</option>
@@ -1279,7 +1249,9 @@ async function loadObjects() {
   ['cfFilterObject','histFilterObject','restockFilterObject'].forEach(selId => {
     const sel = document.getElementById(selId);
     if (!sel) return;
-    sel.innerHTML = '<option value="">Всички</option>';
+    // Set placeholder based on filter id
+    const placeholder = { 'cfFilterObject': 'Обект', 'histFilterObject': 'Обект', 'restockFilterObject': 'Обект' }[selId] || 'Всички';
+    sel.innerHTML = `<option value="">${placeholder}</option>`;
     data.forEach(o => {
       const opt = document.createElement('option');
       opt.value = o.id; opt.textContent = o.name; sel.appendChild(opt);
