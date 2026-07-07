@@ -328,11 +328,14 @@ input.qty-big-input {
 
 <div style="background:#ff6b35; color:#fff; text-align:center; padding:6px; font-weight:800; font-size:12px; letter-spacing:1px;">⚠️ DEV ENVIRONMENT ⚠️</div>
 <div class="header" style="display:flex; align-items:center; justify-content:space-between; padding:9px 16px;">
-  <button class="menu-btn" onclick="toggleSideMenu()" style="background:transparent; border:none; padding:8px; cursor:pointer; display:flex; flex-direction:column; gap:4px; color:var(--text);">
-    <span style="width:22px; height:2px; background:currentColor; border-radius:2px;"></span>
-    <span style="width:22px; height:2px; background:currentColor; border-radius:2px;"></span>
-    <span style="width:22px; height:2px; background:currentColor; border-radius:2px;"></span>
-  </button>
+  <div style="display:flex; align-items:center; gap:8px;">
+    <button class="menu-btn" onclick="toggleSideMenu()" style="background:transparent; border:none; padding:8px; cursor:pointer; display:flex; flex-direction:column; gap:4px; color:var(--text);">
+      <span style="width:22px; height:2px; background:currentColor; border-radius:2px;"></span>
+      <span style="width:22px; height:2px; background:currentColor; border-radius:2px;"></span>
+      <span style="width:22px; height:2px; background:currentColor; border-radius:2px;"></span>
+    </button>
+    <button id="headerHistoryBtn" onclick="openRestockHistory()" style="display:none; background:transparent; border:1px solid var(--border); border-radius:8px; padding:6px 10px; cursor:pointer; color:var(--text2); font-size:12px; font-weight:700; font-family:var(--font);">📋 История</button>
+  </div>
   <div style="display:flex; align-items:center; gap:10px;">
     <div id="headerIcon" style="font-size:24px; color:var(--accent); display:flex; align-items:center; justify-content:center;">⬆️</div>
     <div style="text-align:right;">
@@ -494,18 +497,28 @@ input.qty-big-input {
   <!-- 8. ЗАПИШИ -->
   <button class="submit-btn" id="submitBtn" onclick="submitRestock()">💾 Запиши зареждането</button>
 
-  <!-- История на зарежданията -->
-  <div style="margin-top:72px; padding-top:48px; border-top:2px solid var(--border);"></div><div class="section-label" style="margin-top:0">Последни зареждания</div>
-  <div class="card" style="margin-bottom:8px; padding:10px 14px;">
-    <select id="restockFilterObject" onchange="loadRestockHistory()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; appearance:none; font-family:var(--font); margin-bottom:10px;">
-      <option value="">Обект</option>
-    </select>
-    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
-      <input type="date" id="restockFilterDateFrom" onchange="loadRestockHistory()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; font-family:var(--font);">
-      <input type="date" id="restockFilterDateTo" onchange="loadRestockHistory()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; font-family:var(--font);">
+</div>
+
+<!-- Modal: История на зарежданията -->
+<div id="restockHistoryModal" class="modal-overlay" style="display:none;">
+  <div class="modal" style="max-width:600px;">
+    <div class="modal-title">
+      📋 История на зарежданията
+    </div>
+    <div class="card" style="margin-bottom:8px; padding:10px 14px;">
+      <select id="restockFilterObject" onchange="loadRestockHistory()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; appearance:none; font-family:var(--font); margin-bottom:10px;">
+        <option value="">Обект</option>
+      </select>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+        <input type="date" id="restockFilterDateFrom" onchange="loadRestockHistory()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; font-family:var(--font);">
+        <input type="date" id="restockFilterDateTo" onchange="loadRestockHistory()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; font-family:var(--font);">
+      </div>
+    </div>
+    <div id="restockHistory" style="max-height:60vh; overflow-y:auto;"><div class="loading"><div class="spinner"></div></div></div>
+    <div class="modal-btns">
+      <button class="cancel" onclick="closeRestockHistory()">Затвори</button>
     </div>
   </div>
-  <div id="restockHistory"><div class="loading"><div class="spinner"></div></div></div>
 </div>
 
 <!-- PAGE: ОТЧИТАНЕ -->
@@ -3112,13 +3125,19 @@ function updateHeaderTitle(tab) {
   const t = tabTitles[tab];
   if (!t) return;
   const el = document.getElementById('headerIcon');
-  if (!el) return;
-  const theme = localStorage.getItem('app_theme') || 'standard';
-  const isLucide = (theme === 'coffee-dark' || theme === 'coffee-light');
-  if (isLucide && typeof lucideIcons !== 'undefined' && lucideIcons[t.icon]) {
-    el.innerHTML = lucideIcons[t.icon];
-  } else {
-    el.innerHTML = t.icon;
+  if (el) {
+    const theme = localStorage.getItem('app_theme') || 'standard';
+    const isLucide = (theme === 'coffee-dark' || theme === 'coffee-light');
+    if (isLucide && typeof lucideIcons !== 'undefined' && lucideIcons[t.icon]) {
+      el.innerHTML = lucideIcons[t.icon];
+    } else {
+      el.innerHTML = t.icon;
+    }
+  }
+  // Show/hide history button based on tab
+  const historyBtn = document.getElementById('headerHistoryBtn');
+  if (historyBtn) {
+    historyBtn.style.display = (tab === 'restock') ? 'inline-block' : 'none';
   }
 }
 
@@ -6124,6 +6143,15 @@ function setTxPeriodPrevious() {
   document.getElementById('txFilterDateFrom').value = fmt(first);
   document.getElementById('txFilterDateTo').value = fmt(last);
   loadTxHistory();
+}
+
+
+function openRestockHistory() {
+  document.getElementById('restockHistoryModal').style.display = 'flex';
+  loadRestockHistory();
+}
+function closeRestockHistory() {
+  document.getElementById('restockHistoryModal').style.display = 'none';
 }
 
 </script>
