@@ -383,8 +383,8 @@ input.qty-big-input {
 <div class="page active" id="page-restock">
 
   <!-- 1. ОБЕКТ -->
-  <div class="section-label" style="display:flex; justify-content:space-between; align-items:center;">
-    <span>Обект</span>
+  <div class="section-label" style="display:flex; justify-content:space-between; align-items:flex-end; height:auto;">
+    <span style="line-height:1;">Обект</span>
     <button onclick="openRestockHistory()" style="background:transparent; border:1px solid var(--border); border-radius:6px; padding:5px 10px; cursor:pointer; color:var(--text2); font-size:12px; font-weight:700; font-family:var(--font); text-transform:none; letter-spacing:0;">📋 История</button>
   </div>
   <div class="card">
@@ -500,9 +500,9 @@ input.qty-big-input {
 </div>
 
 <!-- Full screen: История на зарежданията -->
-<div id="restockHistoryModal" style="display:none; position:fixed; top:72px; left:0; right:0; bottom:0; background:var(--bg); z-index:99; overflow-y:auto;" onscroll="handleOverlayScroll(this)"><div style="max-width:480px; margin:0 auto; padding:8px 16px 100px;">
+<div class="page" id="page-restock-history">
   <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
-    <div class="section-label" style="margin:0 0 10px;">История на зарежданията</div>
+    <div class="section-label">История на зарежданията</div>
     <button onclick="closeRestockHistory()" style="background:transparent; border:1px solid var(--border); border-radius:6px; padding:5px 10px; cursor:pointer; color:var(--text2); font-size:12px; font-weight:700; font-family:var(--font);">← Назад</button>
   </div>
   <div class="card" style="margin-bottom:8px; padding:10px 14px;">
@@ -3135,9 +3135,6 @@ function updateHeaderTitle(tab) {
 }
 
 function switchTab(tab) {
-  // Затвори History overlay при смяна на таб
-  const hm = document.getElementById('restockHistoryModal');
-  if (hm) hm.style.display = 'none';
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
@@ -6143,13 +6140,14 @@ function setTxPeriodPrevious() {
 
 
 function openRestockHistory() {
-  document.getElementById('restockHistoryModal').style.display = 'block';
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-restock-history').classList.add('active');
   history.pushState({ overlay: 'restockHistory' }, '');
   loadRestockHistory();
 }
 function closeRestockHistory() {
-  document.getElementById('restockHistoryModal').style.display = 'none';
-  // Ако сме бутнали state, върни назад с история  
+  document.getElementById('page-restock-history').classList.remove('active');
+  document.getElementById('page-restock').classList.add('active');
   if (history.state && history.state.overlay === 'restockHistory') {
     history.back();
   }
@@ -6185,9 +6183,10 @@ function handleOverlayScroll(el) {
 
 // Обработи browser Back / swipe от история  
 window.addEventListener('popstate', (e) => {
-  const overlay = document.getElementById('restockHistoryModal');
-  if (overlay && overlay.style.display !== 'none') {
-    overlay.style.display = 'none';
+  const hp = document.getElementById('page-restock-history');
+  if (hp && hp.classList.contains('active')) {
+    hp.classList.remove('active');
+    document.getElementById('page-restock').classList.add('active');
   }
 });
 
