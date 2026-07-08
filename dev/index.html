@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Coffee Brothers">
-<title>Coffee Brothers</title>
+<title>Coffee Brothers DEV</title>
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="icon" type="image/png" href="icon-192.png">
 <link rel="manifest" href="manifest.json">
@@ -326,6 +326,7 @@ input.qty-big-input {
 </head>
 <body>
 
+<div style="background:#ff6b35; color:#fff; text-align:center; padding:6px; font-weight:800; font-size:12px; letter-spacing:1px;">⚠️ DEV ENVIRONMENT ⚠️</div>
 <div class="header" style="display:flex; align-items:center; justify-content:space-between; padding:9px 16px;">
   <button class="menu-btn" onclick="toggleSideMenu()" style="background:transparent; border:none; padding:8px; cursor:pointer; display:flex; flex-direction:column; gap:4px; color:var(--text);">
     <span style="width:22px; height:2px; background:currentColor; border-radius:2px;"></span>
@@ -382,7 +383,10 @@ input.qty-big-input {
 <div class="page active" id="page-restock">
 
   <!-- 1. ОБЕКТ -->
-  <div class="section-label">Обект</div>
+  <div class="section-label" style="display:flex; justify-content:space-between; align-items:center;">
+    <span>Обект</span>
+    <button onclick="openRestockHistory()" style="background:transparent; border:1px solid var(--border); border-radius:6px; padding:5px 10px; cursor:pointer; color:var(--text2); font-size:12px; font-weight:700; font-family:var(--font); text-transform:none; letter-spacing:0;">📋 История</button>
+  </div>
   <div class="card">
     <div class="gps-row">
       <div class="field">
@@ -492,15 +496,14 @@ input.qty-big-input {
 
   <!-- 8. ЗАПИШИ -->
   <button class="submit-btn" id="submitBtn" onclick="submitRestock()">💾 Запиши зареждането</button>
-  <button onclick="openRestockHistory()" style="width:100%; margin-top:12px; background:var(--bg3); border:1px solid var(--border); border-radius:12px; padding:12px; cursor:pointer; color:var(--text2); font-size:14px; font-weight:700; font-family:var(--font);">📋 История на зарежданията</button>
 
 </div>
 
 <!-- Full screen: История на зарежданията -->
-<div id="restockHistoryModal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:var(--bg); z-index:101; overflow-y:auto;" onscroll="handleOverlayScroll(this)"><div style="max-width:480px; margin:0 auto; padding:16px 16px 100px;">
+<div id="restockHistoryModal" style="display:none; position:fixed; top:72px; left:0; right:0; bottom:0; background:var(--bg); z-index:99; overflow-y:auto;" onscroll="handleOverlayScroll(this)"><div style="max-width:480px; margin:0 auto; padding:16px 16px 100px;">
   <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
-    <div style="font-size:17px; font-weight:800; color:var(--text);">📋 История на зарежданията</div>
-    <button onclick="closeRestockHistory()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 14px; cursor:pointer; color:var(--text2); font-size:13px; font-weight:700; font-family:var(--font);">✕ Затвори</button>
+    <div class="section-label" style="margin:0;">История на зарежданията</div>
+    <button onclick="closeRestockHistory()" style="background:transparent; border:1px solid var(--border); border-radius:6px; padding:5px 10px; cursor:pointer; color:var(--text2); font-size:12px; font-weight:700; font-family:var(--font);">← Назад</button>
   </div>
   <div class="card" style="margin-bottom:8px; padding:10px 14px;">
     <select id="restockFilterObject" onchange="loadRestockHistory()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; appearance:none; font-family:var(--font); margin-bottom:10px;">
@@ -1183,8 +1186,8 @@ input.qty-big-input {
 
 
 <script>
-const SUPABASE_URL = 'https://yqbfrncncserfpcdikxy.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_n4UfSazXU9vhI9fs2paVNQ_3kz_SD9L';
+const SUPABASE_URL = 'https://neqmyzoxbdedoaoqlpvq.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_EiMiF401eNLhjYa038FOJA_XnBfPQTO';
 const { createClient } = supabase;
 const db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
@@ -6141,10 +6144,16 @@ function setTxPeriodPrevious() {
 
 function openRestockHistory() {
   document.getElementById('restockHistoryModal').style.display = 'flex';
+  // Push state, so browser back closes the overlay
+  history.pushState({ overlay: 'restockHistory' }, '');
   loadRestockHistory();
 }
 function closeRestockHistory() {
   document.getElementById('restockHistoryModal').style.display = 'none';
+  // Ако сме бутнали state, върни назад с история  
+  if (history.state && history.state.overlay === 'restockHistory') {
+    history.back();
+  }
 }
 
 
@@ -6173,6 +6182,15 @@ function handleOverlayScroll(el) {
     bottomNav.classList.remove('hidden');
   }, 2000);
 }
+
+
+// Обработи browser Back / swipe от история  
+window.addEventListener('popstate', (e) => {
+  const overlay = document.getElementById('restockHistoryModal');
+  if (overlay && overlay.style.display !== 'none') {
+    overlay.style.display = 'none';
+  }
+});
 
 </script>
 <!-- BOTTOM NAV - shortcuts -->
