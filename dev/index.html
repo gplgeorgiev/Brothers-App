@@ -498,7 +498,7 @@ input.qty-big-input {
 </div>
 
 <!-- Full screen: История на зарежданията -->
-<div id="restockHistoryModal" style="display:none; position:fixed; inset:0; background:var(--bg); z-index:300; overflow-y:auto;"><div style="max-width:480px; margin:0 auto; padding:16px;">
+<div id="restockHistoryModal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:90px; background:var(--bg); z-index:99; overflow-y:auto;"><div style="max-width:480px; margin:0 auto; padding:16px;">
   <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
     <div style="font-size:17px; font-weight:800; color:var(--text);">📋 История на зарежданията</div>
     <button onclick="closeRestockHistory()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 14px; cursor:pointer; color:var(--text2); font-size:13px; font-weight:700; font-family:var(--font);">✕ Затвори</button>
@@ -3132,6 +3132,9 @@ function updateHeaderTitle(tab) {
 }
 
 function switchTab(tab) {
+  // Затвори History overlay при смяна на таб
+  const hm = document.getElementById('restockHistoryModal');
+  if (hm) hm.style.display = 'none';
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
