@@ -76,7 +76,7 @@ input.qty-big-input {
   .tab.active { background:var(--accent); border-color:var(--accent); color:#fff; }
 
   /* PAGES */
-  .page { display:none; padding:16px; }
+  .page { display:none; padding:8px 16px 16px; }
   .page.active { display:block; }
 
   /* SECTION LABEL */
@@ -500,9 +500,9 @@ input.qty-big-input {
 </div>
 
 <!-- Full screen: История на зарежданията -->
-<div id="restockHistoryModal" style="display:none; position:fixed; top:72px; left:0; right:0; bottom:0; background:var(--bg); z-index:99; overflow-y:auto;" onscroll="handleOverlayScroll(this)"><div style="max-width:480px; margin:0 auto; padding:16px 16px 100px;">
+<div id="restockHistoryModal" style="display:none; position:fixed; top:72px; left:0; right:0; bottom:0; background:var(--bg); z-index:99; overflow-y:auto;" onscroll="handleOverlayScroll(this)"><div style="max-width:480px; margin:0 auto; padding:8px 16px 100px;">
   <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
-    <div class="section-label" style="margin:0;">История на зарежданията</div>
+    <div class="section-label" style="margin:0 0 10px;">История на зарежданията</div>
     <button onclick="closeRestockHistory()" style="background:transparent; border:1px solid var(--border); border-radius:6px; padding:5px 10px; cursor:pointer; color:var(--text2); font-size:12px; font-weight:700; font-family:var(--font);">← Назад</button>
   </div>
   <div class="card" style="margin-bottom:8px; padding:10px 14px;">
@@ -6143,8 +6143,7 @@ function setTxPeriodPrevious() {
 
 
 function openRestockHistory() {
-  document.getElementById('restockHistoryModal').style.display = 'flex';
-  // Push state, so browser back closes the overlay
+  document.getElementById('restockHistoryModal').style.display = 'block';
   history.pushState({ overlay: 'restockHistory' }, '');
   loadRestockHistory();
 }
