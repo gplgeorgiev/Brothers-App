@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Coffee Brothers">
-<title>Coffee Brothers DEV</title>
+<title>Coffee Brothers</title>
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="icon" type="image/png" href="icon-192.png">
 <link rel="manifest" href="manifest.json">
@@ -326,7 +326,6 @@ input.qty-big-input {
 </head>
 <body>
 
-<div style="background:#ff6b35; color:#fff; text-align:center; padding:6px; font-weight:800; font-size:12px; letter-spacing:1px;">⚠️ DEV ENVIRONMENT ⚠️</div>
 <div class="header" style="display:flex; align-items:center; justify-content:space-between; padding:9px 16px;">
   <button class="menu-btn" onclick="toggleSideMenu()" style="background:transparent; border:none; padding:8px; cursor:pointer; display:flex; flex-direction:column; gap:4px; color:var(--text);">
     <span style="width:22px; height:2px; background:currentColor; border-radius:2px;"></span>
@@ -498,7 +497,7 @@ input.qty-big-input {
 </div>
 
 <!-- Full screen: История на зарежданията -->
-<div id="restockHistoryModal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:90px; background:var(--bg); z-index:99; overflow-y:auto;"><div style="max-width:480px; margin:0 auto; padding:16px;">
+<div id="restockHistoryModal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:var(--bg); z-index:101; overflow-y:auto;" onscroll="handleOverlayScroll(this)"><div style="max-width:480px; margin:0 auto; padding:16px 16px 100px;">
   <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
     <div style="font-size:17px; font-weight:800; color:var(--text);">📋 История на зарежданията</div>
     <button onclick="closeRestockHistory()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 14px; cursor:pointer; color:var(--text2); font-size:13px; font-weight:700; font-family:var(--font);">✕ Затвори</button>
@@ -1184,8 +1183,8 @@ input.qty-big-input {
 
 
 <script>
-const SUPABASE_URL = 'https://neqmyzoxbdedoaoqlpvq.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_EiMiF401eNLhjYa038FOJA_XnBfPQTO';
+const SUPABASE_URL = 'https://yqbfrncncserfpcdikxy.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_n4UfSazXU9vhI9fs2paVNQ_3kz_SD9L';
 const { createClient } = supabase;
 const db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
@@ -6146,6 +6145,33 @@ function openRestockHistory() {
 }
 function closeRestockHistory() {
   document.getElementById('restockHistoryModal').style.display = 'none';
+}
+
+
+let overlayLastScroll = 0;
+let overlayScrollTimer = null;
+function handleOverlayScroll(el) {
+  const currentScroll = el.scrollTop;
+  const bottomNav = document.querySelector('.bottom-nav');
+  if (!bottomNav) return;
+  
+  if (currentScroll < 50) {
+    bottomNav.classList.remove('hidden');
+    overlayLastScroll = currentScroll;
+    return;
+  }
+  
+  if (currentScroll > overlayLastScroll + 5) {
+    bottomNav.classList.add('hidden');
+  } else if (currentScroll < overlayLastScroll - 5) {
+    bottomNav.classList.remove('hidden');
+  }
+  overlayLastScroll = currentScroll;
+  
+  clearTimeout(overlayScrollTimer);
+  overlayScrollTimer = setTimeout(() => {
+    bottomNav.classList.remove('hidden');
+  }, 2000);
 }
 
 </script>
