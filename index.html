@@ -76,7 +76,7 @@ input.qty-big-input {
   .tab.active { background:var(--accent); border-color:var(--accent); color:#fff; }
 
   /* PAGES */
-  .page { display:none; padding:16px; }
+  .page { display:none; padding:8px 16px 16px; }
   .page.active { display:block; }
 
   /* SECTION LABEL */
@@ -382,7 +382,10 @@ input.qty-big-input {
 <div class="page active" id="page-restock">
 
   <!-- 1. ОБЕКТ -->
-  <div class="section-label">Обект</div>
+  <div style="display:flex; align-items:center; justify-content:space-between;">
+    <div class="section-label">Обект</div>
+    <button onclick="openRestockHistory()" style="background:transparent; border:1px solid var(--border); border-radius:6px; padding:5px 10px; cursor:pointer; color:var(--text2); font-size:12px; font-weight:700; font-family:var(--font);">📋 История</button>
+  </div>
   <div class="card">
     <div class="gps-row">
       <div class="field">
@@ -493,18 +496,29 @@ input.qty-big-input {
   <!-- 8. ЗАПИШИ -->
   <button class="submit-btn" id="submitBtn" onclick="submitRestock()">💾 Запиши зареждането</button>
 
-  <!-- История на зарежданията -->
-  <div style="margin-top:72px; padding-top:48px; border-top:2px solid var(--border);"></div><div class="section-label" style="margin-top:0">Последни зареждания</div>
-  <div class="card" style="margin-bottom:8px; padding:10px 14px;">
-    <select id="restockFilterObject" onchange="loadRestockHistory()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; appearance:none; font-family:var(--font); margin-bottom:10px;">
-      <option value="">Обект</option>
-    </select>
-    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+</div>
+
+<!-- Full screen: История на зарежданията -->
+<div class="page" id="page-restock-history">
+  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
+    <div class="section-label">История на зарежданията</div>
+    <button onclick="closeRestockHistory()" style="background:transparent; border:1px solid var(--border); border-radius:6px; padding:5px 10px; cursor:pointer; color:var(--text2); font-size:12px; font-weight:700; font-family:var(--font);">← Назад</button>
+  </div>
+  <div class="card" style="padding:10px 14px;">
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px;">
+      <button onclick="restockCurrentMonth()" style="padding:8px; border-radius:8px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:14px; font-weight:700; cursor:pointer; font-family:var(--font);">📅 Текущ месец</button>
+      <button onclick="restockPreviousMonth()" style="padding:8px; border-radius:8px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:14px; font-weight:700; cursor:pointer; font-family:var(--font);">📅 Минал месец</button>
+    </div>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px;">
       <input type="date" id="restockFilterDateFrom" onchange="loadRestockHistory()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; font-family:var(--font);">
       <input type="date" id="restockFilterDateTo" onchange="loadRestockHistory()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; font-family:var(--font);">
     </div>
+    <select id="restockFilterObject" onchange="loadRestockHistory()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; appearance:none; font-family:var(--font);">
+      <option value="">Обект</option>
+    </select>
   </div>
-  <div id="restockHistory"><div class="loading"><div class="spinner"></div></div></div>
+  <div id="restockHistory" style="padding-bottom:120px;"><div class="loading"><div class="spinner"></div></div></div>
+</div>
 </div>
 
 <!-- PAGE: ОТЧИТАНЕ -->
@@ -3111,14 +3125,16 @@ function updateHeaderTitle(tab) {
   const t = tabTitles[tab];
   if (!t) return;
   const el = document.getElementById('headerIcon');
-  if (!el) return;
-  const theme = localStorage.getItem('app_theme') || 'standard';
-  const isLucide = (theme === 'coffee-dark' || theme === 'coffee-light');
-  if (isLucide && typeof lucideIcons !== 'undefined' && lucideIcons[t.icon]) {
-    el.innerHTML = lucideIcons[t.icon];
-  } else {
-    el.innerHTML = t.icon;
+  if (el) {
+    const theme = localStorage.getItem('app_theme') || 'standard';
+    const isLucide = (theme === 'coffee-dark' || theme === 'coffee-light');
+    if (isLucide && typeof lucideIcons !== 'undefined' && lucideIcons[t.icon]) {
+      el.innerHTML = lucideIcons[t.icon];
+    } else {
+      el.innerHTML = t.icon;
+    }
   }
+
 }
 
 function switchTab(tab) {
@@ -6123,6 +6139,89 @@ function setTxPeriodPrevious() {
   document.getElementById('txFilterDateFrom').value = fmt(first);
   document.getElementById('txFilterDateTo').value = fmt(last);
   loadTxHistory();
+}
+
+
+function openRestockHistory() {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-restock-history').classList.add('active');
+  history.pushState({ overlay: 'restockHistory' }, '');
+  // Default текущ месец
+  const fromEl = document.getElementById('restockFilterDateFrom');
+  if (fromEl && !fromEl.value) {
+    const now = new Date();
+    const first = new Date(now.getFullYear(), now.getMonth(), 1);
+    const last = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    const fmt = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    fromEl.value = fmt(first);
+    document.getElementById('restockFilterDateTo').value = fmt(last);
+  }
+  loadRestockHistory();
+}
+function closeRestockHistory() {
+  document.getElementById('page-restock-history').classList.remove('active');
+  document.getElementById('page-restock').classList.add('active');
+  if (history.state && history.state.overlay === 'restockHistory') {
+    history.back();
+  }
+}
+
+
+let overlayLastScroll = 0;
+let overlayScrollTimer = null;
+function handleOverlayScroll(el) {
+  const currentScroll = el.scrollTop;
+  const bottomNav = document.querySelector('.bottom-nav');
+  if (!bottomNav) return;
+  
+  if (currentScroll < 50) {
+    bottomNav.classList.remove('hidden');
+    overlayLastScroll = currentScroll;
+    return;
+  }
+  
+  if (currentScroll > overlayLastScroll + 5) {
+    bottomNav.classList.add('hidden');
+  } else if (currentScroll < overlayLastScroll - 5) {
+    bottomNav.classList.remove('hidden');
+  }
+  overlayLastScroll = currentScroll;
+  
+  clearTimeout(overlayScrollTimer);
+  overlayScrollTimer = setTimeout(() => {
+    bottomNav.classList.remove('hidden');
+  }, 2000);
+}
+
+
+// Обработи browser Back / swipe от история  
+window.addEventListener('popstate', (e) => {
+  const hp = document.getElementById('page-restock-history');
+  if (hp && hp.classList.contains('active')) {
+    hp.classList.remove('active');
+    document.getElementById('page-restock').classList.add('active');
+  }
+});
+
+
+function restockCurrentMonth() {
+  const now = new Date();
+  const first = new Date(now.getFullYear(), now.getMonth(), 1);
+  const last = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  const fmt = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  document.getElementById('restockFilterDateFrom').value = fmt(first);
+  document.getElementById('restockFilterDateTo').value = fmt(last);
+  loadRestockHistory();
+}
+
+function restockPreviousMonth() {
+  const now = new Date();
+  const first = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const last = new Date(now.getFullYear(), now.getMonth(), 0);
+  const fmt = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  document.getElementById('restockFilterDateFrom').value = fmt(first);
+  document.getElementById('restockFilterDateTo').value = fmt(last);
+  loadRestockHistory();
 }
 
 </script>
