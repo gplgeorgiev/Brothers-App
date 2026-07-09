@@ -374,6 +374,7 @@ input.qty-big-input {
       <button class="menu-item" data-tab="products" onclick="selectMenu('products')">📦 Продукти</button>
     </div>
     <button class="menu-item" data-tab="settings" onclick="selectMenu('settings')">⚙️ Настройки</button>
+    <button class="menu-item" onclick="doLogout()" style="color:var(--red);">🚪 Изход</button>
   </div>
 </div>
 
@@ -1196,7 +1197,28 @@ input.qty-big-input {
 
 <div class="toast" id="toast"></div>
 
-
+<!-- LOGIN OVERLAY -->
+<div id="loginOverlay" style="position:fixed; inset:0; z-index:9999; background:var(--bg); display:flex; align-items:center; justify-content:center; padding:24px;">
+  <div style="width:100%; max-width:360px;">
+    <div style="text-align:center; margin-bottom:24px;">
+      <img src="icon-192.png" style="width:64px; height:64px; border-radius:14px; object-fit:cover; margin-bottom:12px;">
+      <div style="font-size:20px; font-weight:800; color:var(--text);">Coffee Brothers</div>
+      <div style="font-size:13px; color:var(--text2);">Вписване</div>
+    </div>
+    <div class="card">
+      <div class="field">
+        <label>ИМЕЙЛ</label>
+        <input type="email" id="loginEmail" autocomplete="username" inputmode="email" placeholder="твоя@имейл.bg">
+      </div>
+      <div class="field">
+        <label>ПАРОЛА</label>
+        <input type="password" id="loginPassword" autocomplete="current-password" placeholder="парола" onkeydown="if(event.key==='Enter') doLogin()">
+      </div>
+      <div id="loginError" style="color:var(--red); font-size:13px; margin-bottom:10px; display:none;"></div>
+      <button id="loginBtn" onclick="doLogin()" class="submit-btn" style="margin-top:4px;">Влез</button>
+    </div>
+  </div>
+</div>
 
 <script>
 const SUPABASE_URL = 'https://neqmyzoxbdedoaoqlpvq.supabase.co';
@@ -1240,23 +1262,92 @@ window.addEventListener('scroll', () => {
 }, { passive: true });
 
 document.addEventListener('DOMContentLoaded', async () => {
-  // Apply saved theme
+  // Apply saved theme (винаги, за да е тематизиран и login екранът)
   const savedTheme = localStorage.getItem('app_theme') || 'standard';
   document.documentElement.setAttribute('data-theme', savedTheme);
   // Apply icons after DOM is ready
   setTimeout(() => applyThemeIcons(savedTheme), 100);
 
+  // ── AUTH GATE ── приложението се зарежда само при вписан потребител
+  const { data: { session } } = await db.auth.getSession();
+  if (session) {
+    document.getElementById('loginOverlay').style.display = 'none';
+    await initApp();
+  } else {
+    document.getElementById('loginOverlay').style.display = 'flex';
+  }
+});
+
+// Инициализация на приложението (само след успешно вписване)
+async function initApp() {
   document.getElementById('dateInput').value = getLocalDateString();
   const finDateEl = document.getElementById('finDateInput');
   if (finDateEl) finDateEl.value = getLocalDateString();
   document.getElementById('soDate').value = new Date().toISOString().split('T')[0];
   document.getElementById('headerDate').textContent = formatDateBG(new Date());
   await Promise.all([loadObjects(), loadProducts(), loadTechnicians()]);
+  await resolveCurrentTechnician();
   loadDefaultTech();
   renderProductCards();
   if (document.getElementById('finCategoryScroll')) renderFinCategories();
   loadRestockHistory();
-});
+}
+
+// ── AUTH: вписване / изход / разпознаване на техник ──
+let currentTechnician = null;
+
+async function doLogin() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const password = document.getElementById('loginPassword').value;
+  const errEl = document.getElementById('loginError');
+  const btn = document.getElementById('loginBtn');
+  errEl.style.display = 'none';
+  if (!email || !password) {
+    errEl.textContent = 'Попълни имейл и парола';
+    errEl.style.display = 'block';
+    return;
+  }
+  btn.disabled = true;
+  const orig = btn.textContent;
+  btn.textContent = '⏳ Влизане...';
+  const { error } = await db.auth.signInWithPassword({ email, password });
+  if (error) {
+    errEl.textContent = 'Грешен имейл или парола';
+    errEl.style.display = 'block';
+    btn.disabled = false;
+    btn.textContent = orig;
+    return;
+  }
+  document.getElementById('loginPassword').value = '';
+  document.getElementById('loginOverlay').style.display = 'none';
+  btn.disabled = false;
+  btn.textContent = orig;
+  await initApp();
+}
+
+async function doLogout() {
+  const ok = await showConfirm('Изход от профила?');
+  if (!ok) return;
+  await db.auth.signOut();
+  location.reload();
+}
+
+// Намери техника, свързан с вписания потребител (по technicians.user_id).
+// Защитено: ако колоната още не съществува или няма връзка — просто пропуска.
+async function resolveCurrentTechnician() {
+  try {
+    const { data: { user } } = await db.auth.getUser();
+    if (!user) return;
+    const { data, error } = await db.from('technicians')
+      .select('*').eq('user_id', user.id).is('deleted_at', null).maybeSingle();
+    if (error || !data) return;
+    currentTechnician = data;
+    // По подразбиране "кой въвежда" = вписаният техник
+    localStorage.setItem('defaultTech', String(data.id));
+  } catch (e) {
+    // колоната user_id още не е добавена — игнорирай
+  }
+}
 
 // ── LOAD DATA ──
 async function loadObjects() {
