@@ -666,7 +666,10 @@ input.qty-big-input {
 <div class="page" id="page-finance">
 
   <!-- 1. ОБЕКТ -->
-  <div class="section-label">Обект</div>
+  <div style="display:flex; align-items:center; justify-content:space-between;">
+    <div class="section-label">Обект</div>
+    <button onclick="openFinanceHistory()" style="background:transparent; border:1px solid var(--border); border-radius:6px; padding:5px 10px; cursor:pointer; color:var(--text2); font-size:12px; font-weight:700; font-family:var(--font);">📋 История</button>
+  </div>
   <div class="card">
     <div class="gps-row">
       <div class="field">
@@ -782,9 +785,15 @@ input.qty-big-input {
 
   <button onclick="saveFinance()" class="submit-btn" id="finSubmitBtn">💾 Запиши транзакцията</button>
 
-  <!-- История -->
-  <div style="margin-top:72px; padding-top:48px; border-top:2px solid var(--border);"></div><div class="section-label" style="margin-top:0">Последни транзакции</div>
-  <div class="card" style="margin-bottom:8px; padding:10px 14px;">
+</div>
+
+<!-- Full screen: История на транзакциите -->
+<div class="page" id="page-finance-history">
+  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
+    <div class="section-label">Последни транзакции</div>
+    <button onclick="closeFinanceHistory()" style="background:transparent; border:1px solid var(--border); border-radius:6px; padding:5px 10px; cursor:pointer; color:var(--text2); font-size:12px; font-weight:700; font-family:var(--font);">← Назад</button>
+  </div>
+  <div class="card" style="padding:10px 14px;">
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px;">
       <button onclick="setTxPeriodCurrent()" style="padding:8px; border-radius:8px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:14px; font-weight:700; cursor:pointer; font-family:var(--font);">📅 Текущ месец</button>
       <button onclick="setTxPeriodPrevious()" style="padding:8px; border-radius:8px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:14px; font-weight:700; cursor:pointer; font-family:var(--font);">📅 Минал месец</button>
@@ -812,7 +821,7 @@ input.qty-big-input {
       <option value="">Обект</option>
     </select>
   </div>
-  <div id="txHistory"><div class="loading"><div class="spinner"></div></div></div>
+  <div id="txHistory" style="padding-bottom:120px;"><div class="loading"><div class="spinner"></div></div></div>
 </div>
 
 <!-- PAGE: СЕРВИЗ -->
@@ -3358,18 +3367,7 @@ function getGPSFinance() {
 }
 
 async function loadFinance() {
-  // По подразбиране - текущ месец
-  const dateFromEl = document.getElementById('txFilterDateFrom');
-  const dateToEl = document.getElementById('txFilterDateTo');
-  if (dateFromEl && !dateFromEl.value) {
-    const now = new Date();
-    const first = new Date(now.getFullYear(), now.getMonth(), 1);
-    const last = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    const fmt = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-    dateFromEl.value = fmt(first);
-    if (dateToEl) dateToEl.value = fmt(last);
-  }
-  await Promise.all([loadTxHistory(), populateFinanceSelects()]);
+  populateFinanceSelects();
   renderFinCategories();
 }
 
@@ -6167,6 +6165,30 @@ function closeRestockHistory() {
   }
 }
 
+function openFinanceHistory() {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-finance-history').classList.add('active');
+  history.pushState({ overlay: 'financeHistory' }, '');
+  // Default текущ месец
+  const fromEl = document.getElementById('txFilterDateFrom');
+  if (fromEl && !fromEl.value) {
+    const now = new Date();
+    const first = new Date(now.getFullYear(), now.getMonth(), 1);
+    const last = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    const fmt = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    fromEl.value = fmt(first);
+    document.getElementById('txFilterDateTo').value = fmt(last);
+  }
+  loadTxHistory();
+}
+function closeFinanceHistory() {
+  document.getElementById('page-finance-history').classList.remove('active');
+  document.getElementById('page-finance').classList.add('active');
+  if (history.state && history.state.overlay === 'financeHistory') {
+    history.back();
+  }
+}
+
 
 let overlayLastScroll = 0;
 let overlayScrollTimer = null;
@@ -6201,6 +6223,11 @@ window.addEventListener('popstate', (e) => {
   if (hp && hp.classList.contains('active')) {
     hp.classList.remove('active');
     document.getElementById('page-restock').classList.add('active');
+  }
+  const fp = document.getElementById('page-finance-history');
+  if (fp && fp.classList.contains('active')) {
+    fp.classList.remove('active');
+    document.getElementById('page-finance').classList.add('active');
   }
 });
 
