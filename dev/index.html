@@ -1226,6 +1226,12 @@ const SUPABASE_KEY = 'sb_publishable_EiMiF401eNLhjYa038FOJA_XnBfPQTO';
 const { createClient } = supabase;
 const db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
+// Токен за Edge функции: JWT на вписания потребител (за да работи Verify JWT)
+async function edgeToken() {
+  const { data: { session } } = await db.auth.getSession();
+  return session?.access_token || SUPABASE_KEY;
+}
+
 let objects = [], products = [], allProducts = [], technicians = [];
 let timerInterval = null, timerSeconds = 0, timerRunning = false;
 let lineCounter = 0;
@@ -1725,11 +1731,13 @@ async function processOCR(input) {
       status.textContent = '⏳ Разпознавам числото...';
 
       // Google Vision през Supabase Edge Function
+      const _tok = await edgeToken();
       const response = await fetch(`${SUPABASE_URL}/functions/v1/ocr-counter`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${SUPABASE_KEY}`
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${_tok}`
         },
         body: JSON.stringify({ image_base64: base64Data })
       });
@@ -4215,11 +4223,13 @@ async function processInvoiceOCR(input) {
       const base64Data = canvas.toDataURL('image/jpeg', 0.85).split(',')[1];
       status.textContent = '⏳ Разпознавам текста...';
 
+      const _tok = await edgeToken();
       const response = await fetch(`${SUPABASE_URL}/functions/v1/ocr-invoice`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${SUPABASE_KEY}`
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${_tok}`
         },
         body: JSON.stringify({ image_base64: base64Data })
       });
@@ -4470,9 +4480,14 @@ async function recalcKmForDate() {
   btn.textContent = '⏳ Изпълнява...';
 
   try {
+    const _tok = await edgeToken();
     const resp = await fetch(`${SUPABASE_URL}/functions/v1/calc-daily-km?date=${date}`, {
       method: 'GET',
-      headers: { 'Content-Type': 'application/json' }
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${_tok}`
+      }
     });
     const data = await resp.json();
     if (data.ok) {
