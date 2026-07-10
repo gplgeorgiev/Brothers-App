@@ -373,6 +373,7 @@ input.qty-big-input {
       <button class="menu-item" data-tab="products" onclick="selectMenu('products')">📦 Продукти</button>
     </div>
     <button class="menu-item" data-tab="settings" onclick="selectMenu('settings')">⚙️ Настройки</button>
+    <button class="menu-item" onclick="doLogout()" style="color:var(--red);">🚪 Изход</button>
   </div>
 </div>
 
@@ -479,9 +480,9 @@ input.qty-big-input {
         </div>
       </div>
 
-      <!-- Престой -->
-      <div class="section-label">Престой</div>
-      <div class="card">
+      <!-- Престой (скрито) -->
+      <div class="section-label" style="display:none;">Престой</div>
+      <div class="card" style="display:none;">
         <div class="timer-row">
           <div class="timer-display" id="timerDisplay">00:00:00</div>
           <div class="timer-buttons">
@@ -1195,7 +1196,28 @@ input.qty-big-input {
 
 <div class="toast" id="toast"></div>
 
-
+<!-- LOGIN OVERLAY -->
+<div id="loginOverlay" style="position:fixed; inset:0; z-index:9999; background:var(--bg); display:flex; align-items:center; justify-content:center; padding:24px;">
+  <div style="width:100%; max-width:360px;">
+    <div style="text-align:center; margin-bottom:24px;">
+      <img src="icon-192.png" style="width:160px; height:160px; border-radius:28px; object-fit:cover; margin-bottom:16px;">
+      <div style="font-size:20px; font-weight:800; color:var(--text);">Coffee Brothers</div>
+      <div style="font-size:13px; color:var(--text2);">Вписване</div>
+    </div>
+    <div class="card">
+      <div class="field">
+        <label>ИМЕЙЛ</label>
+        <input type="email" id="loginEmail" autocomplete="username" inputmode="email" placeholder="твоя@имейл.bg">
+      </div>
+      <div class="field">
+        <label>ПАРОЛА</label>
+        <input type="password" id="loginPassword" autocomplete="current-password" placeholder="парола" onkeydown="if(event.key==='Enter') doLogin()">
+      </div>
+      <div id="loginError" style="color:var(--red); font-size:13px; margin-bottom:10px; display:none;"></div>
+      <button id="loginBtn" onclick="doLogin()" class="submit-btn" style="margin-top:4px;">Влез</button>
+    </div>
+  </div>
+</div>
 
 <script>
 const SUPABASE_URL = 'https://yqbfrncncserfpcdikxy.supabase.co';
@@ -1239,23 +1261,92 @@ window.addEventListener('scroll', () => {
 }, { passive: true });
 
 document.addEventListener('DOMContentLoaded', async () => {
-  // Apply saved theme
+  // Apply saved theme (винаги, за да е тематизиран и login екранът)
   const savedTheme = localStorage.getItem('app_theme') || 'standard';
   document.documentElement.setAttribute('data-theme', savedTheme);
   // Apply icons after DOM is ready
   setTimeout(() => applyThemeIcons(savedTheme), 100);
 
+  // ── AUTH GATE ── приложението се зарежда само при вписан потребител
+  const { data: { session } } = await db.auth.getSession();
+  if (session) {
+    document.getElementById('loginOverlay').style.display = 'none';
+    await initApp();
+  } else {
+    document.getElementById('loginOverlay').style.display = 'flex';
+  }
+});
+
+// Инициализация на приложението (само след успешно вписване)
+async function initApp() {
   document.getElementById('dateInput').value = getLocalDateString();
   const finDateEl = document.getElementById('finDateInput');
   if (finDateEl) finDateEl.value = getLocalDateString();
   document.getElementById('soDate').value = new Date().toISOString().split('T')[0];
   document.getElementById('headerDate').textContent = formatDateBG(new Date());
   await Promise.all([loadObjects(), loadProducts(), loadTechnicians()]);
+  await resolveCurrentTechnician();
   loadDefaultTech();
   renderProductCards();
   if (document.getElementById('finCategoryScroll')) renderFinCategories();
   loadRestockHistory();
-});
+}
+
+// ── AUTH: вписване / изход / разпознаване на техник ──
+let currentTechnician = null;
+
+async function doLogin() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const password = document.getElementById('loginPassword').value;
+  const errEl = document.getElementById('loginError');
+  const btn = document.getElementById('loginBtn');
+  errEl.style.display = 'none';
+  if (!email || !password) {
+    errEl.textContent = 'Попълни имейл и парола';
+    errEl.style.display = 'block';
+    return;
+  }
+  btn.disabled = true;
+  const orig = btn.textContent;
+  btn.textContent = '⏳ Влизане...';
+  const { error } = await db.auth.signInWithPassword({ email, password });
+  if (error) {
+    errEl.textContent = 'Грешен имейл или парола';
+    errEl.style.display = 'block';
+    btn.disabled = false;
+    btn.textContent = orig;
+    return;
+  }
+  document.getElementById('loginPassword').value = '';
+  document.getElementById('loginOverlay').style.display = 'none';
+  btn.disabled = false;
+  btn.textContent = orig;
+  await initApp();
+}
+
+async function doLogout() {
+  const ok = await showConfirm('Изход от профила?');
+  if (!ok) return;
+  await db.auth.signOut();
+  location.reload();
+}
+
+// Намери техника, свързан с вписания потребител — по имейл (technicians.email).
+// Защитено: ако колоната още не съществува или няма съвпадение — просто пропуска.
+async function resolveCurrentTechnician() {
+  try {
+    const { data: { user } } = await db.auth.getUser();
+    if (!user || !user.email) return;
+    const { data, error } = await db.from('technicians')
+      .select('*').eq('email', user.email.toLowerCase()).is('deleted_at', null).maybeSingle();
+    if (error || !data) return;
+    currentTechnician = data;
+    // По подразбиране "кой въвежда" = вписаният техник
+    localStorage.setItem('defaultTech', String(data.id));
+  } catch (e) {
+    // колоната email още не е добавена — игнорирай
+  }
+}
 
 // ── LOAD DATA ──
 async function loadObjects() {
@@ -4278,7 +4369,8 @@ const lucideIcons = {
   '🚗': '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle; margin-right:6px;"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><path d="M9 17h6"/><circle cx="17" cy="17" r="2"/></svg>',
   '🗺': '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle; margin-right:6px;"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>',
   '📦': '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle; margin-right:6px;"><path d="M16.5 9.4 7.55 4.24"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>',
-  '📒': '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle; margin-right:6px;"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>'
+  '📒': '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle; margin-right:6px;"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>',
+  '🚪': '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle; margin-right:6px;"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>'
 };
 
 function applyThemeIcons(theme) {
@@ -5106,6 +5198,7 @@ async function loadTechniciansList() {
         <div style="flex:1; min-width:0;">
           <div style="font-weight:700; font-size:14px;">👤 ${t.name}</div>
           <div style="font-size:11px; color:var(--text2); margin-top:2px;">🚗 ${v ? v.name + (v.license ? ' · ' + v.license : '') : '—'}</div>
+          <div style="font-size:11px; color:var(--text2); margin-top:2px;">✉️ ${t.email || '— няма акаунт —'}</div>
         </div>
         <button onclick="editTechnician(${t.id})" style="padding:5px 10px; border-radius:7px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:11px; font-weight:700; cursor:pointer;">✏️</button>
         <button onclick="deleteTechnician(${t.id})" style="padding:5px 10px; border-radius:7px; border:1px solid var(--red); background:transparent; color:var(--red); font-size:11px; font-weight:700; cursor:pointer;">🗑</button>
@@ -5125,6 +5218,7 @@ async function openTechnicianModal() {
   editingTechnicianId = null;
   document.getElementById('technicianModalTitle').textContent = 'Нов техник';
   document.getElementById('techName').value = '';
+  document.getElementById('techEmail').value = '';
   await populateTechVehicleSelect();
   document.getElementById('technicianModal').style.display = 'flex';
 }
@@ -5139,16 +5233,18 @@ async function editTechnician(id) {
   editingTechnicianId = id;
   document.getElementById('technicianModalTitle').textContent = 'Редакция на техник';
   document.getElementById('techName').value = t.name;
+  document.getElementById('techEmail').value = t.email || '';
   await populateTechVehicleSelect(t.vehicle_id);
   document.getElementById('technicianModal').style.display = 'flex';
 }
 
 async function saveTechnician() {
   const name = document.getElementById('techName').value.trim();
+  const email = document.getElementById('techEmail').value.trim().toLowerCase() || null;
   const vehicleId = parseInt(document.getElementById('techVehicleId').value) || null;
   if (!name) { showToast('Попълни име!', 'error'); return; }
 
-  const payload = { name, vehicle_id: vehicleId };
+  const payload = { name, email, vehicle_id: vehicleId };
   if (!editingTechnicianId) payload.active = true;
   let result;
   if (editingTechnicianId) {
@@ -6342,6 +6438,10 @@ function restockPreviousMonth() {
     <div class="field">
       <label>ИМЕ</label>
       <input type="text" id="techName" placeholder="напр. Бати">
+    </div>
+    <div class="field">
+      <label>ИМЕЙЛ (ЗА ВХОД)</label>
+      <input type="email" id="techEmail" inputmode="email" autocapitalize="none" placeholder="имейлът от акаунта в Supabase">
     </div>
     <div class="field">
       <label>ПРЕВОЗНО СРЕДСТВО</label>
