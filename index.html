@@ -1225,6 +1225,12 @@ const SUPABASE_KEY = 'sb_publishable_n4UfSazXU9vhI9fs2paVNQ_3kz_SD9L';
 const { createClient } = supabase;
 const db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
+// Токен за Edge функции: JWT на вписания потребител (за да работи Verify JWT)
+async function edgeToken() {
+  const { data: { session } } = await db.auth.getSession();
+  return session?.access_token || SUPABASE_KEY;
+}
+
 let objects = [], products = [], allProducts = [], technicians = [];
 let timerInterval = null, timerSeconds = 0, timerRunning = false;
 let lineCounter = 0;
@@ -1724,11 +1730,13 @@ async function processOCR(input) {
       status.textContent = '⏳ Разпознавам числото...';
 
       // Google Vision през Supabase Edge Function
+      const _tok = await edgeToken();
       const response = await fetch(`${SUPABASE_URL}/functions/v1/ocr-counter`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${SUPABASE_KEY}`
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${_tok}`
         },
         body: JSON.stringify({ image_base64: base64Data })
       });
@@ -2508,33 +2516,57 @@ async function saveCash() {
 // ── HISTORY ──
 let currentEditOpId = null;
 
-async function loadRestockHistory() {
-  console.log('loadRestockHistory START at', new Date().toLocaleTimeString());
-  const el = document.getElementById('restockHistory');
-  if (!el) { console.warn('No restockHistory element in DOM'); return; }
-  console.log('Element exists, fetching data...');
-  el.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+const RESTOCK_PAGE = 30;
+let restockLoaded = 0;
+
+function fetchRestockPage(from, size) {
   const objFilter = document.getElementById('restockFilterObject')?.value || '';
   const dateFrom = document.getElementById('restockFilterDateFrom')?.value || '';
   const dateTo = document.getElementById('restockFilterDateTo')?.value || '';
-
   let q = db.from('operation_headers')
     .select('*, operations(id, product_name, product_id, quantity, cost_value, account_code, amount, deleted_at)')
     .eq('op_type', 'restock')
     .is('deleted_at', null)
     .order('date', { ascending: false })
     .order('created_at', { ascending: false })
-    .limit(20);
+    .range(from, from + size - 1);
   if (objFilter) q = q.eq('object_id', parseInt(objFilter));
   if (dateFrom) q = q.gte('date', dateFrom);
   if (dateTo) q = q.lte('date', dateTo);
+  return q;
+}
 
-  const { data, error } = await q;
+function restockMoreBtnHtml(lastCount) {
+  if (lastCount < RESTOCK_PAGE) return '';
+  return `<button onclick="loadMoreRestockHistory()" style="width:100%; padding:12px; border-radius:10px; border:1px solid var(--border); background:var(--bg3); color:var(--text); font-size:14px; font-weight:700; cursor:pointer; font-family:var(--font); margin-top:4px;">⬇️ Покажи още</button>`;
+}
+
+async function loadMoreRestockHistory() {
+  const items = document.getElementById('restockHistoryItems');
+  const wrap = document.getElementById('restockMoreWrap');
+  if (!items) return;
+  if (wrap) wrap.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  const { data, error } = await fetchRestockPage(restockLoaded, RESTOCK_PAGE);
+  if (error || !data?.length) { if (wrap) wrap.innerHTML = ''; return; }
+  items.insertAdjacentHTML('beforeend', renderRestockItems(data));
+  restockLoaded += data.length;
+  if (wrap) wrap.innerHTML = restockMoreBtnHtml(data.length);
+}
+
+async function loadRestockHistory() {
+  const el = document.getElementById('restockHistory');
+  if (!el) return;
+  el.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  restockLoaded = 0;
+  const { data, error } = await fetchRestockPage(0, RESTOCK_PAGE);
   if (error) { el.innerHTML = `<div class="empty"><div class="empty-icon">❌</div><p>${error.message}</p></div>`; return; }
-  console.log('loadRestockHistory got', data?.length, 'records');
   if (!data?.length) { el.innerHTML = '<div class="empty"><div class="empty-icon">📭</div><p>Няма записи</p></div>'; return; }
+  restockLoaded = data.length;
+  el.innerHTML = `<div id="restockHistoryItems">${renderRestockItems(data)}</div><div id="restockMoreWrap">${restockMoreBtnHtml(data.length)}</div>`;
+}
 
-  el.innerHTML = data.map(h => `
+function renderRestockItems(data) {
+  return data.map(h => `
     <div class="card" style="margin-bottom:10px;">
       <div style="display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:8px;">
         <div>
@@ -3592,41 +3624,71 @@ async function saveFinance() {
   reenableFin();
 }
 
-async function loadTxHistory() {
-  const el = document.getElementById('txHistory');
-  if (!el) return;
-  el.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+const TX_PAGE = 40;
+let txLoaded = 0;
+
+function fetchTxPage(from, size) {
   const typeFilter = document.getElementById('txFilterType')?.value || '';
-  const categoryFilter = document.getElementById('txFilterCategory')?.value || '';
   const objectFilter = document.getElementById('txFilterObject')?.value || '';
   const paymentFilter = document.getElementById('txFilterPayment')?.value || '';
   const dateFrom = document.getElementById('txFilterDateFrom')?.value || '';
   const dateTo = document.getElementById('txFilterDateTo')?.value || '';
-
   let q = db.from('operation_headers')
     .select('*, operations(account_code, amount, product_name)')
     .in('op_type', ['finance_income', 'finance_expense'])
     .is('deleted_at', null)
     .order('date', { ascending: false })
     .order('created_at', { ascending: false })
-    .limit(40);
+    .range(from, from + size - 1);
   if (typeFilter === 'income') q = q.eq('op_type', 'finance_income');
   if (paymentFilter) q = q.eq('payment_method', paymentFilter);
   if (objectFilter) q = q.eq('object_id', parseInt(objectFilter));
   if (typeFilter === 'expense') q = q.eq('op_type', 'finance_expense');
   if (dateFrom) q = q.gte('date', dateFrom);
   if (dateTo) q = q.lte('date', dateTo);
+  return q;
+}
 
-  const { data: rawData, error } = await q;
-  if (error) { el.innerHTML = `<div class="empty"><div class="empty-icon">❌</div><p>${error.message}</p></div>`; return; }
-  // Филтрирай по категория ако има
-  let data = rawData;
-  if (categoryFilter && data) {
-    data = data.filter(h => (h.operations || []).some(o => o.account_code === categoryFilter));
+function txCategoryFilter(rawData) {
+  const categoryFilter = document.getElementById('txFilterCategory')?.value || '';
+  if (categoryFilter && rawData) {
+    return rawData.filter(h => (h.operations || []).some(o => o.account_code === categoryFilter));
   }
-  if (!data?.length) { el.innerHTML = '<div class="empty"><div class="empty-icon">📭</div><p>Няма транзакции</p></div>'; return; }
+  return rawData || [];
+}
 
-  el.innerHTML = data.map(h => {
+function txMoreBtnHtml(lastRawCount) {
+  if (lastRawCount < TX_PAGE) return '';
+  return `<button onclick="loadMoreTxHistory()" style="width:100%; padding:12px; border-radius:10px; border:1px solid var(--border); background:var(--bg3); color:var(--text); font-size:14px; font-weight:700; cursor:pointer; font-family:var(--font); margin-top:4px;">⬇️ Покажи още</button>`;
+}
+
+async function loadMoreTxHistory() {
+  const items = document.getElementById('txHistoryItems');
+  const wrap = document.getElementById('txMoreWrap');
+  if (!items) return;
+  if (wrap) wrap.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  const { data: rawData, error } = await fetchTxPage(txLoaded, TX_PAGE);
+  if (error || !rawData?.length) { if (wrap) wrap.innerHTML = ''; return; }
+  txLoaded += rawData.length;
+  items.insertAdjacentHTML('beforeend', renderTxItems(txCategoryFilter(rawData)));
+  if (wrap) wrap.innerHTML = txMoreBtnHtml(rawData.length);
+}
+
+async function loadTxHistory() {
+  const el = document.getElementById('txHistory');
+  if (!el) return;
+  el.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  txLoaded = 0;
+  const { data: rawData, error } = await fetchTxPage(0, TX_PAGE);
+  if (error) { el.innerHTML = `<div class="empty"><div class="empty-icon">❌</div><p>${error.message}</p></div>`; return; }
+  if (!rawData?.length) { el.innerHTML = '<div class="empty"><div class="empty-icon">📭</div><p>Няма транзакции</p></div>'; return; }
+  txLoaded = rawData.length;
+  const data = txCategoryFilter(rawData);
+  el.innerHTML = `<div id="txHistoryItems">${renderTxItems(data)}</div><div id="txMoreWrap">${txMoreBtnHtml(rawData.length)}</div>`;
+}
+
+function renderTxItems(data) {
+  return data.map(h => {
     const isIncome = h.op_type === 'finance_income';
     // Намери основната категория (не каса/банка)
     const mainOps = (h.operations || []).filter(o => o.account_code !== '50101' && o.account_code !== '50301');
@@ -4160,11 +4222,13 @@ async function processInvoiceOCR(input) {
       const base64Data = canvas.toDataURL('image/jpeg', 0.85).split(',')[1];
       status.textContent = '⏳ Разпознавам текста...';
 
+      const _tok = await edgeToken();
       const response = await fetch(`${SUPABASE_URL}/functions/v1/ocr-invoice`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${SUPABASE_KEY}`
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${_tok}`
         },
         body: JSON.stringify({ image_base64: base64Data })
       });
@@ -4415,9 +4479,14 @@ async function recalcKmForDate() {
   btn.textContent = '⏳ Изпълнява...';
 
   try {
+    const _tok = await edgeToken();
     const resp = await fetch(`${SUPABASE_URL}/functions/v1/calc-daily-km?date=${date}`, {
       method: 'GET',
-      headers: { 'Content-Type': 'application/json' }
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${_tok}`
+      }
     });
     const data = await resp.json();
     if (data.ok) {
@@ -6240,16 +6309,7 @@ function openRestockHistory() {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById('page-restock-history').classList.add('active');
   history.pushState({ overlay: 'restockHistory' }, '');
-  // Default текущ месец
-  const fromEl = document.getElementById('restockFilterDateFrom');
-  if (fromEl && !fromEl.value) {
-    const now = new Date();
-    const first = new Date(now.getFullYear(), now.getMonth(), 1);
-    const last = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    const fmt = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-    fromEl.value = fmt(first);
-    document.getElementById('restockFilterDateTo').value = fmt(last);
-  }
+  // Без филтър по подразбиране — показва всичко (най-новите отгоре, странициране)
   loadRestockHistory();
 }
 function closeRestockHistory() {
@@ -6264,16 +6324,7 @@ function openFinanceHistory() {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById('page-finance-history').classList.add('active');
   history.pushState({ overlay: 'financeHistory' }, '');
-  // Default текущ месец
-  const fromEl = document.getElementById('txFilterDateFrom');
-  if (fromEl && !fromEl.value) {
-    const now = new Date();
-    const first = new Date(now.getFullYear(), now.getMonth(), 1);
-    const last = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    const fmt = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-    fromEl.value = fmt(first);
-    document.getElementById('txFilterDateTo').value = fmt(last);
-  }
+  // Без филтър по подразбиране — показва всичко (най-новите отгоре, странициране)
   loadTxHistory();
 }
 function closeFinanceHistory() {
