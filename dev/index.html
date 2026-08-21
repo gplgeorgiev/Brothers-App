@@ -1232,6 +1232,22 @@ async function edgeToken() {
   return session?.access_token || SUPABASE_KEY;
 }
 
+// Изтегли ВСИЧКИ редове от заявка (Supabase връща макс 1000 наведнъж).
+// makeQuery() трябва да връща НОВ query builder при всяко извикване, с .order().
+async function fetchAllRows(makeQuery, pageSize = 1000) {
+  let all = [];
+  let from = 0;
+  while (true) {
+    const { data, error } = await makeQuery().range(from, from + pageSize - 1);
+    if (error) return { data: all, error };
+    if (!data || !data.length) break;
+    all = all.concat(data);
+    if (data.length < pageSize) break;
+    from += pageSize;
+  }
+  return { data: all, error: null };
+}
+
 let objects = [], products = [], allProducts = [], technicians = [];
 let timerInterval = null, timerSeconds = 0, timerRunning = false;
 let lineCounter = 0;
@@ -2972,12 +2988,13 @@ async function loadStats() {
   const vehMap = new Map((vehiclesForStats || []).map(v => [v.id, v]));
 
   // Взимаме хедърите за периода (за гориво смятане)
-  const { data: hdrsForStats } = await db.from('operation_headers')
+  const { data: hdrsForStats } = await fetchAllRows(() => db.from('operation_headers')
     .select('id, date, object_name, km, vehicle_id, op_type')
     .gte('date', dateFrom)
     .lte('date', dateTo)
     .in('op_type', ['restock', 'service'])
-    .is('deleted_at', null);
+    .is('deleted_at', null)
+    .order('id', { ascending: true }));
 
   // Изчисли начислен наем за периода: пропорционално за всеки месец
   function calcRentForPeriod(monthlyRent, fromStr, toStr) {
@@ -3020,11 +3037,12 @@ async function loadStats() {
   });
 
   // Взимаме operations с header data - филтрираме по период и не-изтрити
-  const { data: ops } = await db.from('operations')
+  const { data: ops } = await fetchAllRows(() => db.from('operations')
     .select('account_code, amount, entry_type, object_name, product_name, header_id, operation_headers!inner(date, op_type, deleted_at, object_name, contractor, comment, document_ref)')
     .gte('operation_headers.date', dateFrom)
     .lte('operation_headers.date', dateTo)
-    .is('deleted_at', null);
+    .is('deleted_at', null)
+    .order('header_id', { ascending: true }));
 
   if (!ops) {
     grid.innerHTML = '<div class="empty"><div class="empty-icon">📊</div><p>Няма данни</p></div>';
@@ -3870,10 +3888,11 @@ async function saveEditFin() {
 
 async function loadBalanceSummary() {
   const el = document.getElementById('balanceSummary');
-  const { data } = await db.from('operations')
+  const { data } = await fetchAllRows(() => db.from('operations')
     .select('account_code, amount, technician_name, entry_type, header_id, product_name, operation_headers!inner(date, payment_method, op_type, deleted_at, object_name, comment, contractor)')
     .in('account_code', ['50101', '50301'])
-    .is('deleted_at', null);
+    .is('deleted_at', null)
+    .order('header_id', { ascending: true }));
   if (!data) return;
 
   const cashOps = data.filter(o => o.account_code === '50101' && !o.operation_headers?.deleted_at);
@@ -5979,16 +5998,18 @@ async function exportStatsByObject() {
   const excludedSet = new Set((excludedAccs || []).map(a => a.code));
   const { data: vehs } = await db.from('vehicles').select('id, fuel_consumption, fuel_price').is('deleted_at', null);
   const vehMap = new Map((vehs || []).map(v => [v.id, v]));
-  const { data: hdrsForStats } = await db.from('operation_headers')
+  const { data: hdrsForStats } = await fetchAllRows(() => db.from('operation_headers')
     .select('id, date, object_name, km, vehicle_id, op_type')
     .gte('date', dateFrom).lte('date', dateTo)
     .in('op_type', ['restock', 'service'])
-    .is('deleted_at', null);
-  const { data: ops } = await db.from('operations')
+    .is('deleted_at', null)
+    .order('id', { ascending: true }));
+  const { data: ops } = await fetchAllRows(() => db.from('operations')
     .select('account_code, amount, entry_type, object_name, product_name, header_id, operation_headers!inner(date, op_type, deleted_at, object_name, contractor, comment, document_ref)')
     .gte('operation_headers.date', dateFrom)
     .lte('operation_headers.date', dateTo)
-    .is('deleted_at', null);
+    .is('deleted_at', null)
+    .order('header_id', { ascending: true }));
 
   let validOps = (ops || []).filter(o => !o.operation_headers?.deleted_at);
   if (objFilter) validOps = validOps.filter(o => (o.object_name || o.operation_headers?.object_name) === objFilter);
@@ -6110,10 +6131,11 @@ async function exportCashByTechnician() {
   rows.push(['Период от:', dateFrom, 'до:', dateTo]);
   rows.push([]);
 
-  const { data } = await db.from('operations')
+  const { data } = await fetchAllRows(() => db.from('operations')
     .select('account_code, amount, technician_name, entry_type, header_id, operation_headers!inner(date, payment_method, op_type, deleted_at, object_name, comment, contractor)')
     .eq('account_code', '50101')
-    .is('deleted_at', null);
+    .is('deleted_at', null)
+    .order('header_id', { ascending: true }));
 
   const cashOps = (data || []).filter(o => !o.operation_headers?.deleted_at);
 
@@ -6221,10 +6243,11 @@ async function exportBankMovements() {
   rows.push(['Период от:', dateFrom, 'до:', dateTo]);
   rows.push([]);
 
-  const { data } = await db.from('operations')
+  const { data } = await fetchAllRows(() => db.from('operations')
     .select('account_code, amount, entry_type, header_id, operation_headers!inner(date, op_type, deleted_at, object_name, comment, contractor)')
     .eq('account_code', '50301')
-    .is('deleted_at', null);
+    .is('deleted_at', null)
+    .order('header_id', { ascending: true }));
 
   const bankOps = (data || []).filter(o => !o.operation_headers?.deleted_at);
 
