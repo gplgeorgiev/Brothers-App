@@ -1439,10 +1439,15 @@ async function loadTechnicians() {
   technicians = data;
   [document.getElementById('techSelect'), document.getElementById('defaultTechSelect')].forEach(sel => {
     if (!sel) return;
+    const prev = sel.value;
+    const placeholder = sel.querySelector('option[value=""]');
+    sel.innerHTML = '';
+    if (placeholder) sel.appendChild(placeholder);
     data.forEach(t => {
       const opt = document.createElement('option');
       opt.value = t.id; opt.textContent = t.name; sel.appendChild(opt);
     });
+    if (prev && data.some(t => String(t.id) === prev)) sel.value = prev;
   });
   // Попълни техници в Финанси
   if (typeof updateFinExtraSummary === 'function') setTimeout(updateFinExtraSummary, 100);
