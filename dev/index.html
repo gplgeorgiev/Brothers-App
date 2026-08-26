@@ -5303,11 +5303,19 @@ async function populateTechVehicleSelect(selectedId = null) {
   sel.innerHTML = '<option value="">—</option>' + (vehs || []).map(v => `<option value="${v.id}" ${v.id === selectedId ? 'selected' : ''}>${v.name}${v.license ? ' · ' + v.license : ''}</option>`).join('');
 }
 
+function isAdmin() { return currentTechnician?.role === 'admin'; }
+
 async function openTechnicianModal() {
   editingTechnicianId = null;
   document.getElementById('technicianModalTitle').textContent = 'Нов техник';
   document.getElementById('techName').value = '';
   document.getElementById('techEmail').value = '';
+  document.getElementById('techPassword').value = '';
+  document.getElementById('techRole').value = 'member';
+  // Създаване на акаунт — само за админ и само при нов техник
+  const show = isAdmin() ? 'block' : 'none';
+  document.getElementById('techPasswordField').style.display = show;
+  document.getElementById('techRoleField').style.display = show;
   await populateTechVehicleSelect();
   document.getElementById('technicianModal').style.display = 'flex';
 }
@@ -5323,6 +5331,10 @@ async function editTechnician(id) {
   document.getElementById('technicianModalTitle').textContent = 'Редакция на техник';
   document.getElementById('techName').value = t.name;
   document.getElementById('techEmail').value = t.email || '';
+  document.getElementById('techPassword').value = '';
+  // При редакция не създаваме акаунт през този модал
+  document.getElementById('techPasswordField').style.display = 'none';
+  document.getElementById('techRoleField').style.display = 'none';
   await populateTechVehicleSelect(t.vehicle_id);
   document.getElementById('technicianModal').style.display = 'flex';
 }
@@ -5331,10 +5343,42 @@ async function saveTechnician() {
   const name = document.getElementById('techName').value.trim();
   const email = document.getElementById('techEmail').value.trim().toLowerCase() || null;
   const vehicleId = parseInt(document.getElementById('techVehicleId').value) || null;
+  const password = document.getElementById('techPassword')?.value || '';
+  const role = document.getElementById('techRole')?.value || 'member';
   if (!name) { showToast('Попълни име!', 'error'); return; }
 
+  const btn = document.querySelector('#technicianModal .modal-btns button:not(.cancel)');
+  const origBtn = btn?.textContent;
+
+  // НОВ техник + админ + парола → създай login акаунт през Edge функцията
+  if (!editingTechnicianId && isAdmin() && password) {
+    if (!email) { showToast('Въведи имейл за акаунта!', 'error'); return; }
+    if (password.length < 6) { showToast('Паролата трябва да е поне 6 знака!', 'error'); return; }
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Създава...'; }
+    try {
+      const _tok = await edgeToken();
+      const resp = await fetch(`${SUPABASE_URL}/functions/v1/create-user`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${_tok}` },
+        body: JSON.stringify({ name, email, password, role, vehicle_id: vehicleId })
+      });
+      const data = await resp.json();
+      if (!resp.ok || data.error) { showToast('❌ ' + (data.error || 'Грешка при създаване'), 'error'); return; }
+      showToast('✅ Акаунтът е създаден', 'success');
+      closeTechnicianModal();
+      await loadTechniciansList();
+      await loadTechnicians();
+    } catch (e) {
+      showToast('❌ ' + e.message, 'error');
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = origBtn; }
+    }
+    return;
+  }
+
+  // Иначе — техник без акаунт / редакция (старото поведение)
   const payload = { name, email, vehicle_id: vehicleId };
-  if (!editingTechnicianId) payload.active = true;
+  if (!editingTechnicianId) { payload.active = true; payload.tenant_id = currentTechnician?.tenant_id || null; }
   let result;
   if (editingTechnicianId) {
     result = await db.from('technicians').update(payload).eq('id', editingTechnicianId);
@@ -6516,7 +6560,19 @@ function restockPreviousMonth() {
     </div>
     <div class="field">
       <label>ИМЕЙЛ (ЗА ВХОД)</label>
-      <input type="email" id="techEmail" inputmode="email" autocapitalize="none" placeholder="имейлът от акаунта в Supabase">
+      <input type="email" id="techEmail" inputmode="email" autocapitalize="none" placeholder="имейл на техника">
+    </div>
+    <div class="field" id="techPasswordField" style="display:none;">
+      <label>ПАРОЛА (създава акаунт)</label>
+      <input type="text" id="techPassword" autocomplete="new-password" placeholder="мин. 6 знака — остави празно за без акаунт">
+      <div style="font-size:11px; color:var(--text3); margin-top:4px;">Ако попълниш парола, се създава login акаунт. Кажи паролата на техника.</div>
+    </div>
+    <div class="field" id="techRoleField" style="display:none;">
+      <label>РОЛЯ</label>
+      <select id="techRole" style="width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:8px; background:var(--bg3); color:var(--text); font-size:14px;">
+        <option value="member">Техник</option>
+        <option value="admin">Админ</option>
+      </select>
     </div>
     <div class="field">
       <label>ПРЕВОЗНО СРЕДСТВО</label>
