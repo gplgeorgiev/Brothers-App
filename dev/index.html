@@ -1720,9 +1720,26 @@ function toggleSpiralGroup(gid) {
 
 function filterSpiralChecklist() {
   const q = (document.getElementById('spiralSearch').value || '').toLowerCase().trim();
-  document.querySelectorAll('#spiralChecklist .spiral-row').forEach(row => {
-    const match = !q || (row.dataset.code || '').includes(q) || (row.dataset.name || '').includes(q);
-    row.style.display = match ? 'flex' : 'none';
+  document.querySelectorAll('#spiralChecklist .spgrp-body').forEach(body => {
+    let anyMatch = false;
+    body.querySelectorAll('.spiral-row').forEach(row => {
+      const match = !q || (row.dataset.code || '').includes(q) || (row.dataset.name || '').includes(q);
+      row.style.display = match ? 'flex' : 'none';
+      if (match) anyMatch = true;
+    });
+    const card = body.closest('.card');
+    const arr = document.getElementById(body.id + '-arr');
+    if (q) {
+      // при търсене: разгъни групите със съвпадение, скрий групите без
+      body.style.display = anyMatch ? 'block' : 'none';
+      if (card) card.style.display = anyMatch ? 'block' : 'none';
+      if (arr) arr.textContent = '▾';
+    } else {
+      // празно търсене: върни всичко видимо и отворено
+      body.style.display = 'block';
+      if (card) card.style.display = 'block';
+      if (arr) arr.textContent = '▾';
+    }
   });
 }
 
