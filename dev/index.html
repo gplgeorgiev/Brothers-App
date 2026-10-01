@@ -1767,11 +1767,11 @@ async function submitSpiralRestock() {
   const rows = [];
   items.forEach(it => {
     const cost = parseFloat(((it.slot.products?.price_with_vat || 0) * it.added).toFixed(2));
-    const rev = parseFloat(((it.slot.price || 0) * it.added).toFixed(2));
     rows.push({
       header_id: header.id, date, object_name: obj?.name, technician_name: tech?.name,
       product_id: it.slot.product_id, product_name: `${it.slot.slot_code} · ${it.slot.products?.name || ''}`,
-      quantity: it.added, cost_value: cost, amount: rev,
+      quantity: it.added, cost_value: cost, amount: cost,
+      unit_price: it.slot.price || 0,
       account_code: '30201', entry_type: 'C'
     });
   });
