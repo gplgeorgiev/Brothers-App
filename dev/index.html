@@ -450,7 +450,10 @@ input.qty-big-input {
   <!-- SPIRAL секция (само за спирални автомати) -->
   <div id="spiralRestockSection" style="display:none;">
     <div class="section-label">Артикули</div>
-    <input type="search" id="spiralSearch" oninput="filterSpiralChecklist()" placeholder="🔍 търси спирала или артикул" style="width:100%; background:var(--bg3); border:1px solid var(--border); border-radius:10px; padding:11px 14px; color:var(--text); font-size:15px; outline:none; font-family:var(--font); margin-bottom:10px;">
+    <div style="position:relative; margin-bottom:10px;">
+      <input type="text" id="spiralSearch" oninput="filterSpiralChecklist()" placeholder="🔍 търси спирала или артикул" style="width:100%; background:var(--bg3); border:1px solid var(--border); border-radius:10px; padding:11px 48px 11px 14px; color:var(--text); font-size:15px; outline:none; font-family:var(--font);">
+      <button type="button" id="spiralSearchClear" onclick="clearSpiralSearch()" style="display:none; position:absolute; right:6px; top:50%; transform:translateY(-50%); width:38px; height:38px; align-items:center; justify-content:center; border:1px solid var(--border); background:var(--bg); color:var(--text2); border-radius:9px; font-size:20px; line-height:1; cursor:pointer;">✕</button>
+    </div>
     <div id="spiralChecklist"></div>
   </div>
 
@@ -1720,6 +1723,8 @@ function toggleSpiralGroup(gid) {
 
 function filterSpiralChecklist() {
   const q = (document.getElementById('spiralSearch').value || '').toLowerCase().trim();
+  const clearBtn = document.getElementById('spiralSearchClear');
+  if (clearBtn) clearBtn.style.display = q ? 'flex' : 'none';
   document.querySelectorAll('#spiralChecklist .spgrp-body').forEach(body => {
     let anyMatch = false;
     body.querySelectorAll('.spiral-row').forEach(row => {
@@ -1741,6 +1746,13 @@ function filterSpiralChecklist() {
       if (arr) arr.textContent = '▸';
     }
   });
+}
+
+function clearSpiralSearch() {
+  const el = document.getElementById('spiralSearch');
+  if (!el) return;
+  el.value = '';
+  filterSpiralChecklist();
 }
 
 async function submitSpiralRestock() {
