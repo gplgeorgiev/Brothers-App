@@ -5121,7 +5121,7 @@ async function saveProduct() {
   const autoAdd = document.getElementById('prodAutoAdd').checked;
   if (!name) { showToast('Попълни име!', 'error'); return; }
 
-  const payload = { name, icon, unit, price_with_vat: priceWithVat, auto_add: autoAdd };
+  const payload = { name, icon, unit, price_with_vat: priceWithVat, price_no_vat: parseFloat((priceWithVat / 1.2).toFixed(4)), auto_add: autoAdd };
   let result;
   if (editingProductId) {
     result = await db.from('products').update(payload).eq('id', editingProductId);
