@@ -451,7 +451,7 @@ input.qty-big-input {
   <div id="spiralRestockSection" style="display:none;">
     <div class="section-label">Артикули</div>
     <div style="position:relative; margin-bottom:10px;">
-      <input type="text" id="spiralSearch" oninput="filterSpiralChecklist()" onfocus="this.select()" onmouseup="return false" placeholder="🔍 търси спирала или артикул" style="width:100%; background:var(--bg3); border:1px solid var(--border); border-radius:10px; padding:11px 48px 11px 14px; color:var(--text); font-size:15px; outline:none; font-family:var(--font);">
+      <input type="text" id="spiralSearch" oninput="filterSpiralChecklist()" onfocus="if(this.value){this.value='';filterSpiralChecklist();}" placeholder="🔍 търси спирала или артикул" style="width:100%; background:var(--bg3); border:1px solid var(--border); border-radius:10px; padding:11px 48px 11px 14px; color:var(--text); font-size:15px; outline:none; font-family:var(--font);">
       <button type="button" id="spiralSearchClear" onclick="clearSpiralSearch()" style="display:none; position:absolute; right:6px; top:50%; transform:translateY(-50%); width:38px; height:38px; align-items:center; justify-content:center; border:1px solid var(--border); background:var(--bg); color:var(--text2); border-radius:9px; font-size:20px; line-height:1; cursor:pointer;">✕</button>
     </div>
     <div id="spiralChecklist"></div>
