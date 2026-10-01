@@ -1753,6 +1753,7 @@ function clearSpiralSearch() {
   if (!el) return;
   el.value = '';
   filterSpiralChecklist();
+  el.focus();  // връща фокуса → задейства наново скрола към върха (onfocus)
 }
 
 // При фокус — изкарай търсачката близо до върха, за да не я крие клавиатурата
