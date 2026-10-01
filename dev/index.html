@@ -1679,10 +1679,10 @@ async function renderSpiralChecklist(objectId) {
           <div style="font-weight:800; font-size:13px;">${g === '—' ? 'Спирали' : 'Ред ' + g}</div>
           <div style="display:flex; align-items:center; gap:8px;">
             <span style="font-size:11px; color:var(--text2);">${groups[g].length} сп.</span>
-            <span id="${gid}-arr" style="font-size:11px; color:var(--text2);">▾</span>
+            <span id="${gid}-arr" style="font-size:11px; color:var(--text2);">▸</span>
           </div>
         </div>
-        <div id="${gid}" class="spgrp-body">${rows}</div>
+        <div id="${gid}" class="spgrp-body" style="display:none;">${rows}</div>
       </div>`;
   }).join('');
 }
@@ -1735,10 +1735,10 @@ function filterSpiralChecklist() {
       if (card) card.style.display = anyMatch ? 'block' : 'none';
       if (arr) arr.textContent = '▾';
     } else {
-      // празно търсене: върни всичко видимо и отворено
-      body.style.display = 'block';
+      // празно търсене: редовете са видими (горе), групите — СГЪНАТИ (по подразбиране)
+      body.style.display = 'none';
       if (card) card.style.display = 'block';
-      if (arr) arr.textContent = '▾';
+      if (arr) arr.textContent = '▸';
     }
   });
 }
