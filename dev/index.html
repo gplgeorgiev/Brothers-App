@@ -5232,6 +5232,7 @@ function resetSlotForm() {
   document.getElementById('slotCapacity').value = '';
   document.getElementById('slotPrice').value = '';
   document.getElementById('slotSaveBtn').textContent = '+ Добави спирала';
+  document.getElementById('slotCancelBtn').style.display = 'none';
 }
 
 async function loadPlanogram() {
@@ -5288,6 +5289,7 @@ async function editSlot(id) {
   document.getElementById('slotCapacity').value = s.capacity || '';
   document.getElementById('slotPrice').value = s.price || '';
   document.getElementById('slotSaveBtn').textContent = '✓ Запази промените';
+  document.getElementById('slotCancelBtn').style.display = 'block';
   window.scrollTo(0, 0);
 }
 
@@ -6694,7 +6696,10 @@ function restockPreviousMonth() {
         <input type="text" id="slotPrice" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*" placeholder="напр. 1.50">
       </div>
     </div>
-    <button onclick="saveSlot()" class="submit-btn" id="slotSaveBtn" style="margin-top:0;">+ Добави спирала</button>
+    <div style="display:flex; gap:8px;">
+      <button onclick="resetSlotForm()" id="slotCancelBtn" style="display:none; flex:1; padding:14px; border-radius:12px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:15px; font-weight:700; cursor:pointer; font-family:var(--font);">Отказ</button>
+      <button onclick="saveSlot()" class="submit-btn" id="slotSaveBtn" style="margin-top:0; flex:2;">+ Добави спирала</button>
+    </div>
   </div>
 
   <div class="section-label">Спирали</div>
