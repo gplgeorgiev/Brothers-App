@@ -400,6 +400,8 @@ input.qty-big-input {
     <div id="objectInfo"></div>
   </div>
 
+  <!-- COFFEE секции (само за кафе машини) -->
+  <div id="coffeeRestockSections">
   <!-- 2. ПРОДУКТИ -->
   <div class="section-label">Продукти</div>
   <div class="card">
@@ -441,6 +443,17 @@ input.qty-big-input {
     </div>
     <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none" onchange="processOCR(this)">
     <input type="file" id="galleryInput" accept="image/*" style="display:none" onchange="processOCR(this)">
+  </div>
+  </div>
+  <!-- КРАЙ COFFEE секции -->
+
+  <!-- SPIRAL секция (само за спирални автомати) -->
+  <div id="spiralRestockSection" style="display:none;">
+    <div style="display:flex; align-items:center; justify-content:space-between;">
+      <div class="section-label">Спирали — добавени бройки</div>
+      <input type="search" id="spiralSearch" oninput="filterSpiralChecklist()" placeholder="🔍 търси" style="width:120px; background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:6px 10px; color:var(--text); font-size:12px; outline:none; font-family:var(--font);">
+    </div>
+    <div id="spiralChecklist"></div>
   </div>
 
   <!-- 4-7. ДОПЪЛНИТЕЛНИ -->
@@ -1631,8 +1644,159 @@ document.getElementById('objectSelect').addEventListener('change', function() {
         <span class="badge amber">🏠 ${obj.rent} EUR наем</span>
         ${obj.serial_number ? `<span class="badge">${obj.serial_number}</span>` : ''}
       </div>`;
-  } else { document.getElementById('objectInfo').innerHTML = ''; }
+    const isSpiral = obj.type === 'spiral';
+    document.getElementById('coffeeRestockSections').style.display = isSpiral ? 'none' : 'block';
+    document.getElementById('spiralRestockSection').style.display = isSpiral ? 'block' : 'none';
+    if (isSpiral) renderSpiralChecklist(obj.id);
+  } else {
+    document.getElementById('objectInfo').innerHTML = '';
+    document.getElementById('coffeeRestockSections').style.display = 'block';
+    document.getElementById('spiralRestockSection').style.display = 'none';
+  }
 });
+
+// ── ЗАРЕЖДАНЕ НА СПИРАЛЕН АВТОМАТ (чек-лист) ──
+let spiralSlots = [];
+
+async function renderSpiralChecklist(objectId) {
+  const wrap = document.getElementById('spiralChecklist');
+  wrap.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  const { data, error } = await db.from('machine_slots')
+    .select('*, products(name, icon, price_with_vat)')
+    .eq('object_id', objectId)
+    .is('deleted_at', null)
+    .order('sort_order', { ascending: true, nullsFirst: false })
+    .order('slot_code', { ascending: true });
+  if (error) { wrap.innerHTML = `<div class="empty"><div class="empty-icon">❌</div><p>${error.message}</p></div>`; return; }
+  if (!data || !data.length) { wrap.innerHTML = '<div class="empty"><div class="empty-icon">📋</div><p>Няма планограма за тази машина. Добави спирали в Основни данни → Обекти → Планограма.</p></div>'; return; }
+  spiralSlots = data;
+  const groups = {};
+  data.forEach(s => { const g = s.row_group || '—'; (groups[g] = groups[g] || []).push(s); });
+  wrap.innerHTML = Object.keys(groups).sort().map((g, gi) => {
+    const rows = groups[g].map(s => spiralRowHtml(s)).join('');
+    const gid = 'spgrp-' + gi;
+    return `
+      <div class="card" style="padding:0; margin-bottom:8px; overflow:hidden;">
+        <div onclick="toggleSpiralGroup('${gid}')" style="display:flex; justify-content:space-between; align-items:center; padding:10px 14px; cursor:pointer; background:var(--bg3);">
+          <div style="font-weight:800; font-size:13px;">${g === '—' ? 'Спирали' : 'Ред ' + g}</div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-size:11px; color:var(--text2);">${groups[g].length} сп.</span>
+            <span id="${gid}-arr" style="font-size:11px; color:var(--text2);">▾</span>
+          </div>
+        </div>
+        <div id="${gid}" class="spgrp-body">${rows}</div>
+      </div>`;
+  }).join('');
+}
+
+function spiralRowHtml(s) {
+  return `
+    <div class="spiral-row" data-code="${(s.slot_code||'').toLowerCase()}" data-name="${(s.products?.name||'').toLowerCase()}" style="display:flex; align-items:center; gap:8px; padding:8px 12px; border-top:1px solid var(--border);">
+      <div style="font-family:var(--mono); font-weight:800; min-width:32px; text-align:center;">${s.slot_code}</div>
+      <div style="flex:1; min-width:0;">
+        <div style="font-size:12px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${s.products?.icon||'📦'} ${s.products?.name||'—'}</div>
+        <div style="font-size:10px; color:var(--text3);">кап.${s.capacity} · ${(s.price||0).toFixed(2)} EUR</div>
+      </div>
+      <div style="display:flex; align-items:center; gap:4px;">
+        <div onclick="changeSpiralQty('${s.id}',-1)" style="width:30px; height:30px; border-radius:7px; background:var(--bg3); border:1px solid var(--border); display:flex; align-items:center; justify-content:center; font-size:18px; font-weight:700; cursor:pointer; user-select:none;">−</div>
+        <input id="sp-add-${s.id}" type="number" inputmode="numeric" min="0" value="" placeholder="0" style="width:48px; text-align:center; background:var(--bg2); border:1px solid var(--border); border-radius:8px; padding:6px 2px; color:var(--text); font-family:var(--mono); font-size:16px; font-weight:700; outline:none;">
+        <div onclick="changeSpiralQty('${s.id}',1)" style="width:30px; height:30px; border-radius:7px; background:var(--accent); border:none; color:#fff; display:flex; align-items:center; justify-content:center; font-size:18px; font-weight:700; cursor:pointer; user-select:none;">＋</div>
+      </div>
+    </div>`;
+}
+
+function changeSpiralQty(slotId, delta) {
+  const el = document.getElementById('sp-add-' + slotId);
+  if (!el) return;
+  el.value = Math.max(0, (parseInt(el.value) || 0) + delta) || '';
+}
+
+function toggleSpiralGroup(gid) {
+  const body = document.getElementById(gid);
+  const arr = document.getElementById(gid + '-arr');
+  if (!body) return;
+  const hidden = body.style.display === 'none';
+  body.style.display = hidden ? 'block' : 'none';
+  if (arr) arr.textContent = hidden ? '▾' : '▸';
+}
+
+function filterSpiralChecklist() {
+  const q = (document.getElementById('spiralSearch').value || '').toLowerCase().trim();
+  document.querySelectorAll('#spiralChecklist .spiral-row').forEach(row => {
+    const match = !q || (row.dataset.code || '').includes(q) || (row.dataset.name || '').includes(q);
+    row.style.display = match ? 'flex' : 'none';
+  });
+}
+
+async function submitSpiralRestock() {
+  const btn = document.getElementById('submitBtn');
+  if (btn?.disabled) return;
+  const objectId = document.getElementById('objectSelect').value;
+  const techId = document.getElementById('techSelect').value;
+  const date = document.getElementById('dateInput').value;
+  if (!objectId) { showToast('Избери обект!', 'error'); return; }
+  if (!techId) { showToast('Избери техник!', 'error'); return; }
+  if (!date) { showToast('Избери дата!', 'error'); return; }
+
+  const items = [];
+  spiralSlots.forEach(s => {
+    const added = parseInt(document.getElementById('sp-add-' + s.id)?.value) || 0;
+    if (added > 0) items.push({ slot: s, added });
+  });
+  if (!items.length) { showToast('Няма въведени бройки!', 'error'); return; }
+
+  const obj = objects.find(o => o.id == objectId);
+  const tech = technicians.find(t => t.id == techId);
+  const comment = document.getElementById('commentInput').value;
+  const dateObj = new Date(date);
+  const weekNum = getWeekNumber(dateObj);
+  const period = `${dateObj.getFullYear()}.${String(dateObj.getMonth()+1).padStart(2,'0')}`;
+  const cogs = parseFloat(items.reduce((s, it) => s + (it.slot.products?.price_with_vat || 0) * it.added, 0).toFixed(2));
+  const revenue = parseFloat(items.reduce((s, it) => s + (it.slot.price || 0) * it.added, 0).toFixed(2));
+
+  const origText = btn?.innerHTML;
+  if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Записва...'; }
+
+  const { data: header, error: hErr } = await db.from('operation_headers').insert({
+    date, object_id: parseInt(objectId), object_name: obj?.name,
+    technician_id: parseInt(techId), technician_name: tech?.name,
+    op_type: 'restock', week_number: weekNum, period,
+    duration_minutes: 0, km: 0,
+    total_cost: cogs, expected_revenue: revenue,
+    vehicle_id: tech?.vehicle_id || null, comment
+  }).select().single();
+  if (hErr) { showToast('❌ ' + hErr.message, 'error'); if (btn) { btn.disabled = false; btn.innerHTML = origText; } return; }
+
+  const rows = [];
+  items.forEach(it => {
+    const amt = parseFloat(((it.slot.products?.price_with_vat || 0) * it.added).toFixed(2));
+    rows.push({
+      header_id: header.id, date, object_name: obj?.name, technician_name: tech?.name,
+      product_id: it.slot.product_id, product_name: `${it.slot.slot_code} · ${it.slot.products?.name || ''}`,
+      quantity: it.added, cost_value: amt, amount: amt,
+      account_code: '30201', entry_type: 'C'
+    });
+  });
+  rows.push({
+    header_id: header.id, date, object_name: obj?.name, technician_name: tech?.name,
+    product_name: 'Изписани суровини', quantity: 1,
+    cost_value: cogs, amount: cogs, account_code: '60101', entry_type: 'D'
+  });
+  const { error: rErr } = await db.from('operations').insert(rows);
+  if (rErr) { await db.from('operation_headers').delete().eq('id', header.id); showToast('❌ ' + rErr.message, 'error'); if (btn) { btn.disabled = false; btn.innerHTML = origText; } return; }
+
+  showToast(`✅ Записани ${items.length} спирали`, 'success');
+  if (btn) { btn.disabled = false; btn.innerHTML = origText; }
+  document.getElementById('commentInput').value = '';
+  document.getElementById('objectSelect').value = '';
+  document.getElementById('objectInfo').innerHTML = '';
+  document.getElementById('spiralRestockSection').style.display = 'none';
+  document.getElementById('coffeeRestockSections').style.display = 'block';
+  document.getElementById('spiralChecklist').innerHTML = '';
+  spiralSlots = [];
+  window.scrollTo(0, 0);
+  if (typeof loadRestockHistory === 'function') loadRestockHistory();
+}
 
 // ── GPS ──
 function getGPS() {
@@ -1822,6 +1986,9 @@ async function checkDuplicate(opType, objectId, totalCost, technicianId, withinS
 }
 
 async function submitRestock() {
+  // Спирален автомат → отделен запис по спирали
+  const _selObj = objects.find(o => o.id == document.getElementById('objectSelect').value);
+  if (_selObj && _selObj.type === 'spiral') { return submitSpiralRestock(); }
   // Защита срещу double-click
   const submitBtn = document.querySelector('button.submit-btn');
   if (submitBtn?.disabled) return;
