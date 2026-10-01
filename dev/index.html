@@ -449,10 +449,8 @@ input.qty-big-input {
 
   <!-- SPIRAL секция (само за спирални автомати) -->
   <div id="spiralRestockSection" style="display:none;">
-    <div style="display:flex; align-items:center; justify-content:space-between;">
-      <div class="section-label">Спирали — добавени бройки</div>
-      <input type="search" id="spiralSearch" oninput="filterSpiralChecklist()" placeholder="🔍 търси" style="width:120px; background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:6px 10px; color:var(--text); font-size:12px; outline:none; font-family:var(--font);">
-    </div>
+    <div class="section-label">Артикули</div>
+    <input type="search" id="spiralSearch" oninput="filterSpiralChecklist()" placeholder="🔍 търси спирала или артикул" style="width:100%; background:var(--bg3); border:1px solid var(--border); border-radius:10px; padding:11px 14px; color:var(--text); font-size:15px; outline:none; font-family:var(--font); margin-bottom:10px;">
     <div id="spiralChecklist"></div>
   </div>
 
@@ -1691,16 +1689,16 @@ async function renderSpiralChecklist(objectId) {
 
 function spiralRowHtml(s) {
   return `
-    <div class="spiral-row" data-code="${(s.slot_code||'').toLowerCase()}" data-name="${(s.products?.name||'').toLowerCase()}" style="display:flex; align-items:center; gap:8px; padding:8px 12px; border-top:1px solid var(--border);">
-      <div style="font-family:var(--mono); font-weight:800; min-width:32px; text-align:center;">${s.slot_code}</div>
+    <div class="spiral-row" data-code="${(s.slot_code||'').toLowerCase()}" data-name="${(s.products?.name||'').toLowerCase()}" style="display:flex; align-items:center; gap:10px; padding:10px 12px; border-top:1px solid var(--border);">
+      <div style="font-family:var(--mono); font-weight:800; min-width:36px; text-align:center; font-size:17px;">${s.slot_code}</div>
       <div style="flex:1; min-width:0;">
-        <div style="font-size:12px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${s.products?.icon||'📦'} ${s.products?.name||'—'}</div>
-        <div style="font-size:10px; color:var(--text3);">кап.${s.capacity} · ${(s.price||0).toFixed(2)} EUR</div>
+        <div style="font-size:15px; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${s.products?.icon||'📦'} ${s.products?.name||'—'}</div>
+        <div style="font-size:12px; color:var(--text2); margin-top:1px;">кап.${s.capacity} · ${(s.price||0).toFixed(2)} EUR</div>
       </div>
-      <div style="display:flex; align-items:center; gap:4px;">
-        <div onclick="changeSpiralQty('${s.id}',-1)" style="width:30px; height:30px; border-radius:7px; background:var(--bg3); border:1px solid var(--border); display:flex; align-items:center; justify-content:center; font-size:18px; font-weight:700; cursor:pointer; user-select:none;">−</div>
-        <input id="sp-add-${s.id}" type="number" inputmode="numeric" min="0" value="" placeholder="0" style="width:48px; text-align:center; background:var(--bg2); border:1px solid var(--border); border-radius:8px; padding:6px 2px; color:var(--text); font-family:var(--mono); font-size:16px; font-weight:700; outline:none;">
-        <div onclick="changeSpiralQty('${s.id}',1)" style="width:30px; height:30px; border-radius:7px; background:var(--accent); border:none; color:#fff; display:flex; align-items:center; justify-content:center; font-size:18px; font-weight:700; cursor:pointer; user-select:none;">＋</div>
+      <div style="display:flex; align-items:center; gap:5px;">
+        <div onclick="changeSpiralQty('${s.id}',-1)" style="width:34px; height:34px; border-radius:8px; background:var(--bg3); border:1px solid var(--border); display:flex; align-items:center; justify-content:center; font-size:20px; font-weight:700; cursor:pointer; user-select:none;">−</div>
+        <input id="sp-add-${s.id}" type="number" inputmode="numeric" min="0" value="" placeholder="0" style="width:54px; text-align:center; background:var(--bg2); border:1px solid var(--border); border-radius:8px; padding:7px 2px; color:var(--text); font-family:var(--mono); font-size:18px; font-weight:800; outline:none;">
+        <div onclick="changeSpiralQty('${s.id}',1)" style="width:34px; height:34px; border-radius:8px; background:var(--accent); border:none; color:#fff; display:flex; align-items:center; justify-content:center; font-size:20px; font-weight:700; cursor:pointer; user-select:none;">＋</div>
       </div>
     </div>`;
 }
@@ -1752,7 +1750,6 @@ async function submitSpiralRestock() {
   const weekNum = getWeekNumber(dateObj);
   const period = `${dateObj.getFullYear()}.${String(dateObj.getMonth()+1).padStart(2,'0')}`;
   const cogs = parseFloat(items.reduce((s, it) => s + (it.slot.products?.price_with_vat || 0) * it.added, 0).toFixed(2));
-  const revenue = parseFloat(items.reduce((s, it) => s + (it.slot.price || 0) * it.added, 0).toFixed(2));
 
   const origText = btn?.innerHTML;
   if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Записва...'; }
@@ -1762,18 +1759,19 @@ async function submitSpiralRestock() {
     technician_id: parseInt(techId), technician_name: tech?.name,
     op_type: 'restock', week_number: weekNum, period,
     duration_minutes: 0, km: 0,
-    total_cost: cogs, expected_revenue: revenue,
+    total_cost: cogs,
     vehicle_id: tech?.vehicle_id || null, comment
   }).select().single();
   if (hErr) { showToast('❌ ' + hErr.message, 'error'); if (btn) { btn.disabled = false; btn.innerHTML = origText; } return; }
 
   const rows = [];
   items.forEach(it => {
-    const amt = parseFloat(((it.slot.products?.price_with_vat || 0) * it.added).toFixed(2));
+    const cost = parseFloat(((it.slot.products?.price_with_vat || 0) * it.added).toFixed(2));
+    const rev = parseFloat(((it.slot.price || 0) * it.added).toFixed(2));
     rows.push({
       header_id: header.id, date, object_name: obj?.name, technician_name: tech?.name,
       product_id: it.slot.product_id, product_name: `${it.slot.slot_code} · ${it.slot.products?.name || ''}`,
-      quantity: it.added, cost_value: amt, amount: amt,
+      quantity: it.added, cost_value: cost, amount: rev,
       account_code: '30201', entry_type: 'C'
     });
   });
