@@ -1814,8 +1814,8 @@ async function submitSpiralRestock() {
   });
   rows.push({
     header_id: header.id, date, object_name: obj?.name, technician_name: tech?.name,
-    product_name: 'Изписани суровини', quantity: 1,
-    cost_value: cogs, amount: cogs, account_code: '60101', entry_type: 'D'
+    product_name: 'Вендинг суровини', quantity: 1,
+    cost_value: cogs, amount: cogs, account_code: '60102', entry_type: 'D'
   });
   const { error: rErr } = await db.from('operations').insert(rows);
   if (rErr) { await db.from('operation_headers').delete().eq('id', header.id); showToast('❌ ' + rErr.message, 'error'); if (btn) { btn.disabled = false; btn.innerHTML = origText; } return; }
@@ -2711,6 +2711,9 @@ async function saveCash() {
   if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 Запиши'; }
 
   if (!hdrErr && header) {
+    // Спиралните машини отиват на 70201 (Вендинг приход), кафето на 70101
+    const _cfObj = objects.find(o => o.id == cf.object_id);
+    const incomeAcc = _cfObj?.type === 'spiral' ? '70201' : '70101';
     // 3. Два реда: 701 Приход и 501 Каса
     await db.from('operations').insert([
       {
@@ -2730,7 +2733,7 @@ async function saveCash() {
         date: cf.date,
         object_name: cf.object_name,
         technician_name: cf.technician_name,
-        account_code: '70101',
+        account_code: incomeAcc,
         amount: cash,
         product_name: 'Вендинг приход',
         quantity: 1,
