@@ -1809,7 +1809,6 @@ async function submitSpiralRestock() {
       header_id: header.id, date, object_name: obj?.name, technician_name: tech?.name,
       product_id: it.slot.product_id, product_name: `${it.slot.slot_code} · ${it.slot.products?.name || ''}`,
       quantity: it.added, cost_value: cost, amount: cost,
-      unit_price: it.slot.price || 0,
       account_code: '30201', entry_type: 'C'
     });
   });
@@ -1820,6 +1819,14 @@ async function submitSpiralRestock() {
   });
   const { error: rErr } = await db.from('operations').insert(rows);
   if (rErr) { await db.from('operation_headers').delete().eq('id', header.id); showToast('❌ ' + rErr.message, 'error'); if (btn) { btn.disabled = false; btn.innerHTML = origText; } return; }
+
+  // Отчитане: чакащо отчитане с очаквания приход (Σ добавени × продажна цена)
+  const revenue = parseFloat(items.reduce((s, it) => s + (it.slot.price || 0) * it.added, 0).toFixed(2));
+  await db.from('cashflow').insert({
+    date, object_id: parseInt(objectId), object_name: obj?.name,
+    technician_id: parseInt(techId), technician_name: tech?.name,
+    check_value: revenue, operation_id: header.id, status: 'pending'
+  });
 
   showToast(`✅ Записани ${items.length} спирали`, 'success');
   if (btn) { btn.disabled = false; btn.innerHTML = origText; }
@@ -2319,7 +2326,7 @@ async function loadCashflow() {
           </div>
           <span class="badge amber">Чака</span>
         </div>
-        <div class="info-row" style="padding-top:0"><span class="key">Брояч</span><span class="val">${cf.counter ?? '—'}</span></div>
+        ${cf.counter != null ? `<div class="info-row" style="padding-top:0"><span class="key">Брояч</span><span class="val">${cf.counter}</span></div>` : ''}
         ${cf.drinks_sold != null ? `<div class="info-row"><span class="key">Продадени напитки</span><span class="val">${cf.drinks_sold}</span></div>` : ''}
         ${cf.check_value != null ? `<div class="info-row"><span class="key">Очакван приход</span><span class="val" style="color:var(--accent)">${cf.check_value.toFixed(2)} EUR</span></div>` : ''}
         ${cf.target != null ? `<div class="info-row"><span class="key">Таргет (${cf.days_since_last} дни)</span><span class="val" style="color:var(--amber)">${cf.target.toFixed(2)} EUR</span></div>` : ''}
