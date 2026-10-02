@@ -399,6 +399,8 @@ input.qty-big-input {
     <div id="objectInfo"></div>
   </div>
 
+  <!-- COFFEE секции (само за кафе машини) -->
+  <div id="coffeeRestockSections">
   <!-- 2. ПРОДУКТИ -->
   <div class="section-label">Продукти</div>
   <div class="card">
@@ -440,6 +442,18 @@ input.qty-big-input {
     </div>
     <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none" onchange="processOCR(this)">
     <input type="file" id="galleryInput" accept="image/*" style="display:none" onchange="processOCR(this)">
+  </div>
+  </div>
+  <!-- КРАЙ COFFEE секции -->
+
+  <!-- SPIRAL секция (само за спирални автомати) -->
+  <div id="spiralRestockSection" style="display:none;">
+    <div class="section-label">Артикули</div>
+    <div style="position:relative; margin-bottom:10px;">
+      <input type="text" id="spiralSearch" oninput="filterSpiralChecklist()" onfocus="spiralSearchFocus(this)" placeholder="🔍 търси спирала или артикул" style="width:100%; background:var(--bg3); border:1px solid var(--border); border-radius:10px; padding:11px 48px 11px 14px; color:var(--text); font-size:15px; outline:none; font-family:var(--font);">
+      <button type="button" id="spiralSearchClear" onclick="clearSpiralSearch()" style="display:none; position:absolute; right:6px; top:50%; transform:translateY(-50%); width:38px; height:38px; align-items:center; justify-content:center; border:1px solid var(--border); background:var(--bg); color:var(--text2); border-radius:9px; font-size:20px; line-height:1; cursor:pointer;">✕</button>
+    </div>
+    <div id="spiralChecklist"></div>
   </div>
 
   <!-- 4-7. ДОПЪЛНИТЕЛНИ -->
@@ -1630,8 +1644,201 @@ document.getElementById('objectSelect').addEventListener('change', function() {
         <span class="badge amber">🏠 ${obj.rent} EUR наем</span>
         ${obj.serial_number ? `<span class="badge">${obj.serial_number}</span>` : ''}
       </div>`;
-  } else { document.getElementById('objectInfo').innerHTML = ''; }
+    const isSpiral = obj.type === 'spiral';
+    document.getElementById('coffeeRestockSections').style.display = isSpiral ? 'none' : 'block';
+    document.getElementById('spiralRestockSection').style.display = isSpiral ? 'block' : 'none';
+    if (isSpiral) renderSpiralChecklist(obj.id);
+  } else {
+    document.getElementById('objectInfo').innerHTML = '';
+    document.getElementById('coffeeRestockSections').style.display = 'block';
+    document.getElementById('spiralRestockSection').style.display = 'none';
+  }
 });
+
+// ── ЗАРЕЖДАНЕ НА СПИРАЛЕН АВТОМАТ (чек-лист) ──
+let spiralSlots = [];
+
+async function renderSpiralChecklist(objectId) {
+  const wrap = document.getElementById('spiralChecklist');
+  wrap.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  const { data, error } = await db.from('machine_slots')
+    .select('*, products(name, icon, price_with_vat)')
+    .eq('object_id', objectId)
+    .is('deleted_at', null)
+    .order('sort_order', { ascending: true, nullsFirst: false })
+    .order('slot_code', { ascending: true });
+  if (error) { wrap.innerHTML = `<div class="empty"><div class="empty-icon">❌</div><p>${error.message}</p></div>`; return; }
+  if (!data || !data.length) { wrap.innerHTML = '<div class="empty"><div class="empty-icon">📋</div><p>Няма планограма за тази машина. Добави спирали в Основни данни → Обекти → Планограма.</p></div>'; return; }
+  spiralSlots = data;
+  const groups = {};
+  data.forEach(s => { const g = s.row_group || '—'; (groups[g] = groups[g] || []).push(s); });
+  wrap.innerHTML = Object.keys(groups).sort().map((g, gi) => {
+    const rows = groups[g].map(s => spiralRowHtml(s)).join('');
+    const gid = 'spgrp-' + gi;
+    return `
+      <div class="card" style="padding:0; margin-bottom:8px; overflow:hidden;">
+        <div onclick="toggleSpiralGroup('${gid}')" style="display:flex; justify-content:space-between; align-items:center; padding:10px 14px; cursor:pointer; background:var(--bg3);">
+          <div style="font-weight:800; font-size:13px;">${g === '—' ? 'Спирали' : 'Ред ' + g}</div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-size:11px; color:var(--text2);">${groups[g].length} сп.</span>
+            <span id="${gid}-arr" style="font-size:11px; color:var(--text2);">▸</span>
+          </div>
+        </div>
+        <div id="${gid}" class="spgrp-body" style="display:none;">${rows}</div>
+      </div>`;
+  }).join('');
+}
+
+function spiralRowHtml(s) {
+  return `
+    <div class="spiral-row" data-code="${(s.slot_code||'').toLowerCase()}" data-name="${(s.products?.name||'').toLowerCase()}" style="display:flex; align-items:center; gap:10px; padding:10px 12px; border-top:1px solid var(--border);">
+      <div style="font-family:var(--mono); font-weight:800; min-width:36px; text-align:center; font-size:17px;">${s.slot_code}</div>
+      <div style="flex:1; min-width:0;">
+        <div style="font-size:15px; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${s.products?.icon||'📦'} ${s.products?.name||'—'}</div>
+        <div style="font-size:12px; color:var(--text2); margin-top:1px;">кап.${s.capacity} · ${(s.price||0).toFixed(2)} EUR</div>
+      </div>
+      <div style="display:flex; align-items:center; gap:5px;">
+        <div onpointerdown="event.preventDefault()" onclick="changeSpiralQty('${s.id}',-1)" style="width:34px; height:34px; border-radius:8px; background:var(--bg3); border:1px solid var(--border); display:flex; align-items:center; justify-content:center; font-size:20px; font-weight:700; cursor:pointer; user-select:none;">−</div>
+        <input id="sp-add-${s.id}" type="number" inputmode="numeric" min="0" value="" placeholder="0" style="width:54px; text-align:center; background:var(--bg2); border:1px solid var(--border); border-radius:8px; padding:7px 2px; color:var(--text); font-family:var(--mono); font-size:18px; font-weight:800; outline:none;">
+        <div onpointerdown="event.preventDefault()" onclick="changeSpiralQty('${s.id}',1)" style="width:34px; height:34px; border-radius:8px; background:var(--accent); border:none; color:#fff; display:flex; align-items:center; justify-content:center; font-size:20px; font-weight:700; cursor:pointer; user-select:none;">＋</div>
+      </div>
+    </div>`;
+}
+
+function changeSpiralQty(slotId, delta) {
+  const el = document.getElementById('sp-add-' + slotId);
+  if (!el) return;
+  el.value = Math.max(0, (parseInt(el.value) || 0) + delta) || '';
+}
+
+function toggleSpiralGroup(gid) {
+  const body = document.getElementById(gid);
+  const arr = document.getElementById(gid + '-arr');
+  if (!body) return;
+  const hidden = body.style.display === 'none';
+  body.style.display = hidden ? 'block' : 'none';
+  if (arr) arr.textContent = hidden ? '▾' : '▸';
+}
+
+function filterSpiralChecklist() {
+  const q = (document.getElementById('spiralSearch').value || '').toLowerCase().trim();
+  const clearBtn = document.getElementById('spiralSearchClear');
+  if (clearBtn) clearBtn.style.display = q ? 'flex' : 'none';
+  document.querySelectorAll('#spiralChecklist .spgrp-body').forEach(body => {
+    let anyMatch = false;
+    body.querySelectorAll('.spiral-row').forEach(row => {
+      const match = !q || (row.dataset.code || '').includes(q) || (row.dataset.name || '').includes(q);
+      row.style.display = match ? 'flex' : 'none';
+      if (match) anyMatch = true;
+    });
+    const card = body.closest('.card');
+    const arr = document.getElementById(body.id + '-arr');
+    if (q) {
+      // при търсене: разгъни групите със съвпадение, скрий групите без
+      body.style.display = anyMatch ? 'block' : 'none';
+      if (card) card.style.display = anyMatch ? 'block' : 'none';
+      if (arr) arr.textContent = '▾';
+    } else {
+      // празно търсене: редовете са видими (горе), групите — СГЪНАТИ (по подразбиране)
+      body.style.display = 'none';
+      if (card) card.style.display = 'block';
+      if (arr) arr.textContent = '▸';
+    }
+  });
+}
+
+function clearSpiralSearch() {
+  const el = document.getElementById('spiralSearch');
+  if (!el) return;
+  el.value = '';
+  filterSpiralChecklist();
+  el.focus();  // връща фокуса → задейства наново скрола към върха (onfocus)
+}
+
+// При фокус — изкарай търсачката близо до върха, за да не я крие клавиатурата
+function spiralSearchFocus(el) {
+  setTimeout(() => {
+    const y = el.getBoundingClientRect().top + window.scrollY - 60;
+    window.scrollTo({ top: y, behavior: 'smooth' });
+  }, 350);
+}
+
+async function submitSpiralRestock() {
+  const btn = document.getElementById('submitBtn');
+  if (btn?.disabled) return;
+  const objectId = document.getElementById('objectSelect').value;
+  const techId = document.getElementById('techSelect').value;
+  const date = document.getElementById('dateInput').value;
+  if (!objectId) { showToast('Избери обект!', 'error'); return; }
+  if (!techId) { showToast('Избери техник!', 'error'); return; }
+  if (!date) { showToast('Избери дата!', 'error'); return; }
+
+  const items = [];
+  spiralSlots.forEach(s => {
+    const added = parseInt(document.getElementById('sp-add-' + s.id)?.value) || 0;
+    if (added > 0) items.push({ slot: s, added });
+  });
+  if (!items.length) { showToast('Няма въведени бройки!', 'error'); return; }
+
+  const obj = objects.find(o => o.id == objectId);
+  const tech = technicians.find(t => t.id == techId);
+  const comment = document.getElementById('commentInput').value;
+  const dateObj = new Date(date);
+  const weekNum = getWeekNumber(dateObj);
+  const period = `${dateObj.getFullYear()}.${String(dateObj.getMonth()+1).padStart(2,'0')}`;
+  const cogs = parseFloat(items.reduce((s, it) => s + (it.slot.products?.price_with_vat || 0) * it.added, 0).toFixed(2));
+
+  const origText = btn?.innerHTML;
+  if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Записва...'; }
+
+  const { data: header, error: hErr } = await db.from('operation_headers').insert({
+    date, object_id: parseInt(objectId), object_name: obj?.name,
+    technician_id: parseInt(techId), technician_name: tech?.name,
+    op_type: 'restock', week_number: weekNum, period,
+    duration_minutes: 0, km: 0,
+    total_cost: cogs,
+    vehicle_id: tech?.vehicle_id || null, comment
+  }).select().single();
+  if (hErr) { showToast('❌ ' + hErr.message, 'error'); if (btn) { btn.disabled = false; btn.innerHTML = origText; } return; }
+
+  const rows = [];
+  items.forEach(it => {
+    const cost = parseFloat(((it.slot.products?.price_with_vat || 0) * it.added).toFixed(2));
+    rows.push({
+      header_id: header.id, date, object_name: obj?.name, technician_name: tech?.name,
+      product_id: it.slot.product_id, product_name: `${it.slot.slot_code} · ${it.slot.products?.name || ''}`,
+      quantity: it.added, cost_value: cost, amount: cost,
+      account_code: '30201', entry_type: 'C'
+    });
+  });
+  rows.push({
+    header_id: header.id, date, object_name: obj?.name, technician_name: tech?.name,
+    product_name: 'Вендинг суровини', quantity: 1,
+    cost_value: cogs, amount: cogs, account_code: '60104', entry_type: 'D'
+  });
+  const { error: rErr } = await db.from('operations').insert(rows);
+  if (rErr) { await db.from('operation_headers').delete().eq('id', header.id); showToast('❌ ' + rErr.message, 'error'); if (btn) { btn.disabled = false; btn.innerHTML = origText; } return; }
+
+  // Отчитане: чакащо отчитане с очаквания приход (Σ добавени × продажна цена)
+  const revenue = parseFloat(items.reduce((s, it) => s + (it.slot.price || 0) * it.added, 0).toFixed(2));
+  await db.from('cashflow').insert({
+    date, object_id: parseInt(objectId), object_name: obj?.name,
+    technician_id: parseInt(techId), technician_name: tech?.name,
+    check_value: revenue, operation_id: header.id, status: 'pending'
+  });
+
+  showToast(`✅ Записани ${items.length} спирали`, 'success');
+  if (btn) { btn.disabled = false; btn.innerHTML = origText; }
+  document.getElementById('commentInput').value = '';
+  document.getElementById('objectSelect').value = '';
+  document.getElementById('objectInfo').innerHTML = '';
+  document.getElementById('spiralRestockSection').style.display = 'none';
+  document.getElementById('coffeeRestockSections').style.display = 'block';
+  document.getElementById('spiralChecklist').innerHTML = '';
+  spiralSlots = [];
+  window.scrollTo(0, 0);
+  if (typeof loadRestockHistory === 'function') loadRestockHistory();
+}
 
 // ── GPS ──
 function getGPS() {
@@ -1821,6 +2028,9 @@ async function checkDuplicate(opType, objectId, totalCost, technicianId, withinS
 }
 
 async function submitRestock() {
+  // Спирален автомат → отделен запис по спирали
+  const _selObj = objects.find(o => o.id == document.getElementById('objectSelect').value);
+  if (_selObj && _selObj.type === 'spiral') { return submitSpiralRestock(); }
   // Защита срещу double-click
   const submitBtn = document.querySelector('button.submit-btn');
   if (submitBtn?.disabled) return;
@@ -2115,7 +2325,7 @@ async function loadCashflow() {
           </div>
           <span class="badge amber">Чака</span>
         </div>
-        <div class="info-row" style="padding-top:0"><span class="key">Брояч</span><span class="val">${cf.counter ?? '—'}</span></div>
+        ${cf.counter != null ? `<div class="info-row" style="padding-top:0"><span class="key">Брояч</span><span class="val">${cf.counter}</span></div>` : ''}
         ${cf.drinks_sold != null ? `<div class="info-row"><span class="key">Продадени напитки</span><span class="val">${cf.drinks_sold}</span></div>` : ''}
         ${cf.check_value != null ? `<div class="info-row"><span class="key">Очакван приход</span><span class="val" style="color:var(--accent)">${cf.check_value.toFixed(2)} EUR</span></div>` : ''}
         ${cf.target != null ? `<div class="info-row"><span class="key">Таргет (${cf.days_since_last} дни)</span><span class="val" style="color:var(--amber)">${cf.target.toFixed(2)} EUR</span></div>` : ''}
@@ -2500,6 +2710,9 @@ async function saveCash() {
   if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 Запиши'; }
 
   if (!hdrErr && header) {
+    // Спиралните машини отиват на 70201 (Вендинг приход), кафето на 70101
+    const _cfObj = objects.find(o => o.id == cf.object_id);
+    const incomeAcc = _cfObj?.type === 'spiral' ? '70201' : '70101';
     // 3. Два реда: 701 Приход и 501 Каса
     await db.from('operations').insert([
       {
@@ -2519,7 +2732,7 @@ async function saveCash() {
         date: cf.date,
         object_name: cf.object_name,
         technician_name: cf.technician_name,
-        account_code: '70101',
+        account_code: incomeAcc,
         amount: cash,
         product_name: 'Вендинг приход',
         quantity: 1,
@@ -5120,7 +5333,7 @@ async function saveProduct() {
   const autoAdd = document.getElementById('prodAutoAdd').checked;
   if (!name) { showToast('Попълни име!', 'error'); return; }
 
-  const payload = { name, icon, unit, price_with_vat: priceWithVat, auto_add: autoAdd };
+  const payload = { name, icon, unit, price_with_vat: priceWithVat, price_no_vat: parseFloat((priceWithVat / 1.2).toFixed(4)), auto_add: autoAdd };
   let result;
   if (editingProductId) {
     result = await db.from('products').update(payload).eq('id', editingProductId);
@@ -5170,9 +5383,10 @@ async function loadObjectsList() {
   list.innerHTML = data.map(o => `
     <div style="padding:10px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; gap:8px;">
       <div style="flex:1; min-width:0;">
-        <div style="font-weight:700; font-size:14px;">${o.name}</div>
+        <div style="font-weight:700; font-size:14px;">${o.type === 'spiral' ? '🥤' : '☕'} ${o.name}</div>
         <div style="font-size:11px; color:var(--text2); margin-top:2px;">📏 ${o.km_from_base || 0} km · 🏠 ${(o.rent || 0).toFixed(2)} EUR · 🎯 ${(o.target_weekly || 0).toFixed(2)} EUR/седм · К:${(o.k_percent || 0).toFixed(2)} EUR${o.lat ? ' · 📍' : ''}</div>
       </div>
+      ${o.type === 'spiral' ? `<button onclick="openPlanogram(${o.id})" style="padding:5px 10px; border-radius:7px; border:1px solid var(--accent); background:transparent; color:var(--accent); font-size:11px; font-weight:700; cursor:pointer;">📋 Планограма</button>` : ''}
       <button onclick="editObject(${o.id})" style="padding:5px 10px; border-radius:7px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:11px; font-weight:700; cursor:pointer;">✏️</button>
       <button onclick="deleteObject(${o.id})" style="padding:5px 10px; border-radius:7px; border:1px solid var(--red); background:transparent; color:var(--red); font-size:11px; font-weight:700; cursor:pointer;">🗑</button>
     </div>
@@ -5198,10 +5412,114 @@ function getObjectLocation() {
   );
 }
 
+// ── ПЛАНОГРАМА (спирални автомати) ──
+let planogramObjectId = null;
+let editingSlotId = null;
+
+async function openPlanogram(objectId) {
+  planogramObjectId = objectId;
+  const obj = objects.find(o => o.id == objectId);
+  document.getElementById('planogramTitle').textContent = 'Планограма — ' + (obj?.name || '');
+  const sel = document.getElementById('slotProduct');
+  sel.innerHTML = '<option value="">— избери —</option>' +
+    (products || []).map(p => `<option value="${p.id}">${p.icon || '📦'} ${p.name}</option>`).join('');
+  resetSlotForm();
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-planogram').classList.add('active');
+  history.pushState({ overlay: 'planogram' }, '');
+  loadPlanogram();
+}
+
+function closePlanogram() {
+  document.getElementById('page-planogram').classList.remove('active');
+  document.getElementById('page-objects').classList.add('active');
+  if (history.state && history.state.overlay === 'planogram') history.back();
+}
+
+function resetSlotForm() {
+  editingSlotId = null;
+  document.getElementById('slotCode').value = '';
+  document.getElementById('slotGroup').value = '';
+  document.getElementById('slotProduct').value = '';
+  document.getElementById('slotCapacity').value = '';
+  document.getElementById('slotPrice').value = '';
+  document.getElementById('slotSaveBtn').textContent = '+ Добави спирала';
+  document.getElementById('slotCancelBtn').style.display = 'none';
+}
+
+async function loadPlanogram() {
+  const el = document.getElementById('planogramList');
+  if (!el) return;
+  el.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  const { data, error } = await db.from('machine_slots')
+    .select('*, products(name, icon)')
+    .eq('object_id', planogramObjectId)
+    .is('deleted_at', null)
+    .order('sort_order', { ascending: true, nullsFirst: false })
+    .order('slot_code', { ascending: true });
+  if (error) { el.innerHTML = `<div class="empty"><div class="empty-icon">❌</div><p>${error.message}</p></div>`; return; }
+  if (!data || !data.length) { el.innerHTML = '<div class="empty"><div class="empty-icon">📋</div><p>Няма спирали. Добави първата горе.</p></div>'; return; }
+  el.innerHTML = data.map(s => `
+    <div style="display:flex; align-items:center; gap:8px; padding:8px 10px; border-bottom:1px solid var(--border);">
+      <div style="font-family:var(--mono); font-weight:800; min-width:36px; text-align:center;">${s.slot_code}</div>
+      <div style="flex:1; min-width:0;">
+        <div style="font-size:13px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${s.products?.icon || '📦'} ${s.products?.name || '—'}</div>
+        <div style="font-size:11px; color:var(--text2);">кап. ${s.capacity} · ${(s.price || 0).toFixed(2)} EUR${s.row_group ? ' · ред ' + s.row_group : ''}</div>
+      </div>
+      <button onclick="editSlot('${s.id}')" style="padding:5px 9px; border-radius:7px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:11px; cursor:pointer;">✏️</button>
+      <button onclick="deleteSlot('${s.id}')" style="padding:5px 9px; border-radius:7px; border:1px solid var(--red); background:transparent; color:var(--red); font-size:11px; cursor:pointer;">🗑</button>
+    </div>
+  `).join('');
+}
+
+async function saveSlot() {
+  const slot_code = document.getElementById('slotCode').value.trim();
+  const product_id = parseInt(document.getElementById('slotProduct').value) || null;
+  const capacity = parseInt(document.getElementById('slotCapacity').value) || 0;
+  const price = parseFloat(document.getElementById('slotPrice').value.replace(',', '.')) || 0;
+  const row_group = document.getElementById('slotGroup').value.trim() || null;
+  if (!slot_code) { showToast('Въведи № на спирала!', 'error'); return; }
+  if (!product_id) { showToast('Избери артикул!', 'error'); return; }
+  const payload = { object_id: planogramObjectId, slot_code, product_id, capacity, price, row_group, tenant_id: currentTechnician?.tenant_id || null };
+  let result;
+  if (editingSlotId) result = await db.from('machine_slots').update(payload).eq('id', editingSlotId);
+  else result = await db.from('machine_slots').insert(payload);
+  if (result.error) { showToast('❌ ' + result.error.message, 'error'); return; }
+  showToast('✅ Запазено', 'success');
+  resetSlotForm();
+  document.getElementById('slotCode').focus();
+  loadPlanogram();
+}
+
+async function editSlot(id) {
+  const { data: s } = await db.from('machine_slots').select('*').eq('id', id).single();
+  if (!s) return;
+  editingSlotId = id;
+  document.getElementById('slotCode').value = s.slot_code;
+  document.getElementById('slotGroup').value = s.row_group || '';
+  document.getElementById('slotProduct').value = s.product_id || '';
+  document.getElementById('slotCapacity').value = s.capacity || '';
+  document.getElementById('slotPrice').value = s.price || '';
+  document.getElementById('slotSaveBtn').textContent = '✓ Запази промените';
+  document.getElementById('slotCancelBtn').style.display = 'block';
+  window.scrollTo(0, 0);
+}
+
+async function deleteSlot(id) {
+  const ok = await showConfirm('Изтрий спиралата?');
+  if (!ok) return;
+  const { error } = await db.from('machine_slots').update({ deleted_at: new Date().toISOString() }).eq('id', id);
+  if (error) { showToast('❌ ' + error.message, 'error'); return; }
+  showToast('🗑 Изтрито', 'success');
+  if (editingSlotId === id) resetSlotForm();
+  loadPlanogram();
+}
+
 function openObjectModal() {
   editingObjectId = null;
   document.getElementById('objectModalTitle').textContent = 'Нов обект';
   document.getElementById('objName').value = '';
+  document.getElementById('objType').value = 'vending';
   document.getElementById('objKmFromBase').value = '';
   document.getElementById('objRent').value = '';
   document.getElementById('objTargetWeekly').value = '';
@@ -5221,6 +5539,7 @@ async function editObject(id) {
   editingObjectId = id;
   document.getElementById('objectModalTitle').textContent = 'Редакция на обект';
   document.getElementById('objName').value = o.name;
+  document.getElementById('objType').value = o.type === 'spiral' ? 'spiral' : 'vending';
   document.getElementById('objKmFromBase').value = o.km_from_base || '';
   document.getElementById('objRent').value = o.rent || '';
   document.getElementById('objTargetWeekly').value = o.target_weekly || '';
@@ -5232,6 +5551,7 @@ async function editObject(id) {
 
 async function saveObject() {
   const name = document.getElementById('objName').value.trim();
+  const type = document.getElementById('objType').value || 'vending';
   const km = parseFloat(document.getElementById('objKmFromBase').value.replace(',', '.')) || 0;
   const rent = parseFloat(document.getElementById('objRent').value.replace(',', '.')) || 0;
   const targetWeekly = parseFloat(document.getElementById('objTargetWeekly').value.replace(',', '.')) || 0;
@@ -5240,7 +5560,7 @@ async function saveObject() {
   const lng = parseFloat(document.getElementById('objLng').value.replace(',', '.')) || null;
   if (!name) { showToast('Попълни име!', 'error'); return; }
 
-  const payload = { name, km_from_base: km, rent, target_weekly: targetWeekly, k_percent: kPercent, lat, lng };
+  const payload = { name, type, km_from_base: km, rent, target_weekly: targetWeekly, k_percent: kPercent, lat, lng };
   if (!editingObjectId) payload.active = true;
   let result;
   if (editingObjectId) {
@@ -6481,6 +6801,11 @@ window.addEventListener('popstate', (e) => {
     fp.classList.remove('active');
     document.getElementById('page-finance').classList.add('active');
   }
+  const pg = document.getElementById('page-planogram');
+  if (pg && pg.classList.contains('active')) {
+    pg.classList.remove('active');
+    document.getElementById('page-objects').classList.add('active');
+  }
 });
 
 
@@ -6549,6 +6874,50 @@ function restockPreviousMonth() {
   </div>
 </div>
 
+<!-- Full screen: Планограма -->
+<div class="page" id="page-planogram">
+  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
+    <div class="section-label" id="planogramTitle">Планограма</div>
+    <button onclick="closePlanogram()" style="background:transparent; border:1px solid var(--border); border-radius:6px; padding:5px 10px; cursor:pointer; color:var(--text2); font-size:12px; font-weight:700; font-family:var(--font);">← Назад</button>
+  </div>
+
+  <div class="card" style="padding:12px 14px; margin-bottom:10px;">
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px;">
+      <div class="field" style="margin-bottom:0;">
+        <label>СПИРАЛА №</label>
+        <input type="text" id="slotCode" placeholder="напр. 11 / A1">
+      </div>
+      <div class="field" style="margin-bottom:0;">
+        <label>ГРУПА / РЕД (по избор)</label>
+        <input type="text" id="slotGroup" placeholder="напр. A">
+      </div>
+    </div>
+    <div class="field" style="margin-bottom:8px;">
+      <label>АРТИКУЛ</label>
+      <select id="slotProduct" style="width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:8px; background:var(--bg3); color:var(--text); font-size:14px;">
+        <option value="">— избери —</option>
+      </select>
+    </div>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px;">
+      <div class="field" style="margin-bottom:0;">
+        <label>КАПАЦИТЕТ</label>
+        <input type="number" id="slotCapacity" inputmode="numeric" placeholder="напр. 8">
+      </div>
+      <div class="field" style="margin-bottom:0;">
+        <label>ЦЕНА (EUR)</label>
+        <input type="text" id="slotPrice" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*" placeholder="напр. 1.50">
+      </div>
+    </div>
+    <div style="display:flex; gap:8px;">
+      <button onclick="resetSlotForm()" id="slotCancelBtn" style="display:none; flex:1; padding:14px; border-radius:12px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:15px; font-weight:700; cursor:pointer; font-family:var(--font);">Отказ</button>
+      <button onclick="saveSlot()" class="submit-btn" id="slotSaveBtn" style="margin-top:0; flex:1;">+ Добави спирала</button>
+    </div>
+  </div>
+
+  <div class="section-label">Спирали</div>
+  <div id="planogramList" style="padding-bottom:120px;"><div class="loading"><div class="spinner"></div></div></div>
+</div>
+
 <!-- Modal за нов/редакция обект -->
 <div id="objectModal" class="modal-overlay" style="display:none;">
   <div class="modal">
@@ -6556,6 +6925,13 @@ function restockPreviousMonth() {
     <div class="field">
       <label>ИМЕ</label>
       <input type="text" id="objName" placeholder="напр. Бряст">
+    </div>
+    <div class="field">
+      <label>ТИП МАШИНА</label>
+      <select id="objType" style="width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:8px; background:var(--bg3); color:var(--text); font-size:14px;">
+        <option value="vending">☕ Кафе машина</option>
+        <option value="spiral">🥤 Спирален автомат</option>
+      </select>
     </div>
     <div class="field">
       <label>КМ ОТ БАЗА (една посока)</label>
