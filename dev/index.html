@@ -1442,7 +1442,7 @@ async function loadObjects() {
 }
 
 async function loadProducts() {
-  const { data } = await db.from('products').select('*').eq('active', true).order('sort_order', {ascending:true, nullsFirst:false}).order('name');
+  const { data } = await db.from('products').select('*').eq('active', true).is('deleted_at', null).order('sort_order', {ascending:true, nullsFirst:false}).order('name');
   if (!data) return;
   allProducts = data;  // всички, вкл. auto_add
   products = data.filter(p => !p.auto_add);  // само за избор в кошницата
@@ -5325,7 +5325,7 @@ async function doImportProducts() {
 
   // вече съществуващи в базата
   const names = deduped.map(it => it.name);
-  const { data: existing } = await db.from('products').select('name').in('name', names);
+  const { data: existing } = await db.from('products').select('name').in('name', names).is('deleted_at', null);
   const existSet = new Set((existing || []).map(p => p.name));
   const existingNames = deduped.filter(it => existSet.has(it.name)).map(it => it.name);
   const toInsert = deduped.filter(it => !existSet.has(it.name));
