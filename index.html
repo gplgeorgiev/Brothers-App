@@ -1100,7 +1100,10 @@ input.qty-big-input {
 <div class="page" id="page-products">
   <div class="section-label" style="margin-top:0">Продукти</div>
   <div class="card">
-    <button onclick="openProductModal()" style="width:100%; padding:10px; border-radius:8px; border:none; background:var(--accent); color:#fff; font-size:13px; font-weight:700; cursor:pointer; font-family:var(--font); margin-bottom:10px;">+ Нов продукт</button>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px;">
+      <button onclick="openProductModal()" style="padding:10px; border-radius:8px; border:none; background:var(--accent); color:#fff; font-size:13px; font-weight:700; cursor:pointer; font-family:var(--font);">+ Нов продукт</button>
+      <button onclick="openImportProductsModal()" style="padding:10px; border-radius:8px; border:1px solid var(--accent); background:transparent; color:var(--accent); font-size:13px; font-weight:700; cursor:pointer; font-family:var(--font);">📥 Импорт</button>
+    </div>
     <div id="productsList"></div>
   </div>
 </div>
@@ -5273,6 +5276,55 @@ async function deleteRoute(id) {
 // === ПРОДУКТИ CRUD ===
 let editingProductId = null;
 
+// ── ИМПОРТ НА АРТИКУЛИ ──
+function openImportProductsModal() {
+  document.getElementById('importProductsText').value = '';
+  document.getElementById('importProductsPreview').innerHTML = '';
+  document.getElementById('importProductsModal').style.display = 'flex';
+}
+function closeImportProductsModal() {
+  document.getElementById('importProductsModal').style.display = 'none';
+}
+function parseImportProductsLines() {
+  const txt = document.getElementById('importProductsText').value || '';
+  const items = [];
+  txt.split(/\r?\n/).forEach(line => {
+    if (!line.trim()) return;
+    const parts = line.split(/[\t;]/).map(s => s.trim());
+    const name = parts[0];
+    if (!name) return;
+    const cost = parseFloat((parts[1] || '0').replace(',', '.')) || 0;
+    const icon = parts[2] || '📦';
+    const unit = parts[3] || 'бр';
+    items.push({ name, cost, icon, unit });
+  });
+  return items;
+}
+function previewImportProducts() {
+  const items = parseImportProductsLines();
+  const el = document.getElementById('importProductsPreview');
+  el.innerHTML = items.length ? `✅ ${items.length} артикула готови за импорт` : '';
+}
+async function doImportProducts() {
+  const items = parseImportProductsLines();
+  if (!items.length) { showToast('Няма редове за импорт!', 'error'); return; }
+  const btn = document.getElementById('importProductsBtn');
+  const orig = btn.textContent;
+  btn.disabled = true; btn.textContent = '⏳ Импортира...';
+  const payload = items.map(it => ({
+    name: it.name, icon: it.icon, unit: it.unit,
+    price_with_vat: it.cost, price_no_vat: parseFloat((it.cost / 1.2).toFixed(4)),
+    auto_add: false
+  }));
+  const { error } = await db.from('products').insert(payload);
+  btn.disabled = false; btn.textContent = orig;
+  if (error) { showToast('❌ ' + error.message, 'error'); return; }
+  showToast(`✅ Импортирани ${items.length} артикула`, 'success');
+  closeImportProductsModal();
+  await loadProductsList();
+  await loadProducts();
+}
+
 async function loadProductsList() {
   const list = document.getElementById('productsList');
   if (!list) return;
@@ -7048,6 +7100,26 @@ function restockPreviousMonth() {
     <div class="modal-btns">
       <button class="cancel" onclick="closeRouteModal()">Откажи</button>
       <button onclick="saveRoute()">✓ Запиши</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal за импорт на артикули -->
+<div id="importProductsModal" class="modal-overlay" style="display:none;">
+  <div class="modal" style="max-height:90vh; overflow-y:auto;">
+    <div class="modal-title">📥 Импорт на артикули</div>
+    <div style="font-size:12px; color:var(--text2); margin-bottom:8px; line-height:1.5;">
+      По един артикул на ред. Разделител <b>;</b> или табулация (копиране от Excel).<br>
+      Формат: <b>Име; Себестойност; Икона; Единица</b><br>
+      Само <b>Име</b> е задължително (цена 0, икона 📦, ед. „бр" по подразбиране).
+    </div>
+    <div class="field">
+      <textarea id="importProductsText" rows="8" oninput="previewImportProducts()" placeholder="Кока Кола; 1.00&#10;Фанта; 0.95&#10;Сникърс; 0.70" style="resize:vertical; background:var(--bg3); border:1px solid var(--border); border-radius:10px; padding:12px 14px; color:var(--text); font-family:var(--mono); font-size:13px; width:100%; outline:none;"></textarea>
+    </div>
+    <div id="importProductsPreview" style="font-size:12px; color:var(--text2); margin-bottom:10px; min-height:16px;"></div>
+    <div class="modal-btns">
+      <button class="cancel" onclick="closeImportProductsModal()">Откажи</button>
+      <button onclick="doImportProducts()" id="importProductsBtn">Импортирай</button>
     </div>
   </div>
 </div>
