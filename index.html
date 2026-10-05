@@ -5311,7 +5311,26 @@ async function doImportProducts() {
   const btn = document.getElementById('importProductsBtn');
   const orig = btn.textContent;
   btn.disabled = true; btn.textContent = '⏳ Импортира...';
-  const payload = items.map(it => ({
+
+  // 1) махни дубликати в самия списък (по точно име)
+  const seen = new Set();
+  const deduped = [];
+  items.forEach(it => { if (!seen.has(it.name)) { seen.add(it.name); deduped.push(it); } });
+
+  // 2) махни имена, които вече съществуват в базата
+  const names = deduped.map(it => it.name);
+  const { data: existing } = await db.from('products').select('name').in('name', names);
+  const existSet = new Set((existing || []).map(p => p.name));
+  const toInsert = deduped.filter(it => !existSet.has(it.name));
+  const skipped = items.length - toInsert.length;
+
+  if (!toInsert.length) {
+    btn.disabled = false; btn.textContent = orig;
+    showToast('Всички артикули вече съществуват', 'error');
+    return;
+  }
+
+  const payload = toInsert.map(it => ({
     name: it.name, icon: it.icon, unit: it.unit,
     price_with_vat: it.cost, price_no_vat: parseFloat((it.cost / 1.2).toFixed(4)),
     auto_add: false
@@ -5319,7 +5338,7 @@ async function doImportProducts() {
   const { error } = await db.from('products').insert(payload);
   btn.disabled = false; btn.textContent = orig;
   if (error) { showToast('❌ ' + error.message, 'error'); return; }
-  showToast(`✅ Импортирани ${items.length} артикула`, 'success');
+  showToast(`✅ Импортирани ${toInsert.length}${skipped ? ', пропуснати ' + skipped + ' (дубликати)' : ''}`, 'success');
   closeImportProductsModal();
   await loadProductsList();
   await loadProducts();
