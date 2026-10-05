@@ -1441,7 +1441,7 @@ async function loadObjects() {
 }
 
 async function loadProducts() {
-  const { data } = await db.from('products').select('*').eq('active', true).order('sort_order', {ascending:true, nullsFirst:false}).order('name');
+  const { data } = await db.from('products').select('*').eq('active', true).is('deleted_at', null).order('sort_order', {ascending:true, nullsFirst:false}).order('name');
   if (!data) return;
   allProducts = data;  // всички, вкл. auto_add
   products = data.filter(p => !p.auto_add);  // само за избор в кошницата
@@ -5312,21 +5312,35 @@ async function doImportProducts() {
   const orig = btn.textContent;
   btn.disabled = true; btn.textContent = '⏳ Импортира...';
 
-  // 1) махни дубликати в самия списък (по точно име)
+  // повторени в самия списък (срещат се повече от веднъж)
+  const counts = {};
+  items.forEach(it => { counts[it.name] = (counts[it.name] || 0) + 1; });
+  const dupInList = Object.keys(counts).filter(n => counts[n] > 1);
+
+  // дедупликирай (пази първата поява)
   const seen = new Set();
   const deduped = [];
   items.forEach(it => { if (!seen.has(it.name)) { seen.add(it.name); deduped.push(it); } });
 
-  // 2) махни имена, които вече съществуват в базата
+  // вече съществуващи в базата
   const names = deduped.map(it => it.name);
-  const { data: existing } = await db.from('products').select('name').in('name', names);
+  const { data: existing } = await db.from('products').select('name').in('name', names).is('deleted_at', null);
   const existSet = new Set((existing || []).map(p => p.name));
+  const existingNames = deduped.filter(it => existSet.has(it.name)).map(it => it.name);
   const toInsert = deduped.filter(it => !existSet.has(it.name));
-  const skipped = items.length - toInsert.length;
+
+  // резултат с имена
+  const renderResult = (importedCount) => {
+    let html = `✅ Импортирани: <b>${importedCount}</b>`;
+    if (existingNames.length) html += `<br>⏭️ Вече съществуват (${existingNames.length}): ${existingNames.join(', ')}`;
+    if (dupInList.length) html += `<br>🔁 Повторени в списъка (${dupInList.length}): ${dupInList.join(', ')}`;
+    document.getElementById('importProductsPreview').innerHTML = html;
+  };
 
   if (!toInsert.length) {
     btn.disabled = false; btn.textContent = orig;
-    showToast('Всички артикули вече съществуват', 'error');
+    renderResult(0);
+    showToast('Няма нови артикули за импорт', 'error');
     return;
   }
 
@@ -5338,8 +5352,9 @@ async function doImportProducts() {
   const { error } = await db.from('products').insert(payload);
   btn.disabled = false; btn.textContent = orig;
   if (error) { showToast('❌ ' + error.message, 'error'); return; }
-  showToast(`✅ Импортирани ${toInsert.length}${skipped ? ', пропуснати ' + skipped + ' (дубликати)' : ''}`, 'success');
-  closeImportProductsModal();
+  renderResult(toInsert.length);
+  showToast(`✅ Импортирани ${toInsert.length}${existingNames.length + dupInList.length ? ', пропуснати ' + (existingNames.length + dupInList.length) : ''}`, 'success');
+  document.getElementById('importProductsText').value = '';
   await loadProductsList();
   await loadProducts();
 }
