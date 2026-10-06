@@ -7058,10 +7058,7 @@ function restockPreviousMonth() {
 <div class="page" id="page-planogram">
   <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
     <div class="section-label" id="planogramTitle">Планограма</div>
-    <div style="display:flex; gap:6px;">
-      <button onclick="openImportPlanogramModal()" style="background:transparent; border:1px solid var(--accent); border-radius:6px; padding:5px 10px; cursor:pointer; color:var(--accent); font-size:12px; font-weight:700; font-family:var(--font);">📥 Импорт</button>
-      <button onclick="closePlanogram()" style="background:transparent; border:1px solid var(--border); border-radius:6px; padding:5px 10px; cursor:pointer; color:var(--text2); font-size:12px; font-weight:700; font-family:var(--font);">← Назад</button>
-    </div>
+    <button onclick="closePlanogram()" style="background:transparent; border:1px solid var(--border); border-radius:6px; padding:5px 10px; cursor:pointer; color:var(--text2); font-size:12px; font-weight:700; font-family:var(--font);">← Назад</button>
   </div>
 
   <div class="card" style="padding:12px 14px; margin-bottom:10px;">
@@ -7094,6 +7091,7 @@ function restockPreviousMonth() {
     <div style="display:flex; gap:8px;">
       <button onclick="resetSlotForm()" id="slotCancelBtn" style="display:none; flex:1; padding:14px; border-radius:12px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:15px; font-weight:700; cursor:pointer; font-family:var(--font);">Отказ</button>
       <button onclick="saveSlot()" class="submit-btn" id="slotSaveBtn" style="margin-top:0; flex:1;">+ Добави спирала</button>
+      <button onclick="openImportPlanogramModal()" id="planogramImportBtn" style="margin-top:0; padding:14px; border-radius:12px; border:1px solid var(--accent); background:transparent; color:var(--accent); font-size:15px; font-weight:700; cursor:pointer; font-family:var(--font); white-space:nowrap;">📥 Импорт</button>
     </div>
   </div>
 
