@@ -5540,11 +5540,11 @@ async function loadPlanogram() {
   const { data, error } = await db.from('machine_slots')
     .select('*, products(name, icon)')
     .eq('object_id', planogramObjectId)
-    .is('deleted_at', null)
-    .order('sort_order', { ascending: true, nullsFirst: false })
-    .order('slot_code', { ascending: true });
+    .is('deleted_at', null);
   if (error) { el.innerHTML = `<div class="empty"><div class="empty-icon">❌</div><p>${error.message}</p></div>`; return; }
   if (!data || !data.length) { el.innerHTML = '<div class="empty"><div class="empty-icon">📋</div><p>Няма спирали. Добави първата горе.</p></div>'; return; }
+  // сортирай по възходящ номер на спиралата (числово: 2, 11, 12)
+  data.sort((a, b) => String(a.slot_code).localeCompare(String(b.slot_code), undefined, { numeric: true, sensitivity: 'base' }));
   el.innerHTML = data.map(s => `
     <div style="display:flex; align-items:center; gap:8px; padding:8px 10px; border-bottom:1px solid var(--border);">
       <div style="font-family:var(--mono); font-weight:800; min-width:36px; text-align:center;">${s.slot_code}</div>
