@@ -5601,6 +5601,99 @@ async function deleteSlot(id) {
   loadPlanogram();
 }
 
+// ===== Импорт на цяла планограма (замества всички спирали) =====
+function openImportPlanogramModal() {
+  document.getElementById('importPlanogramText').value = '';
+  document.getElementById('importPlanogramPreview').innerHTML = '';
+  document.getElementById('importPlanogramModal').style.display = 'flex';
+}
+function closeImportPlanogramModal() {
+  document.getElementById('importPlanogramModal').style.display = 'none';
+}
+function parseImportPlanogramLines() {
+  const txt = document.getElementById('importPlanogramText').value || '';
+  const items = [];
+  txt.split(/\r?\n/).forEach(line => {
+    if (!line.trim()) return;
+    const parts = line.split(/[\t;]/).map(s => s.trim());
+    const slot_code = parts[0];
+    const name = parts[1] || '';
+    if (!slot_code || !name) return;
+    const capacity = parseInt((parts[2] || '0').replace(/[^0-9]/g, '')) || 0;
+    const price = parseFloat((parts[3] || '0').replace(',', '.')) || 0;
+    const row_group = parts[4] || null;
+    items.push({ slot_code, name, capacity, price, row_group });
+  });
+  return items;
+}
+function previewImportPlanogram() {
+  const items = parseImportPlanogramLines();
+  const el = document.getElementById('importPlanogramPreview');
+  el.innerHTML = items.length ? `✅ ${items.length} спирали готови за импорт` : '';
+}
+async function doImportPlanogram() {
+  if (!planogramObjectId) { showToast('Няма избрана машина!', 'error'); return; }
+  const items = parseImportPlanogramLines();
+  if (!items.length) { showToast('Няма редове за импорт!', 'error'); return; }
+
+  const btn = document.getElementById('importPlanogramBtn');
+  const orig = btn.textContent;
+
+  // Съпоставяне на артикулите по име
+  const names = [...new Set(items.map(it => it.name))];
+  const { data: prods, error: pErr } = await db.from('products')
+    .select('id,name').in('name', names).is('deleted_at', null);
+  if (pErr) { showToast('❌ ' + pErr.message, 'error'); return; }
+  const nameToId = {};
+  (prods || []).forEach(p => { if (nameToId[p.name] === undefined) nameToId[p.name] = p.id; });
+  const unmatched = names.filter(n => nameToId[n] === undefined);
+  if (unmatched.length) {
+    document.getElementById('importPlanogramPreview').innerHTML =
+      `❌ Ненамерени артикули (${unmatched.length}): ${unmatched.join(', ')}<br>Добави ги първо в таб Продукти или поправи имената.`;
+    showToast('Има ненамерени артикули', 'error');
+    return;
+  }
+
+  // Повторени № на спирала в списъка
+  const codeCounts = {};
+  items.forEach(it => { codeCounts[it.slot_code] = (codeCounts[it.slot_code] || 0) + 1; });
+  const dupCodes = Object.keys(codeCounts).filter(c => codeCounts[c] > 1);
+
+  const ok = await showConfirm(`Импортът ще ИЗТРИЕ текущата планограма и ще създаде нова с ${items.length} спирали. Продължи?`);
+  if (!ok) return;
+
+  btn.disabled = true; btn.textContent = '⏳ Импортира...';
+
+  // Изтрий (soft-delete) съществуващите спирали на машината
+  const { error: delErr } = await db.from('machine_slots')
+    .update({ deleted_at: new Date().toISOString() })
+    .eq('object_id', planogramObjectId)
+    .is('deleted_at', null);
+  if (delErr) { btn.disabled = false; btn.textContent = orig; showToast('❌ ' + delErr.message, 'error'); return; }
+
+  // Вмъкни новите спирали
+  const payload = items.map((it, idx) => ({
+    object_id: planogramObjectId,
+    slot_code: it.slot_code,
+    product_id: nameToId[it.name],
+    capacity: it.capacity,
+    price: it.price,
+    row_group: it.row_group,
+    sort_order: idx + 1,
+    tenant_id: currentTechnician?.tenant_id || null
+  }));
+  const { error: insErr } = await db.from('machine_slots').insert(payload);
+  btn.disabled = false; btn.textContent = orig;
+  if (insErr) { showToast('❌ ' + insErr.message, 'error'); return; }
+
+  let html = `✅ Нова планограма: <b>${items.length}</b> спирали`;
+  if (dupCodes.length) html += `<br>⚠️ Повторени № (${dupCodes.length}): ${dupCodes.join(', ')}`;
+  document.getElementById('importPlanogramPreview').innerHTML = html;
+  showToast(`✅ Нова планограма: ${items.length} спирали`, 'success');
+  document.getElementById('importPlanogramText').value = '';
+  loadPlanogram();
+}
+
 function openObjectModal() {
   editingObjectId = null;
   document.getElementById('objectModalTitle').textContent = 'Нов обект';
@@ -6974,7 +7067,7 @@ function restockPreviousMonth() {
         <input type="text" id="slotCode" placeholder="напр. 11 / A1">
       </div>
       <div class="field" style="margin-bottom:0;">
-        <label>ГРУПА / РЕД (по избор)</label>
+        <label>РЕД (по избор)</label>
         <input type="text" id="slotGroup" placeholder="напр. A">
       </div>
     </div>
@@ -6997,6 +7090,7 @@ function restockPreviousMonth() {
     <div style="display:flex; gap:8px;">
       <button onclick="resetSlotForm()" id="slotCancelBtn" style="display:none; flex:1; padding:14px; border-radius:12px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:15px; font-weight:700; cursor:pointer; font-family:var(--font);">Отказ</button>
       <button onclick="saveSlot()" class="submit-btn" id="slotSaveBtn" style="margin-top:0; flex:1;">+ Добави спирала</button>
+      <button onclick="openImportPlanogramModal()" id="planogramImportBtn" style="margin-top:0; flex:1; padding:14px; border-radius:12px; border:1px solid var(--accent); background:transparent; color:var(--accent); font-size:15px; font-weight:700; cursor:pointer; font-family:var(--font);">📥 Импорт</button>
     </div>
   </div>
 
@@ -7154,6 +7248,27 @@ function restockPreviousMonth() {
     <div class="modal-btns">
       <button class="cancel" onclick="closeImportProductsModal()">Откажи</button>
       <button onclick="doImportProducts()" id="importProductsBtn">Импортирай</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal за импорт на цяла планограма -->
+<div id="importPlanogramModal" class="modal-overlay" style="display:none;">
+  <div class="modal" style="max-height:90vh; overflow-y:auto;">
+    <div class="modal-title">📥 Импорт на планограма</div>
+    <div style="font-size:12px; color:var(--text2); margin-bottom:8px; line-height:1.5;">
+      По една спирала на ред. Разделител <b>;</b> или табулация (копиране от Excel).<br>
+      Формат: <b>Спирала №; Артикул; Капацитет; Цена; Ред</b><br>
+      <b>Спирала №</b> и <b>Артикул</b> са задължителни. Артикулът се съпоставя по име.<br>
+      ⚠️ Импортът <b>изтрива текущата планограма</b> и създава нова.
+    </div>
+    <div class="field">
+      <textarea id="importPlanogramText" rows="8" oninput="previewImportPlanogram()" placeholder="11; Кока Кола; 8; 1.50; A&#10;12; Фанта; 8; 1.50; A&#10;21; Сникърс; 6; 1.20; B" style="resize:vertical; background:var(--bg3); border:1px solid var(--border); border-radius:10px; padding:12px 14px; color:var(--text); font-family:var(--mono); font-size:13px; width:100%; outline:none;"></textarea>
+    </div>
+    <div id="importPlanogramPreview" style="font-size:12px; color:var(--text2); margin-bottom:10px; min-height:16px;"></div>
+    <div class="modal-btns">
+      <button class="cancel" onclick="closeImportPlanogramModal()">Откажи</button>
+      <button onclick="doImportPlanogram()" id="importPlanogramBtn">Импортирай</button>
     </div>
   </div>
 </div>
