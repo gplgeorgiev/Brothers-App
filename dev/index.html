@@ -1701,8 +1701,8 @@ async function renderSpiralChecklist(objectId) {
 
 function spiralRowHtml(s) {
   return `
-    <div class="spiral-row" data-code="${(s.slot_code||'').toLowerCase()}" data-name="${(s.products?.name||'').toLowerCase()}" style="display:flex; align-items:center; gap:10px; padding:10px 12px; border-top:1px solid var(--border);">
-      <div style="font-family:var(--mono); font-weight:800; min-width:36px; text-align:center; font-size:17px;">${s.slot_code}</div>
+    <div class="spiral-row" data-code="${(s.slot_code||'').toLowerCase()}" data-name="${(s.products?.name||'').toLowerCase()}" style="display:flex; align-items:center; gap:8px; padding:10px 12px; border-top:1px solid var(--border);">
+      <div style="font-family:var(--mono); font-weight:800; min-width:26px; text-align:right; font-size:17px;">${s.slot_code}</div>
       <div style="flex:1; min-width:0;">
         <div style="font-size:13px; font-weight:700; line-height:1.25; word-break:break-word;">${s.products?.icon||'📦'} ${s.products?.name||'—'}</div>
       </div>
