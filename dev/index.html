@@ -3722,14 +3722,14 @@ function updateFinAmount(val) {
 
 function changeFinAmount(delta) {
   const inp = document.getElementById('finAmountInput');
-  let val = parseFloat(inp.value) || 0;
+  let val = parseFloat(String(inp.value).replace(',', '.')) || 0;
   val = Math.max(0, val + delta);
   inp.value = val.toFixed(2);
 }
 
 function addFinLine() {
   if (!finSelectedCat) return;
-  const amount = parseFloat(document.getElementById('finAmountInput').value) || 0;
+  const amount = parseFloat(String(document.getElementById('finAmountInput').value).replace(',', '.')) || 0;
   if (amount <= 0) { showToast('Въведи сума!', 'error'); return; }
   const cat = FIN_CATEGORIES[finType].find(c => c.code === finSelectedCat);
   const existing = finBasket.find(b => b.code === finSelectedCat);
