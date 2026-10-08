@@ -1269,7 +1269,6 @@ async function fetchAllRows(makeQuery, pageSize = 1000) {
 }
 
 let objects = [], products = [], allProducts = [], technicians = [];
-let vendingProductIds = new Set();  // артикули, заети в планограма на спирален автомат
 let timerInterval = null, timerSeconds = 0, timerRunning = false;
 let lineCounter = 0;
 
@@ -1450,11 +1449,6 @@ async function loadProducts() {
   if (!data) return;
   allProducts = data;  // всички, вкл. auto_add
   products = data.filter(p => !p.auto_add);  // само за избор в кошницата
-  // артикули, заети в планограма на спирален автомат → не ги показвай в кафе списъка
-  try {
-    const { data: slots } = await db.from('machine_slots').select('product_id').is('deleted_at', null);
-    vendingProductIds = new Set((slots || []).map(s => s.product_id).filter(Boolean));
-  } catch (e) { vendingProductIds = new Set(); }
   document.getElementById('prodCount').textContent = data.length;
   renderProductCards();
 }
@@ -1501,7 +1495,8 @@ let basket = []; // [{product, qty}]
 
 function renderProductCards() {
   const wrap = document.getElementById('productScrollWrap');
-  const list = products.filter(p => !vendingProductIds.has(p.id));
+  // кафе списъкът показва само артикули за кафе машина (спиралните се скриват)
+  const list = products.filter(p => (p.machine_type || 'vending') !== 'spiral');
   wrap.innerHTML = list.map(p => `
     <div class="prod-card" id="pc-${p.id}" onclick="selectProdCard(${p.id})">
       <div class="pc-icon">${p.icon || '📦'}</div>
@@ -5360,6 +5355,7 @@ let editingProductId = null;
 function openImportProductsModal() {
   document.getElementById('importProductsText').value = '';
   document.getElementById('importProductsPreview').innerHTML = '';
+  const t = document.getElementById('importProductsType'); if (t) t.value = 'vending';
   document.getElementById('importProductsModal').style.display = 'flex';
 }
 function closeImportProductsModal() {
@@ -5424,10 +5420,11 @@ async function doImportProducts() {
     return;
   }
 
+  const machineType = document.getElementById('importProductsType')?.value || 'vending';
   const payload = toInsert.map(it => ({
     name: it.name, icon: it.icon, unit: it.unit,
     price_with_vat: it.cost, price_no_vat: parseFloat((it.cost / 1.2).toFixed(4)),
-    auto_add: false
+    auto_add: false, machine_type: machineType
   }));
   const { error } = await db.from('products').insert(payload);
   btn.disabled = false; btn.textContent = orig;
@@ -5455,7 +5452,7 @@ async function loadProductsList() {
     <div style="padding:10px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; gap:8px;">
       <div style="flex:1; min-width:0;">
         <div style="font-weight:700; font-size:14px;">${p.icon || '📦'} ${p.name}</div>
-        <div style="font-size:11px; color:var(--text2); margin-top:2px;">${p.unit || '—'} · ${(p.price_with_vat || 0).toFixed(2)} EUR${p.auto_add ? ' · <span style="color:var(--amber);">🔄 Авто-добавяне</span>' : ''}</div>
+        <div style="font-size:11px; color:var(--text2); margin-top:2px;">${p.machine_type === 'spiral' ? '🥤 спирала' : '☕ кафе'} · ${p.unit || '—'} · ${(p.price_with_vat || 0).toFixed(2)} EUR${p.auto_add ? ' · <span style="color:var(--amber);">🔄 Авто-добавяне</span>' : ''}</div>
       </div>
       <button onclick="editProduct(${p.id})" style="padding:5px 10px; border-radius:7px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:11px; font-weight:700; cursor:pointer;">✏️</button>
       <button onclick="deleteProduct(${p.id})" style="padding:5px 10px; border-radius:7px; border:1px solid var(--red); background:transparent; color:var(--red); font-size:11px; font-weight:700; cursor:pointer;">🗑</button>
@@ -5467,6 +5464,7 @@ function openProductModal() {
   editingProductId = null;
   document.getElementById('productModalTitle').textContent = 'Нов продукт';
   document.getElementById('prodName').value = '';
+  document.getElementById('prodMachineType').value = 'vending';
   document.getElementById('prodIcon').value = '📦';
   document.getElementById('prodUnit').value = '';
   document.getElementById('prodPriceVat').value = '';
@@ -5484,6 +5482,7 @@ async function editProduct(id) {
   editingProductId = id;
   document.getElementById('productModalTitle').textContent = 'Редакция на продукт';
   document.getElementById('prodName').value = p.name;
+  document.getElementById('prodMachineType').value = p.machine_type || 'vending';
   document.getElementById('prodIcon').value = p.icon || '📦';
   document.getElementById('prodUnit').value = p.unit || '';
   document.getElementById('prodPriceVat').value = p.price_with_vat || 0;
@@ -5497,9 +5496,10 @@ async function saveProduct() {
   const unit = document.getElementById('prodUnit').value.trim();
   const priceWithVat = parseFloat(document.getElementById('prodPriceVat').value.replace(',', '.')) || 0;
   const autoAdd = document.getElementById('prodAutoAdd').checked;
+  const machineType = document.getElementById('prodMachineType').value || 'vending';
   if (!name) { showToast('Попълни име!', 'error'); return; }
 
-  const payload = { name, icon, unit, price_with_vat: priceWithVat, price_no_vat: parseFloat((priceWithVat / 1.2).toFixed(4)), auto_add: autoAdd };
+  const payload = { name, icon, unit, price_with_vat: priceWithVat, price_no_vat: parseFloat((priceWithVat / 1.2).toFixed(4)), auto_add: autoAdd, machine_type: machineType };
   let result;
   if (editingProductId) {
     result = await db.from('products').update(payload).eq('id', editingProductId);
@@ -5655,7 +5655,6 @@ async function saveSlot() {
   resetSlotForm();
   document.getElementById('slotCode').focus();
   loadPlanogram();
-  loadProducts();  // обнови кафе списъка (скрий заетите в планограма)
 }
 
 async function editSlot(id) {
@@ -5680,7 +5679,6 @@ async function deleteSlot(id) {
   showToast('🗑 Изтрито', 'success');
   if (editingSlotId === id) resetSlotForm();
   loadPlanogram();
-  loadProducts();  // обнови кафе списъка
 }
 
 // ===== Импорт на цяла планограма (замества всички спирали) =====
@@ -5774,7 +5772,6 @@ async function doImportPlanogram() {
   showToast(`✅ Нова планограма: ${items.length} спирали`, 'success');
   document.getElementById('importPlanogramText').value = '';
   loadPlanogram();
-  loadProducts();  // обнови кафе списъка (скрий заетите в планограма)
 }
 
 function openObjectModal() {
@@ -7325,6 +7322,13 @@ function restockPreviousMonth() {
       Само <b>Име</b> е задължително (цена 0, икона 📦, ед. „бр" по подразбиране).
     </div>
     <div class="field">
+      <label>ТИП МАШИНА (за всички в този импорт)</label>
+      <select id="importProductsType" style="width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:8px; background:var(--bg3); color:var(--text); font-size:14px;">
+        <option value="vending">☕ Кафе машина</option>
+        <option value="spiral">🥤 Спирален автомат</option>
+      </select>
+    </div>
+    <div class="field">
       <textarea id="importProductsText" rows="8" oninput="previewImportProducts()" placeholder="Кока Кола; 1.00&#10;Фанта; 0.95&#10;Сникърс; 0.70" style="resize:vertical; background:var(--bg3); border:1px solid var(--border); border-radius:10px; padding:12px 14px; color:var(--text); font-family:var(--mono); font-size:13px; width:100%; outline:none;"></textarea>
     </div>
     <div id="importProductsPreview" style="font-size:12px; color:var(--text2); margin-bottom:10px; min-height:16px;"></div>
@@ -7363,6 +7367,13 @@ function restockPreviousMonth() {
     <div class="field">
       <label>ИМЕ</label>
       <input type="text" id="prodName" placeholder="напр. Кафе">
+    </div>
+    <div class="field">
+      <label>ТИП МАШИНА</label>
+      <select id="prodMachineType" style="width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:8px; background:var(--bg3); color:var(--text); font-size:14px;">
+        <option value="vending">☕ Кафе машина</option>
+        <option value="spiral">🥤 Спирален автомат</option>
+      </select>
     </div>
     <div class="field">
       <label>ИКОНА (emoji)</label>
