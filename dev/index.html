@@ -328,10 +328,11 @@ input.qty-big-input {
 
 <div style="background:#ff6b35; color:#fff; text-align:center; padding:6px; font-weight:800; font-size:12px; letter-spacing:1px;">⚠️ DEV ENVIRONMENT ⚠️</div>
 <div class="header" style="display:flex; align-items:center; justify-content:space-between; padding:9px 16px;">
-  <button class="menu-btn" onclick="toggleSideMenu()" style="background:transparent; border:none; padding:8px; cursor:pointer; display:flex; flex-direction:column; gap:4px; color:var(--text);">
+  <button class="menu-btn" onclick="toggleSideMenu()" style="position:relative; background:transparent; border:none; padding:8px; cursor:pointer; display:flex; flex-direction:column; gap:4px; color:var(--text);">
     <span style="width:22px; height:2px; background:currentColor; border-radius:2px;"></span>
     <span style="width:22px; height:2px; background:currentColor; border-radius:2px;"></span>
     <span style="width:22px; height:2px; background:currentColor; border-radius:2px;"></span>
+    <span id="menuAlertDot" style="display:none; position:absolute; top:3px; right:3px; width:9px; height:9px; background:var(--red); border-radius:50%; border:1.5px solid var(--bg2);"></span>
   </button>
   <div style="display:flex; align-items:center; gap:10px;">
     <div id="headerIcon" style="font-size:24px; color:var(--accent); display:flex; align-items:center; justify-content:center;">⬆️</div>
@@ -358,6 +359,10 @@ input.qty-big-input {
     <button class="menu-item" data-tab="cashflow" onclick="selectMenu('cashflow')">💰 Отчитане</button>
     <button class="menu-item" data-tab="finance" onclick="selectMenu('finance')">💳 Финанси</button>
     <button class="menu-item" data-tab="service" onclick="selectMenu('service')">🔧 Сервиз</button>
+    <button class="menu-item" data-tab="events" onclick="selectMenu('events')" style="display:flex; justify-content:space-between; align-items:center;">
+      <span>🔔 Събития</span>
+      <span id="eventsBadge" style="display:none; min-width:20px; height:20px; padding:0 5px; align-items:center; justify-content:center; background:var(--red); color:#fff; border-radius:10px; font-size:11px; font-weight:800;"></span>
+    </button>
     <button class="menu-item" data-tab="history" onclick="selectMenu('history')">📋 История</button>
     <button class="menu-item" data-tab="stats" onclick="selectMenu('stats')">📊 Статистика</button>
     <button class="menu-item" data-tab="trash" onclick="selectMenu('trash')">🗑 Кошче</button>
@@ -1112,6 +1117,12 @@ input.qty-big-input {
   </div>
 </div>
 
+<div class="page" id="page-events">
+  <div class="section-label">Предстоящи събития</div>
+  <div style="font-size:12px; color:var(--text2); margin-bottom:10px;">Изтичане на застраховки/прегледи за автомобилите и наеми за обектите (следващите 30 дни и просрочени).</div>
+  <div id="eventsList" style="padding-bottom:120px;"><div class="loading"><div class="spinner"></div></div></div>
+</div>
+
 <div class="page" id="page-settings">
   <div class="section-label">Връзка</div>
   <div class="card">
@@ -1333,6 +1344,7 @@ async function initApp() {
   renderProductCards();
   if (document.getElementById('finCategoryScroll')) renderFinCategories();
   loadRestockHistory();
+  checkEventsAlert();
 }
 
 // ── AUTH: вписване / изход / разпознаване на техник ──
@@ -3559,6 +3571,7 @@ const tabTitles = {
   'service': { icon: '🔧', name: 'Сервиз' },
   'stats': { icon: '📊', name: 'Статистика' },
   'history': { icon: '📋', name: 'История' },
+  'events': { icon: '🔔', name: 'Събития' },
   'trash': { icon: '🗑', name: 'Кошче' },
   'settings': { icon: '⚙️', name: 'Настройки' },
   'accounts': { icon: '📒', name: 'Сметкоплан' },
@@ -3607,6 +3620,7 @@ function switchTab(tab) {
   if(tab==='settings') { loadUnknownRoutes(); loadTrashRetention(); loadThemeSetting(); }
   if(tab==='trash') loadTrash();
   if(tab==='stats') { loadStats(); loadBalanceSummary(); }
+  if(tab==='events') loadEvents();
 }
 
 // ── HELPERS ──
@@ -5783,6 +5797,7 @@ function openObjectModal() {
   document.getElementById('objType').value = 'vending';
   document.getElementById('objKmFromBase').value = '';
   document.getElementById('objRent').value = '';
+  document.getElementById('objRentDay').value = '';
   document.getElementById('objTargetWeekly').value = '';
   document.getElementById('objKPercent').value = '';
   document.getElementById('objLat').value = '';
@@ -5803,6 +5818,7 @@ async function editObject(id) {
   document.getElementById('objType').value = o.type === 'spiral' ? 'spiral' : 'vending';
   document.getElementById('objKmFromBase').value = o.km_from_base || '';
   document.getElementById('objRent').value = o.rent || '';
+  document.getElementById('objRentDay').value = o.rent_day || '';
   document.getElementById('objTargetWeekly').value = o.target_weekly || '';
   document.getElementById('objKPercent').value = o.k_percent || '';
   document.getElementById('objLat').value = o.lat || '';
@@ -5815,13 +5831,15 @@ async function saveObject() {
   const type = document.getElementById('objType').value || 'vending';
   const km = parseFloat(document.getElementById('objKmFromBase').value.replace(',', '.')) || 0;
   const rent = parseFloat(document.getElementById('objRent').value.replace(',', '.')) || 0;
+  const rentDayRaw = parseInt(document.getElementById('objRentDay').value) || null;
+  const rentDay = (rentDayRaw && rentDayRaw >= 1 && rentDayRaw <= 31) ? rentDayRaw : null;
   const targetWeekly = parseFloat(document.getElementById('objTargetWeekly').value.replace(',', '.')) || 0;
   const kPercent = parseFloat(document.getElementById('objKPercent').value.replace(',', '.')) || 0;
   const lat = parseFloat(document.getElementById('objLat').value.replace(',', '.')) || null;
   const lng = parseFloat(document.getElementById('objLng').value.replace(',', '.')) || null;
   if (!name) { showToast('Попълни име!', 'error'); return; }
 
-  const payload = { name, type, km_from_base: km, rent, target_weekly: targetWeekly, k_percent: kPercent, lat, lng };
+  const payload = { name, type, km_from_base: km, rent, rent_day: rentDay, target_weekly: targetWeekly, k_percent: kPercent, lat, lng };
   if (!editingObjectId) payload.active = true;
   let result;
   if (editingObjectId) {
@@ -5834,6 +5852,7 @@ async function saveObject() {
   closeObjectModal();
   await loadObjectsList();
   await loadObjects();
+  checkEventsAlert();
 }
 
 async function deleteObject(id) {
@@ -6050,6 +6069,88 @@ async function loadVehiclesList() {
   `).join('');
 }
 
+// ── ПРЕДСТОЯЩИ СЪБИТИЯ (срокове автомобили + наеми обекти) ──
+function _eventDaysLeft(dateStr) {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const d = new Date(dateStr); d.setHours(0, 0, 0, 0);
+  return Math.round((d - today) / 86400000);
+}
+
+function _nextRentDate(day) {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const clamp = (yy, mm) => new Date(yy, mm, Math.min(day, new Date(yy, mm + 1, 0).getDate()));
+  let d = clamp(today.getFullYear(), today.getMonth());
+  if (d < today) {
+    const m = today.getMonth();
+    d = clamp(m === 11 ? today.getFullYear() + 1 : today.getFullYear(), (m + 1) % 12);
+  }
+  const off = d.getTimezoneOffset();
+  return new Date(d.getTime() - off * 60000).toISOString().slice(0, 10);
+}
+
+async function computeUpcomingEvents() {
+  const events = [];
+  const { data: vehicles } = await db.from('vehicles').select('*').is('deleted_at', null);
+  const vdefs = [
+    { f: 'insurance_until', label: 'Гражданска отговорност', icon: '🛡' },
+    { f: 'inspection_until', label: 'Технически преглед', icon: '🔧' },
+    { f: 'casco_until', label: 'Каско', icon: '🚗' },
+    { f: 'vignette_until', label: 'Винетка', icon: '🏷' }
+  ];
+  (vehicles || []).forEach(v => {
+    vdefs.forEach(def => {
+      if (v[def.f]) events.push({ icon: def.icon, title: def.label, who: v.name, date: v[def.f], days: _eventDaysLeft(v[def.f]) });
+    });
+  });
+  const { data: objs } = await db.from('objects').select('*').is('deleted_at', null);
+  (objs || []).forEach(o => {
+    if (o.rent_day) {
+      const nd = _nextRentDate(o.rent_day);
+      events.push({ icon: '🏠', title: 'Наем', who: o.name, date: nd, days: _eventDaysLeft(nd) });
+    }
+  });
+  events.sort((a, b) => a.days - b.days);
+  return events;
+}
+
+async function loadEvents() {
+  const el = document.getElementById('eventsList');
+  if (!el) return;
+  el.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  const all = await computeUpcomingEvents();
+  const list = all.filter(e => e.days <= 30);
+  if (!list.length) { el.innerHTML = '<div class="empty"><div class="empty-icon">✅</div><p>Няма предстоящи събития в следващите 30 дни.</p></div>'; return; }
+  el.innerHTML = list.map(e => {
+    let color = 'var(--text2)', txt;
+    if (e.days < 0) { color = 'var(--red)'; txt = `просрочено с ${Math.abs(e.days)} дни`; }
+    else if (e.days === 0) { color = 'var(--red)'; txt = 'днес'; }
+    else if (e.days <= 3) { color = 'var(--red)'; txt = `след ${e.days} дни`; }
+    else if (e.days <= 7) { color = 'var(--amber)'; txt = `след ${e.days} дни`; }
+    else { txt = `след ${e.days} дни`; }
+    const dstr = new Date(e.date).toLocaleDateString('bg-BG', { day: 'numeric', month: 'short', year: 'numeric' });
+    return `
+      <div style="display:flex; align-items:center; gap:10px; padding:12px 10px; border-bottom:1px solid var(--border);">
+        <div style="font-size:22px;">${e.icon}</div>
+        <div style="flex:1; min-width:0;">
+          <div style="font-size:14px; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${e.title} · ${e.who}</div>
+          <div style="font-size:12px; color:var(--text2);">${dstr}</div>
+        </div>
+        <div style="font-size:12px; font-weight:800; color:${color}; white-space:nowrap;">${txt}</div>
+      </div>`;
+  }).join('');
+}
+
+async function checkEventsAlert() {
+  try {
+    const all = await computeUpcomingEvents();
+    const urgent = all.filter(e => e.days <= 7); // вкл. просрочени
+    const badge = document.getElementById('eventsBadge');
+    const dot = document.getElementById('menuAlertDot');
+    if (badge) { badge.textContent = urgent.length || ''; badge.style.display = urgent.length ? 'inline-flex' : 'none'; }
+    if (dot) dot.style.display = urgent.length ? 'block' : 'none';
+  } catch (e) { /* няма колоните още — тихо */ }
+}
+
 function openVehicleModal() {
   editingVehicleId = null;
   document.getElementById('vehicleModalTitle').textContent = 'Ново превозно средство';
@@ -6057,6 +6158,10 @@ function openVehicleModal() {
   document.getElementById('vehLicense').value = '';
   document.getElementById('vehConsumption').value = '';
   document.getElementById('vehPrice').value = '';
+  document.getElementById('vehInsurance').value = '';
+  document.getElementById('vehInspection').value = '';
+  document.getElementById('vehCasco').value = '';
+  document.getElementById('vehVignette').value = '';
   document.getElementById('vehicleModal').style.display = 'flex';
 }
 
@@ -6073,6 +6178,10 @@ async function editVehicle(id) {
   document.getElementById('vehLicense').value = v.license || '';
   document.getElementById('vehConsumption').value = v.fuel_consumption || '';
   document.getElementById('vehPrice').value = v.fuel_price || '';
+  document.getElementById('vehInsurance').value = v.insurance_until || '';
+  document.getElementById('vehInspection').value = v.inspection_until || '';
+  document.getElementById('vehCasco').value = v.casco_until || '';
+  document.getElementById('vehVignette').value = v.vignette_until || '';
   document.getElementById('vehicleModal').style.display = 'flex';
 }
 
@@ -6083,7 +6192,12 @@ async function saveVehicle() {
   const price = parseFloat(document.getElementById('vehPrice').value.replace(',', '.')) || 0;
   if (!name) { showToast('Попълни име!', 'error'); return; }
 
-  const payload = { name, license, fuel_consumption: consumption, fuel_price: price };
+  const _d = id => document.getElementById(id).value || null;
+  const payload = {
+    name, license, fuel_consumption: consumption, fuel_price: price,
+    insurance_until: _d('vehInsurance'), inspection_until: _d('vehInspection'),
+    casco_until: _d('vehCasco'), vignette_until: _d('vehVignette')
+  };
   let result;
   if (editingVehicleId) {
     result = await db.from('vehicles').update(payload).eq('id', editingVehicleId);
@@ -6094,6 +6208,7 @@ async function saveVehicle() {
   showToast('✅ Запазено', 'success');
   closeVehicleModal();
   await loadVehiclesList();
+  checkEventsAlert();
 }
 
 async function deleteVehicle(id) {
@@ -7199,9 +7314,15 @@ function restockPreviousMonth() {
       <label>КМ ОТ БАЗА (една посока)</label>
       <input type="text" id="objKmFromBase" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*" placeholder="напр. 42.5">
     </div>
-    <div class="field">
-      <label>МЕСЕЧЕН НАЕМ</label>
-      <input type="text" id="objRent" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*" placeholder="напр. 35.79">
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+      <div class="field">
+        <label>МЕСЕЧЕН НАЕМ</label>
+        <input type="text" id="objRent" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*" placeholder="напр. 35.79">
+      </div>
+      <div class="field">
+        <label>ДЕН ЗА НАЕМ (1–31)</label>
+        <input type="number" id="objRentDay" inputmode="numeric" min="1" max="31" placeholder="напр. 5">
+      </div>
     </div>
     <div class="field">
       <label>СЕДМИЧЕН ТАРГЕТ (EUR)</label>
@@ -7282,6 +7403,25 @@ function restockPreviousMonth() {
     <div class="field">
       <label>ЦЕНА НА ЛИТЪР</label>
       <input type="text" id="vehPrice" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*" placeholder="1.29">
+    </div>
+    <div class="section-label" style="margin-top:4px;">Срокове (по избор)</div>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+      <div class="field" style="margin-bottom:8px;">
+        <label>🛡 ГРАЖД. ОТГОВОРНОСТ</label>
+        <input type="date" id="vehInsurance">
+      </div>
+      <div class="field" style="margin-bottom:8px;">
+        <label>🔧 ТЕХ. ПРЕГЛЕД</label>
+        <input type="date" id="vehInspection">
+      </div>
+      <div class="field" style="margin-bottom:8px;">
+        <label>🚗 КАСКО</label>
+        <input type="date" id="vehCasco">
+      </div>
+      <div class="field" style="margin-bottom:8px;">
+        <label>🏷 ВИНЕТКА</label>
+        <input type="date" id="vehVignette">
+      </div>
     </div>
     <div class="modal-btns">
       <button class="cancel" onclick="closeVehicleModal()">Откажи</button>
