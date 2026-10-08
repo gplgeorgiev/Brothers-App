@@ -1269,6 +1269,7 @@ async function fetchAllRows(makeQuery, pageSize = 1000) {
 }
 
 let objects = [], products = [], allProducts = [], technicians = [];
+let vendingProductIds = new Set();  // артикули, заети в планограма на спирален автомат
 let timerInterval = null, timerSeconds = 0, timerRunning = false;
 let lineCounter = 0;
 
@@ -1449,6 +1450,11 @@ async function loadProducts() {
   if (!data) return;
   allProducts = data;  // всички, вкл. auto_add
   products = data.filter(p => !p.auto_add);  // само за избор в кошницата
+  // артикули, заети в планограма на спирален автомат → не ги показвай в кафе списъка
+  try {
+    const { data: slots } = await db.from('machine_slots').select('product_id').is('deleted_at', null);
+    vendingProductIds = new Set((slots || []).map(s => s.product_id).filter(Boolean));
+  } catch (e) { vendingProductIds = new Set(); }
   document.getElementById('prodCount').textContent = data.length;
   renderProductCards();
 }
@@ -1495,7 +1501,8 @@ let basket = []; // [{product, qty}]
 
 function renderProductCards() {
   const wrap = document.getElementById('productScrollWrap');
-  wrap.innerHTML = products.map(p => `
+  const list = products.filter(p => !vendingProductIds.has(p.id));
+  wrap.innerHTML = list.map(p => `
     <div class="prod-card" id="pc-${p.id}" onclick="selectProdCard(${p.id})">
       <div class="pc-icon">${p.icon || '📦'}</div>
       <div class="pc-name">${p.name}</div>
@@ -5648,6 +5655,7 @@ async function saveSlot() {
   resetSlotForm();
   document.getElementById('slotCode').focus();
   loadPlanogram();
+  loadProducts();  // обнови кафе списъка (скрий заетите в планограма)
 }
 
 async function editSlot(id) {
@@ -5672,6 +5680,7 @@ async function deleteSlot(id) {
   showToast('🗑 Изтрито', 'success');
   if (editingSlotId === id) resetSlotForm();
   loadPlanogram();
+  loadProducts();  // обнови кафе списъка
 }
 
 // ===== Импорт на цяла планограма (замества всички спирали) =====
@@ -5765,6 +5774,7 @@ async function doImportPlanogram() {
   showToast(`✅ Нова планограма: ${items.length} спирали`, 'success');
   document.getElementById('importPlanogramText').value = '';
   loadPlanogram();
+  loadProducts();  // обнови кафе списъка (скрий заетите в планограма)
 }
 
 function openObjectModal() {
