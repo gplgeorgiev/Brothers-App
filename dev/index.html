@@ -412,7 +412,7 @@ input.qty-big-input {
       <div class="prod-label"><span id="popupIcon">☕</span><span id="popupName">Продукт</span></div>
       <div class="qty-controls">
         <div class="qty-big-btn" onclick="changePopupQty(-1)">−</div>
-        <input class="qty-big-input" id="popupQtyInput" type="text" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" value="1" oninput="updateBasketFromInput(this.value.replace(',', '.'))" oncontextmenu="event.preventDefault();" onfocus="this.select()">
+        <input class="qty-big-input" id="popupQtyInput" type="text" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*" value="1" oninput="updateBasketFromInput(this.value.replace(',', '.'))" oncontextmenu="event.preventDefault();" onfocus="this.select()">
         <div class="qty-big-btn" onclick="changePopupQty(1)">＋</div>
       </div>
       
@@ -429,7 +429,7 @@ input.qty-big-input {
     <div class="field" style="margin-bottom:0">
       <label>БРОЯЧ (незадължително)</label>
       <div style="display:flex; gap:8px;">
-        <input type="number" inputmode="decimal" id="counterInput" placeholder="напр. 12450" autocomplete="off" style="flex:1">
+        <input type="number" inputmode="decimal" id="counterInput" placeholder="напр. 12450" style="flex:1">
         <button class="ocr-btn" onclick="triggerCamera()" title="Снимай брояча">📷</button>
         <button class="ocr-btn" onclick="triggerGallery()" title="От галерия">🖼️</button>
       </div>
@@ -566,7 +566,7 @@ input.qty-big-input {
     <div style="font-size:13px; color:var(--text2); margin-bottom:20px;" id="modalSub"></div>
     <div class="field">
       <label>CASH (EUR)</label>
-      <input type="number" inputmode="decimal" id="modalCashInput" placeholder="0.00" step="0.01" min="0" autocomplete="off"
+      <input type="number" inputmode="decimal" id="modalCashInput" placeholder="0.00" step="0.01" min="0"
         style="font-size:24px; font-weight:700; text-align:center; padding:16px;">
     </div>
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:8px;">
@@ -582,11 +582,11 @@ input.qty-big-input {
     <div style="font-size:15px; font-weight:800; margin-bottom:16px;" id="editCfTitle">✏️ Редакция</div>
     <div class="field">
       <label>БРОЯЧ</label>
-      <input type="number" inputmode="decimal" id="editCfCounter" placeholder="напр. 12450" autocomplete="off">
+      <input type="number" inputmode="decimal" id="editCfCounter" placeholder="напр. 12450">
     </div>
     <div class="field">
       <label>CASH (EUR)</label>
-      <input type="number" inputmode="decimal" id="editCfCash" placeholder="0.00" step="0.01" autocomplete="off">
+      <input type="number" inputmode="decimal" id="editCfCash" placeholder="0.00" step="0.01">
     </div>
     <div class="field">
       <label>ТЕХНИК</label>
@@ -716,7 +716,7 @@ input.qty-big-input {
       <div class="prod-label"><span id="finCatIcon">📦</span><span id="finCatName">Категория</span></div>
       <div class="qty-controls">
         <div class="qty-big-btn" onclick="changeFinAmount(-10)">−</div>
-        <input class="qty-big-input" id="finAmountInput" type="text" pattern="[0-9]*[.,]?[0-9]*" inputmode="decimal" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" value="" placeholder="0.00" oninput="updateFinAmount(this.value.replace(',', '.'))" oncontextmenu="event.preventDefault();" onfocus="this.select()">
+        <input class="qty-big-input" id="finAmountInput" type="text" pattern="[0-9]*[.,]?[0-9]*" inputmode="decimal" value="" placeholder="0.00" oninput="updateFinAmount(this.value.replace(',', '.'))" oncontextmenu="event.preventDefault();" onfocus="this.select()">
         <div class="qty-big-btn" onclick="changeFinAmount(10)">＋</div>
       </div>
       <button class="qty-add-btn" onclick="addFinLine()">✓ Добави</button>
