@@ -449,9 +449,12 @@ input.qty-big-input {
   <!-- SPIRAL секция (само за спирални автомати) -->
   <div id="spiralRestockSection" style="display:none;">
     <div class="section-label">Артикули</div>
-    <div style="position:relative; margin-bottom:10px;">
-      <input type="text" id="spiralSearch" oninput="filterSpiralChecklist()" onfocus="spiralSearchFocus(this)" placeholder="🔍 търси спирала или артикул" style="width:100%; background:var(--bg3); border:1px solid var(--border); border-radius:10px; padding:11px 48px 11px 14px; color:var(--text); font-size:15px; outline:none; font-family:var(--font);">
-      <button type="button" id="spiralSearchClear" onclick="clearSpiralSearch()" style="display:none; position:absolute; right:6px; top:50%; transform:translateY(-50%); width:38px; height:38px; align-items:center; justify-content:center; border:1px solid var(--border); background:var(--bg); color:var(--text2); border-radius:9px; font-size:20px; line-height:1; cursor:pointer;">✕</button>
+    <div id="spiralSearchBar" style="display:flex; gap:8px; margin-bottom:10px; align-items:stretch;">
+      <div style="position:relative; flex:1; min-width:0;">
+        <input type="text" id="spiralSearch" oninput="filterSpiralChecklist()" onfocus="spiralSearchFocus(this)" onblur="spiralSearchBlur()" placeholder="🔍 спирала или артикул" style="width:100%; background:var(--bg3); border:1px solid var(--border); border-radius:10px; padding:11px 40px 11px 12px; color:var(--text); font-size:15px; outline:none; font-family:var(--font);">
+        <button type="button" id="spiralSearchClear" onpointerdown="event.preventDefault()" onclick="clearSpiralSearch()" style="display:none; position:absolute; right:6px; top:50%; transform:translateY(-50%); width:38px; height:38px; align-items:center; justify-content:center; border:1px solid var(--border); background:var(--bg); color:var(--text2); border-radius:9px; font-size:20px; line-height:1; cursor:pointer;">✕</button>
+      </div>
+      <button type="button" id="spiralListBtn" onclick="toggleSpiralPickList()" title="Списък за зареждане (само с въведено количество)" style="flex:0 0 auto; width:48px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); border-radius:10px; font-size:20px; cursor:pointer; font-family:var(--font);">📋</button>
     </div>
     <div id="spiralChecklist"></div>
   </div>
@@ -1491,7 +1494,9 @@ let basket = []; // [{product, qty}]
 
 function renderProductCards() {
   const wrap = document.getElementById('productScrollWrap');
-  wrap.innerHTML = products.map(p => `
+  // кафе списъкът показва само артикули за кафе машина (спиралните се скриват)
+  const list = products.filter(p => (p.machine_type || 'vending') !== 'spiral');
+  wrap.innerHTML = list.map(p => `
     <div class="prod-card" id="pc-${p.id}" onclick="selectProdCard(${p.id})">
       <div class="pc-icon">${p.icon || '📦'}</div>
       <div class="pc-name">${p.name}</div>
@@ -1660,6 +1665,7 @@ document.getElementById('objectSelect').addEventListener('change', function() {
 
 // ── ЗАРЕЖДАНЕ НА СПИРАЛЕН АВТОМАТ (чек-лист) ──
 let spiralSlots = [];
+let spiralPickMode = false;
 
 async function renderSpiralChecklist(objectId) {
   const wrap = document.getElementById('spiralChecklist');
@@ -1673,6 +1679,8 @@ async function renderSpiralChecklist(objectId) {
   if (error) { wrap.innerHTML = `<div class="empty"><div class="empty-icon">❌</div><p>${error.message}</p></div>`; return; }
   if (!data || !data.length) { wrap.innerHTML = '<div class="empty"><div class="empty-icon">📋</div><p>Няма планограма за тази машина. Добави спирали в Основни данни → Обекти → Планограма.</p></div>'; return; }
   spiralSlots = data;
+  spiralPickMode = false;
+  setSpiralListBtnActive(false);
   const groups = {};
   data.forEach(s => { const g = s.row_group || '—'; (groups[g] = groups[g] || []).push(s); });
   wrap.innerHTML = Object.keys(groups).sort().map((g, gi) => {
@@ -1694,11 +1702,10 @@ async function renderSpiralChecklist(objectId) {
 
 function spiralRowHtml(s) {
   return `
-    <div class="spiral-row" data-code="${(s.slot_code||'').toLowerCase()}" data-name="${(s.products?.name||'').toLowerCase()}" style="display:flex; align-items:center; gap:10px; padding:10px 12px; border-top:1px solid var(--border);">
-      <div style="font-family:var(--mono); font-weight:800; min-width:36px; text-align:center; font-size:17px;">${s.slot_code}</div>
+    <div class="spiral-row" data-code="${(s.slot_code||'').toLowerCase()}" data-name="${(s.products?.name||'').toLowerCase()}" style="display:flex; align-items:center; gap:8px; padding:10px 12px 10px 8px; border-top:1px solid var(--border);">
+      <div style="font-family:var(--mono); font-weight:800; min-width:24px; text-align:right; font-size:17px;">${s.slot_code}</div>
       <div style="flex:1; min-width:0;">
-        <div style="font-size:15px; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${s.products?.icon||'📦'} ${s.products?.name||'—'}</div>
-        <div style="font-size:12px; color:var(--text2); margin-top:1px;">кап.${s.capacity} · ${(s.price||0).toFixed(2)} EUR</div>
+        <div style="font-size:15px; font-weight:700; line-height:1.25; word-break:break-word;">${s.products?.icon||'📦'} ${s.products?.name||'—'}</div>
       </div>
       <div style="display:flex; align-items:center; gap:5px;">
         <div onpointerdown="event.preventDefault()" onclick="changeSpiralQty('${s.id}',-1)" style="width:34px; height:34px; border-radius:8px; background:var(--bg3); border:1px solid var(--border); display:flex; align-items:center; justify-content:center; font-size:20px; font-weight:700; cursor:pointer; user-select:none;">−</div>
@@ -1724,6 +1731,7 @@ function toggleSpiralGroup(gid) {
 }
 
 function filterSpiralChecklist() {
+  if (spiralPickMode) { spiralPickMode = false; setSpiralListBtnActive(false); }
   const q = (document.getElementById('spiralSearch').value || '').toLowerCase().trim();
   const clearBtn = document.getElementById('spiralSearchClear');
   if (clearBtn) clearBtn.style.display = q ? 'flex' : 'none';
@@ -1755,15 +1763,81 @@ function clearSpiralSearch() {
   if (!el) return;
   el.value = '';
   filterSpiralChecklist();
-  el.focus();  // връща фокуса → задейства наново скрола към върха (onfocus)
+  el.focus();           // фокусът не е губен (preventDefault на ✕), но подсигуряваме
+  spiralSearchFocus(el); // закотви наново най-горе
 }
 
-// При фокус — изкарай търсачката близо до върха, за да не я крие клавиатурата
+function setSpiralListBtnActive(on) {
+  const btn = document.getElementById('spiralListBtn');
+  if (!btn) return;
+  if (on) { btn.style.background = 'var(--accent)'; btn.style.color = '#fff'; btn.style.borderColor = 'var(--accent)'; }
+  else { btn.style.background = 'var(--bg3)'; btn.style.color = 'var(--text2)'; btn.style.borderColor = 'var(--border)'; }
+}
+
+// Връщане към изгледа по подразбиране: всички спирали, групите сгънати
+function resetSpiralView() {
+  document.querySelectorAll('#spiralChecklist .spgrp-body').forEach(body => {
+    body.querySelectorAll('.spiral-row').forEach(row => { row.style.display = 'flex'; });
+    const card = body.closest('.card');
+    const arr = document.getElementById(body.id + '-arr');
+    body.style.display = 'none';
+    if (card) card.style.display = 'block';
+    if (arr) arr.textContent = '▸';
+  });
+}
+
+// Списък за зареждане: показва само спиралите с въведено количество (≠ 0)
+function toggleSpiralPickList() {
+  spiralPickMode = !spiralPickMode;
+  setSpiralListBtnActive(spiralPickMode);
+  if (!spiralPickMode) { resetSpiralView(); return; }
+  // изчисти търсенето, за да не се бият филтрите
+  const se = document.getElementById('spiralSearch');
+  if (se) se.value = '';
+  const clearBtn = document.getElementById('spiralSearchClear');
+  if (clearBtn) clearBtn.style.display = 'none';
+  document.querySelectorAll('#spiralChecklist .spgrp-body').forEach(body => {
+    let any = false;
+    body.querySelectorAll('.spiral-row').forEach(row => {
+      const inp = row.querySelector('input[id^="sp-add-"]');
+      const val = inp ? (parseInt(inp.value) || 0) : 0;
+      const show = val !== 0;
+      row.style.display = show ? 'flex' : 'none';
+      if (show) any = true;
+    });
+    const card = body.closest('.card');
+    const arr = document.getElementById(body.id + '-arr');
+    body.style.display = any ? 'block' : 'none';
+    if (card) card.style.display = any ? 'block' : 'none';
+    if (arr) arr.textContent = '▾';
+  });
+}
+
+// При фокус — закови търсачката най-горе (под хедъра), докато е активна
 function spiralSearchFocus(el) {
-  setTimeout(() => {
-    const y = el.getBoundingClientRect().top + window.scrollY - 60;
-    window.scrollTo({ top: y, behavior: 'smooth' });
-  }, 350);
+  const bar = document.getElementById('spiralSearchBar');
+  if (!bar) return;
+  const headerH = document.querySelector('.header')?.offsetHeight || 50;
+  bar.style.position = 'sticky';
+  bar.style.top = headerH + 'px';
+  bar.style.zIndex = '50';
+  bar.style.background = 'var(--bg)';
+  bar.style.paddingTop = '6px';
+  bar.style.paddingBottom = '6px';
+  // подравни я в горния край веднъж (без плавен скрол, за да не „прескача")
+  const y = bar.getBoundingClientRect().top + window.scrollY - headerH;
+  window.scrollTo({ top: y });
+}
+
+function spiralSearchBlur() {
+  const bar = document.getElementById('spiralSearchBar');
+  if (!bar) return;
+  bar.style.position = '';
+  bar.style.top = '';
+  bar.style.zIndex = '';
+  bar.style.background = '';
+  bar.style.paddingTop = '';
+  bar.style.paddingBottom = '';
 }
 
 async function submitSpiralRestock() {
@@ -2061,11 +2135,11 @@ async function submitRestock() {
   const date = document.getElementById('dateInput').value;
   const lines = getLines();
 
-  if (!techId) { showToast('Избери техник!', 'error'); return; }
-  if (!objectId) { showToast('Избери обект!', 'error'); return; }
+  if (!techId) { showToast('Избери техник!', 'error'); reenable(); return; }
+  if (!objectId) { showToast('Избери обект!', 'error'); reenable(); return; }
   if (!lines.length) {
     const confirmed = await showConfirm('Не сте избрали продукти, желаете ли запис?');
-    if (!confirmed) return;
+    if (!confirmed) { reenable(); return; }
   }
 
   // Валидация на брояч и дата
@@ -2079,12 +2153,14 @@ async function submitRestock() {
     if (lastCf?.[0]) {
       if (counterVal2 < lastCf[0].counter) {
         showToast(`❌ Броячът (${counterVal2}) е по-малък от предишния (${lastCf[0].counter})!`, 'error');
+        reenable();
         return;
       }
       const lastDate = new Date(lastCf[0].date);
       const curDate = new Date(date);
       if (curDate < lastDate) {
         showToast(`❌ Датата е по-ранна от предишния запис (${lastCf[0].date})!`, 'error');
+        reenable();
         return;
       }
     }
@@ -3647,14 +3723,14 @@ function updateFinAmount(val) {
 
 function changeFinAmount(delta) {
   const inp = document.getElementById('finAmountInput');
-  let val = parseFloat(inp.value) || 0;
+  let val = parseFloat(String(inp.value).replace(',', '.')) || 0;
   val = Math.max(0, val + delta);
   inp.value = val.toFixed(2);
 }
 
 function addFinLine() {
   if (!finSelectedCat) return;
-  const amount = parseFloat(document.getElementById('finAmountInput').value) || 0;
+  const amount = parseFloat(String(document.getElementById('finAmountInput').value).replace(',', '.')) || 0;
   if (amount <= 0) { showToast('Въведи сума!', 'error'); return; }
   const cat = FIN_CATEGORIES[finType].find(c => c.code === finSelectedCat);
   const existing = finBasket.find(b => b.code === finSelectedCat);
@@ -3774,10 +3850,10 @@ async function saveFinance() {
   const contractor = document.getElementById('finContractor').value;
   const comment = document.getElementById('finComment').value;
 
-  if (!objId) { showToast('Избери обект!', 'error'); return; }
-  if (!techId) { showToast('Избери техник!', 'error'); return; }
-  if (!finBasket.length) { showToast('Добави поне една категория!', 'error'); return; }
-  if (!date) { showToast('Избери дата!', 'error'); return; }
+  if (!objId) { showToast('Избери обект!', 'error'); reenableFin(); return; }
+  if (!techId) { showToast('Избери техник!', 'error'); reenableFin(); return; }
+  if (!finBasket.length) { showToast('Добави поне една категория!', 'error'); reenableFin(); return; }
+  if (!date) { showToast('Избери дата!', 'error'); reenableFin(); return; }
 
   const obj = objects.find(o => o.id == objId);
   const tech = technicians.find(t => t.id == techId);
@@ -5280,6 +5356,7 @@ let editingProductId = null;
 function openImportProductsModal() {
   document.getElementById('importProductsText').value = '';
   document.getElementById('importProductsPreview').innerHTML = '';
+  const t = document.getElementById('importProductsType'); if (t) t.value = 'vending';
   document.getElementById('importProductsModal').style.display = 'flex';
 }
 function closeImportProductsModal() {
@@ -5344,10 +5421,11 @@ async function doImportProducts() {
     return;
   }
 
+  const machineType = document.getElementById('importProductsType')?.value || 'vending';
   const payload = toInsert.map(it => ({
     name: it.name, icon: it.icon, unit: it.unit,
     price_with_vat: it.cost, price_no_vat: parseFloat((it.cost / 1.2).toFixed(4)),
-    auto_add: false
+    auto_add: false, machine_type: machineType
   }));
   const { error } = await db.from('products').insert(payload);
   btn.disabled = false; btn.textContent = orig;
@@ -5375,7 +5453,7 @@ async function loadProductsList() {
     <div style="padding:10px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; gap:8px;">
       <div style="flex:1; min-width:0;">
         <div style="font-weight:700; font-size:14px;">${p.icon || '📦'} ${p.name}</div>
-        <div style="font-size:11px; color:var(--text2); margin-top:2px;">${p.unit || '—'} · ${(p.price_with_vat || 0).toFixed(2)} EUR${p.auto_add ? ' · <span style="color:var(--amber);">🔄 Авто-добавяне</span>' : ''}</div>
+        <div style="font-size:11px; color:var(--text2); margin-top:2px;">${p.machine_type === 'spiral' ? '🥤 спирала' : '☕ кафе'} · ${p.unit || '—'} · ${(p.price_with_vat || 0).toFixed(2)} EUR${p.auto_add ? ' · <span style="color:var(--amber);">🔄 Авто-добавяне</span>' : ''}</div>
       </div>
       <button onclick="editProduct(${p.id})" style="padding:5px 10px; border-radius:7px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:11px; font-weight:700; cursor:pointer;">✏️</button>
       <button onclick="deleteProduct(${p.id})" style="padding:5px 10px; border-radius:7px; border:1px solid var(--red); background:transparent; color:var(--red); font-size:11px; font-weight:700; cursor:pointer;">🗑</button>
@@ -5387,6 +5465,7 @@ function openProductModal() {
   editingProductId = null;
   document.getElementById('productModalTitle').textContent = 'Нов продукт';
   document.getElementById('prodName').value = '';
+  document.getElementById('prodMachineType').value = 'vending';
   document.getElementById('prodIcon').value = '📦';
   document.getElementById('prodUnit').value = '';
   document.getElementById('prodPriceVat').value = '';
@@ -5404,6 +5483,7 @@ async function editProduct(id) {
   editingProductId = id;
   document.getElementById('productModalTitle').textContent = 'Редакция на продукт';
   document.getElementById('prodName').value = p.name;
+  document.getElementById('prodMachineType').value = p.machine_type || 'vending';
   document.getElementById('prodIcon').value = p.icon || '📦';
   document.getElementById('prodUnit').value = p.unit || '';
   document.getElementById('prodPriceVat').value = p.price_with_vat || 0;
@@ -5417,9 +5497,10 @@ async function saveProduct() {
   const unit = document.getElementById('prodUnit').value.trim();
   const priceWithVat = parseFloat(document.getElementById('prodPriceVat').value.replace(',', '.')) || 0;
   const autoAdd = document.getElementById('prodAutoAdd').checked;
+  const machineType = document.getElementById('prodMachineType').value || 'vending';
   if (!name) { showToast('Попълни име!', 'error'); return; }
 
-  const payload = { name, icon, unit, price_with_vat: priceWithVat, price_no_vat: parseFloat((priceWithVat / 1.2).toFixed(4)), auto_add: autoAdd };
+  const payload = { name, icon, unit, price_with_vat: priceWithVat, price_no_vat: parseFloat((priceWithVat / 1.2).toFixed(4)), auto_add: autoAdd, machine_type: machineType };
   let result;
   if (editingProductId) {
     result = await db.from('products').update(payload).eq('id', editingProductId);
@@ -7242,6 +7323,13 @@ function restockPreviousMonth() {
       Само <b>Име</b> е задължително (цена 0, икона 📦, ед. „бр" по подразбиране).
     </div>
     <div class="field">
+      <label>ТИП МАШИНА (за всички в този импорт)</label>
+      <select id="importProductsType" style="width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:8px; background:var(--bg3); color:var(--text); font-size:14px;">
+        <option value="vending">☕ Кафе машина</option>
+        <option value="spiral">🥤 Спирален автомат</option>
+      </select>
+    </div>
+    <div class="field">
       <textarea id="importProductsText" rows="8" oninput="previewImportProducts()" placeholder="Кока Кола; 1.00&#10;Фанта; 0.95&#10;Сникърс; 0.70" style="resize:vertical; background:var(--bg3); border:1px solid var(--border); border-radius:10px; padding:12px 14px; color:var(--text); font-family:var(--mono); font-size:13px; width:100%; outline:none;"></textarea>
     </div>
     <div id="importProductsPreview" style="font-size:12px; color:var(--text2); margin-bottom:10px; min-height:16px;"></div>
@@ -7280,6 +7368,13 @@ function restockPreviousMonth() {
     <div class="field">
       <label>ИМЕ</label>
       <input type="text" id="prodName" placeholder="напр. Кафе">
+    </div>
+    <div class="field">
+      <label>ТИП МАШИНА</label>
+      <select id="prodMachineType" style="width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:8px; background:var(--bg3); color:var(--text); font-size:14px;">
+        <option value="vending">☕ Кафе машина</option>
+        <option value="spiral">🥤 Спирален автомат</option>
+      </select>
     </div>
     <div class="field">
       <label>ИКОНА (emoji)</label>
