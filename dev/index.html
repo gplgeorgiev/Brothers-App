@@ -2136,11 +2136,11 @@ async function submitRestock() {
   const date = document.getElementById('dateInput').value;
   const lines = getLines();
 
-  if (!techId) { showToast('Избери техник!', 'error'); return; }
-  if (!objectId) { showToast('Избери обект!', 'error'); return; }
+  if (!techId) { showToast('Избери техник!', 'error'); reenable(); return; }
+  if (!objectId) { showToast('Избери обект!', 'error'); reenable(); return; }
   if (!lines.length) {
     const confirmed = await showConfirm('Не сте избрали продукти, желаете ли запис?');
-    if (!confirmed) return;
+    if (!confirmed) { reenable(); return; }
   }
 
   // Валидация на брояч и дата
@@ -2154,12 +2154,14 @@ async function submitRestock() {
     if (lastCf?.[0]) {
       if (counterVal2 < lastCf[0].counter) {
         showToast(`❌ Броячът (${counterVal2}) е по-малък от предишния (${lastCf[0].counter})!`, 'error');
+        reenable();
         return;
       }
       const lastDate = new Date(lastCf[0].date);
       const curDate = new Date(date);
       if (curDate < lastDate) {
         showToast(`❌ Датата е по-ранна от предишния запис (${lastCf[0].date})!`, 'error');
+        reenable();
         return;
       }
     }
@@ -3849,10 +3851,10 @@ async function saveFinance() {
   const contractor = document.getElementById('finContractor').value;
   const comment = document.getElementById('finComment').value;
 
-  if (!objId) { showToast('Избери обект!', 'error'); return; }
-  if (!techId) { showToast('Избери техник!', 'error'); return; }
-  if (!finBasket.length) { showToast('Добави поне една категория!', 'error'); return; }
-  if (!date) { showToast('Избери дата!', 'error'); return; }
+  if (!objId) { showToast('Избери обект!', 'error'); reenableFin(); return; }
+  if (!techId) { showToast('Избери техник!', 'error'); reenableFin(); return; }
+  if (!finBasket.length) { showToast('Добави поне една категория!', 'error'); reenableFin(); return; }
+  if (!date) { showToast('Избери дата!', 'error'); reenableFin(); return; }
 
   const obj = objects.find(o => o.id == objId);
   const tech = technicians.find(t => t.id == techId);
