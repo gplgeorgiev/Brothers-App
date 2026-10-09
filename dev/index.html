@@ -1694,19 +1694,21 @@ function saveSpiralDraft() {
     else localStorage.removeItem(_spiralDraftKey(spiralDraftObjId));
   } catch (e) { /* localStorage недостъпен */ }
 }
-function restoreSpiralDraft() {
+async function restoreSpiralDraft() {
   if (!spiralDraftObjId) return;
+  let m;
   try {
     const raw = localStorage.getItem(_spiralDraftKey(spiralDraftObjId));
     if (!raw) return;
-    const m = JSON.parse(raw);
-    let restored = 0;
-    Object.keys(m).forEach(id => {
-      const el = document.getElementById('sp-add-' + id);
-      if (el) { el.value = m[id]; restored++; }
-    });
-    if (restored) showToast('↩️ Възстановени набрани бройки', 'success');
-  } catch (e) { /* игнорирай */ }
+    m = JSON.parse(raw);
+  } catch (e) { return; }
+  if (!m || !Object.keys(m).length) return;
+  const ok = await showConfirm('Открити са незаписани набрани бройки за тази машина. Да ги възстановя ли?');
+  if (!ok) return;
+  Object.keys(m).forEach(id => {
+    const el = document.getElementById('sp-add-' + id);
+    if (el) el.value = m[id];
+  });
 }
 function clearSpiralDraft(objId) {
   try { localStorage.removeItem(_spiralDraftKey(objId)); } catch (e) { }
@@ -1744,7 +1746,7 @@ async function renderSpiralChecklist(objectId) {
         <div id="${gid}" class="spgrp-body" style="display:none;">${rows}</div>
       </div>`;
   }).join('');
-  restoreSpiralDraft();  // върни набраните бройки (при случайно излизане)
+  await restoreSpiralDraft();  // върни набраните бройки (при случайно излизане)
 }
 
 function spiralRowHtml(s) {
