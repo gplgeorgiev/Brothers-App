@@ -1504,6 +1504,7 @@ async function loadTechnicians() {
 let selectedProdId = null;
 let popupQty = 1;
 let basket = []; // [{product, qty}]
+let coffeeDraftObjId = null;  // авто-запазване на позициите за кафе машина
 
 function renderProductCards() {
   const wrap = document.getElementById('productScrollWrap');
@@ -1617,7 +1618,7 @@ function removeFromBasket(idx) {
 
 function renderBasket() {
   const el = document.getElementById('addedLines');
-  if (!basket.length) { el.innerHTML = ''; return; }
+  if (!basket.length) { el.innerHTML = ''; saveCoffeeDraft(); return; }
   el.innerHTML = basket.map((b, i) => `
     <div class="added-line">
       <div class="al-icon">${b.product.icon || '📦'}</div>
@@ -1626,9 +1627,44 @@ function renderBasket() {
       <div class="al-remove" onclick="removeFromBasket(${i})">✕</div>
     </div>
   `).join('');
+  saveCoffeeDraft();
 }
 
 function getLines() { return basket; }
+
+// ── Авто-запазване на позициите за кафе машина (при случайно излизане) ──
+function _coffeeDraftKey(objId) { return 'coffeeDraft_' + objId; }
+function saveCoffeeDraft() {
+  if (!coffeeDraftObjId) return;
+  try {
+    const arr = basket.map(b => ({ id: b.product.id, qty: b.qty }));
+    if (arr.length) localStorage.setItem(_coffeeDraftKey(coffeeDraftObjId), JSON.stringify(arr));
+    else localStorage.removeItem(_coffeeDraftKey(coffeeDraftObjId));
+  } catch (e) { /* localStorage недостъпен */ }
+}
+function clearCoffeeDraft(objId) {
+  try { localStorage.removeItem(_coffeeDraftKey(objId)); } catch (e) { }
+}
+async function maybeRestoreCoffeeDraft(objId) {
+  coffeeDraftObjId = objId;
+  if (basket.length) return; // вече има позиции — не пипай
+  let arr;
+  try {
+    const raw = localStorage.getItem(_coffeeDraftKey(objId));
+    if (!raw) return;
+    arr = JSON.parse(raw);
+  } catch (e) { return; }
+  if (!arr || !arr.length) return;
+  const ok = await showConfirm('Има незаписани позиции за машината. Да ги възстановя ли?');
+  if (!ok) return;
+  basket = [];
+  arr.forEach(it => {
+    const prod = (allProducts || []).find(p => p.id === it.id) || (products || []).find(p => p.id === it.id);
+    if (prod) basket.push({ product: prod, qty: it.qty });
+  });
+  renderBasket();
+  if (typeof updateSummary === 'function') updateSummary();
+}
 
 // ── SUMMARY ──
 function updateSummary() {
@@ -1668,11 +1704,13 @@ document.getElementById('objectSelect').addEventListener('change', function() {
     const isSpiral = obj.type === 'spiral';
     document.getElementById('coffeeRestockSections').style.display = isSpiral ? 'none' : 'block';
     document.getElementById('spiralRestockSection').style.display = isSpiral ? 'block' : 'none';
-    if (isSpiral) renderSpiralChecklist(obj.id);
+    if (isSpiral) { coffeeDraftObjId = null; renderSpiralChecklist(obj.id); }
+    else { maybeRestoreCoffeeDraft(obj.id); }
   } else {
     document.getElementById('objectInfo').innerHTML = '';
     document.getElementById('coffeeRestockSections').style.display = 'block';
     document.getElementById('spiralRestockSection').style.display = 'none';
+    coffeeDraftObjId = null;
   }
 });
 
@@ -1703,7 +1741,7 @@ async function restoreSpiralDraft() {
     m = JSON.parse(raw);
   } catch (e) { return; }
   if (!m || !Object.keys(m).length) return;
-  const ok = await showConfirm('Открити са незаписани набрани бройки за тази машина. Да ги възстановя ли?');
+  const ok = await showConfirm('Има незаписани позиции за машината. Да ги възстановя ли?');
   if (!ok) return;
   Object.keys(m).forEach(id => {
     const el = document.getElementById('sp-add-' + id);
@@ -2344,6 +2382,8 @@ async function submitRestock() {
   document.getElementById('gpsStatus').textContent = '';
   document.getElementById('ocrPreview').style.display = 'none';
   document.getElementById('summarySection').innerHTML = '';
+  clearCoffeeDraft(objectId);
+  coffeeDraftObjId = null;
   basket = [];
   selectedProdId = null;
   renderBasket();
