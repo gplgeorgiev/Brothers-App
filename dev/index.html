@@ -1634,7 +1634,9 @@ function getLines() { return basket; }
 
 // ── Авто-запазване на позициите за кафе машина (при случайно излизане) ──
 function _coffeeDraftKey(objId) { return 'coffeeDraft_' + objId; }
+let _suppressCoffeeSave = false;  // при програмно изчистване да не трием чернова
 function saveCoffeeDraft() {
+  if (_suppressCoffeeSave) return;
   if (!coffeeDraftObjId) return;
   try {
     const arr = basket.map(b => ({ id: b.product.id, qty: b.qty }));
@@ -1646,17 +1648,22 @@ function clearCoffeeDraft(objId) {
   try { localStorage.removeItem(_coffeeDraftKey(objId)); } catch (e) { }
 }
 async function maybeRestoreCoffeeDraft(objId) {
-  coffeeDraftObjId = objId;
-  if (basket.length) return; // вече има позиции — не пипай
-  let arr;
+  // прочети черновата на НОВИЯ обект преди да пипаме кошницата
+  let arr = null;
   try {
     const raw = localStorage.getItem(_coffeeDraftKey(objId));
-    if (!raw) return;
-    arr = JSON.parse(raw);
-  } catch (e) { return; }
-  if (!arr || !arr.length) return;
+    if (raw) arr = JSON.parse(raw);
+  } catch (e) { /* игнорирай */ }
+  // смени активния обект и изчисти кошницата (данните на стария вече са записани)
+  coffeeDraftObjId = objId;
+  basket = [];
+  _suppressCoffeeSave = true;  // празният render да не трие черновата на новия обект
+  renderBasket();
+  _suppressCoffeeSave = false;
+  if (typeof updateSummary === 'function') updateSummary();
+  if (!arr || !arr.length) return;  // няма чернова → остава изчистено
   const ok = await showConfirm('Има незаписани позиции за машината. Да ги възстановя ли?');
-  if (!ok) return;
+  if (!ok) return;  // отказ → остава изчистено, черновата се пази
   basket = [];
   arr.forEach(it => {
     const prod = (allProducts || []).find(p => p.id === it.id) || (products || []).find(p => p.id === it.id);
