@@ -1939,6 +1939,32 @@ function spiralSearchBlur() {
   bar.style.paddingBottom = '';
 }
 
+// Преизчислява сумата на отвореното Отчитане за спирала от свързаните зареждания
+async function recomputeSpiralPending(cfId) {
+  if (!cfId) return;
+  const { data: cf } = await db.from('cashflow').select('status').eq('id', cfId).single();
+  if (!cf || cf.status !== 'pending') return;  // приключените не се пипат
+  const { data: hdrs } = await db.from('operation_headers')
+    .select('spiral_revenue, date, technician_id, technician_name')
+    .eq('cashflow_id', cfId)
+    .eq('op_type', 'restock')
+    .is('deleted_at', null);
+  const list = (hdrs || []).filter(h => h.spiral_revenue != null);
+  if (!list.length) {
+    // няма принос → премахни празното Отчитане
+    await db.from('cashflow').update({ deleted_at: new Date().toISOString() }).eq('id', cfId);
+    return;
+  }
+  const total = parseFloat(list.reduce((s, h) => s + (h.spiral_revenue || 0), 0).toFixed(2));
+  const latest = list.slice().sort((a, b) => (a.date < b.date ? 1 : (a.date > b.date ? -1 : 0)))[0];
+  await db.from('cashflow').update({
+    check_value: total,
+    date: latest?.date,
+    technician_id: latest?.technician_id,
+    technician_name: latest?.technician_name
+  }).eq('id', cfId);
+}
+
 async function submitSpiralRestock() {
   const btn = document.getElementById('submitBtn');
   if (btn?.disabled) return;
@@ -1995,13 +2021,39 @@ async function submitSpiralRestock() {
   const { error: rErr } = await db.from('operations').insert(rows);
   if (rErr) { await db.from('operation_headers').delete().eq('id', header.id); showToast('❌ ' + rErr.message, 'error'); if (btn) { btn.disabled = false; btn.innerHTML = origText; } return; }
 
-  // Отчитане: чакащо отчитане с очаквания приход (Σ добавени × продажна цена)
+  // Отчитане: едно отворено Отчитане на машина, с натрупване (Σ добавени × продажна цена)
   const revenue = parseFloat(items.reduce((s, it) => s + (it.slot.price || 0) * it.added, 0).toFixed(2));
-  await db.from('cashflow').insert({
-    date, object_id: parseInt(objectId), object_name: obj?.name,
-    technician_id: parseInt(techId), technician_name: tech?.name,
-    check_value: revenue, operation_id: header.id, status: 'pending'
-  });
+  // запиши приходната сума на това зареждане (за преизчисляване при изтриване/редакция)
+  await db.from('operation_headers').update({ spiral_revenue: revenue }).eq('id', header.id);
+  // намери отворено (pending) Отчитане за обекта
+  const { data: _openCf } = await db.from('cashflow')
+    .select('id, check_value, operation_id')
+    .eq('object_id', parseInt(objectId))
+    .eq('status', 'pending')
+    .is('deleted_at', null)
+    .order('id', { ascending: false })
+    .limit(1);
+  let _cfId;
+  if (_openCf && _openCf.length) {
+    _cfId = _openCf[0].id;
+    // backfill за старо Отчитане (създадено 1:1 преди натрупването)
+    if (_openCf[0].operation_id) {
+      await db.from('operation_headers')
+        .update({ spiral_revenue: _openCf[0].check_value || 0, cashflow_id: _cfId })
+        .eq('id', _openCf[0].operation_id)
+        .is('spiral_revenue', null);
+    }
+  } else {
+    const { data: _newCf } = await db.from('cashflow').insert({
+      date, object_id: parseInt(objectId), object_name: obj?.name,
+      technician_id: parseInt(techId), technician_name: tech?.name,
+      check_value: 0, status: 'pending'
+    }).select('id').single();
+    _cfId = _newCf?.id;
+  }
+  // свържи зареждането към Отчитането и преизчисли сумата
+  await db.from('operation_headers').update({ cashflow_id: _cfId }).eq('id', header.id);
+  await recomputeSpiralPending(_cfId);
 
   showToast(`✅ Записани ${items.length} спирали`, 'success');
   clearSpiralDraft(objectId);
@@ -3132,10 +3184,19 @@ function addEditLine_unused() {
 async function deleteHeader(id) {
   if (!confirm('Преместване в кошчето?')) return;
   const now = new Date().toISOString();
-  await db.from('cashflow').update({ deleted_at: now }).eq('operation_id', id);
-  await db.from('operations').update({ deleted_at: now }).eq('header_id', id);
-  const { error } = await db.from('operation_headers').update({ deleted_at: now }).eq('id', id);
-  if (error) { showToast('❌ ' + error.message, 'error'); return; }
+  const { data: _hdr } = await db.from('operation_headers').select('cashflow_id, spiral_revenue').eq('id', id).single();
+  if (_hdr && _hdr.spiral_revenue != null && _hdr.cashflow_id) {
+    // спирала (натрупано Отчитане): изтрий зареждането и преизчисли Отчитането
+    await db.from('operations').update({ deleted_at: now }).eq('header_id', id);
+    const { error } = await db.from('operation_headers').update({ deleted_at: now }).eq('id', id);
+    if (error) { showToast('❌ ' + error.message, 'error'); return; }
+    await recomputeSpiralPending(_hdr.cashflow_id);
+  } else {
+    await db.from('cashflow').update({ deleted_at: now }).eq('operation_id', id);
+    await db.from('operations').update({ deleted_at: now }).eq('header_id', id);
+    const { error } = await db.from('operation_headers').update({ deleted_at: now }).eq('id', id);
+    if (error) { showToast('❌ ' + error.message, 'error'); return; }
+  }
   showToast('🗑 Преместено в кошчето', 'success');
   await loadRestockHistory();
   await loadHistory();
@@ -3201,6 +3262,33 @@ async function saveEditOp() {
       await db.from('operations').update({
         date, object_name: obj?.name, technician_name: tech?.name
       }).in('header_id', cashHdrs.map(h => h.id));
+    }
+  }
+
+  // Спирала (натрупано Отчитане): при смяна на обект/дата/техник — премести/преизчисли
+  const { data: _eh } = await db.from('operation_headers')
+    .select('cashflow_id, spiral_revenue').eq('id', currentEditOpId).single();
+  if (_eh && _eh.spiral_revenue != null && _eh.cashflow_id) {
+    const { data: _oldCfRow } = await db.from('cashflow').select('status').eq('id', _eh.cashflow_id).single();
+    if (_oldCfRow && _oldCfRow.status === 'pending') {
+      // открий отвореното Отчитане за (новия) обект
+      const { data: _opc } = await db.from('cashflow').select('id')
+        .eq('object_id', objId).eq('status', 'pending').is('deleted_at', null)
+        .order('id', { ascending: false }).limit(1);
+      let targetCf = _opc && _opc.length ? _opc[0].id : null;
+      if (!targetCf) {
+        const { data: _nc } = await db.from('cashflow').insert({
+          date, object_id: objId, object_name: obj?.name,
+          technician_id: techId, technician_name: tech?.name,
+          check_value: 0, status: 'pending'
+        }).select('id').single();
+        targetCf = _nc?.id;
+      }
+      if (targetCf && targetCf !== _eh.cashflow_id) {
+        await db.from('operation_headers').update({ cashflow_id: targetCf }).eq('id', currentEditOpId);
+        await recomputeSpiralPending(_eh.cashflow_id);
+      }
+      await recomputeSpiralPending(targetCf);
     }
   }
 
