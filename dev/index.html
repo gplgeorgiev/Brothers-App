@@ -1945,7 +1945,7 @@ async function recomputeSpiralPending(cfId) {
   const { data: cf } = await db.from('cashflow').select('status').eq('id', cfId).single();
   if (!cf || cf.status !== 'pending') return;  // приключените не се пипат
   const { data: hdrs } = await db.from('operation_headers')
-    .select('id, date, technician_id, technician_name')
+    .select('total_revenue, date, technician_id, technician_name')
     .eq('cashflow_id', cfId)
     .eq('op_type', 'restock')
     .is('deleted_at', null);
@@ -1955,15 +1955,8 @@ async function recomputeSpiralPending(cfId) {
     await db.from('cashflow').update({ deleted_at: new Date().toISOString() }).eq('id', cfId);
     return;
   }
-  // приход = Σ sale_value по продуктовите редове (30201) на свързаните зареждания
-  const ids = list.map(h => h.id);
-  const { data: lines } = await db.from('operations')
-    .select('sale_value')
-    .in('header_id', ids)
-    .eq('account_code', '30201')
-    .eq('entry_type', 'C')
-    .is('deleted_at', null);
-  const total = parseFloat(((lines || []).reduce((s, r) => s + (r.sale_value || 0), 0)).toFixed(2));
+  // приход = Σ total_revenue на свързаните зареждания
+  const total = parseFloat(list.reduce((s, h) => s + (h.total_revenue || 0), 0).toFixed(2));
   const latest = list.slice().sort((a, b) => (a.date < b.date ? 1 : (a.date > b.date ? -1 : 0)))[0];
   await db.from('cashflow').update({
     check_value: total,
@@ -2030,8 +2023,11 @@ async function submitSpiralRestock() {
   const { error: rErr } = await db.from('operations').insert(rows);
   if (rErr) { await db.from('operation_headers').delete().eq('id', header.id); showToast('❌ ' + rErr.message, 'error'); if (btn) { btn.disabled = false; btn.innerHTML = origText; } return; }
 
+  // приход на зареждането (хедър): Σ sale_value = Σ продажна цена × бройка
+  const _revenue = parseFloat(items.reduce((s, it) => s + (it.slot.price || 0) * it.added, 0).toFixed(2));
+  await db.from('operation_headers').update({ total_revenue: _revenue }).eq('id', header.id);
+
   // Отчитане: едно отворено Отчитане на машина, с натрупване
-  // (приходът се пази на ниво ред в sale_value; тук само свързваме и преизчисляваме)
   const { data: _openCf } = await db.from('cashflow')
     .select('id')
     .eq('object_id', parseInt(objectId))
@@ -3326,12 +3322,16 @@ async function saveEditLine() {
   const qty = parseFloat(document.getElementById('editLineQty').value) || 1;
 
   // Вземи продукта за да изчислим cost_value
-  const { data: op } = await db.from('operations').select('product_id, header_id').eq('id', currentEditLineId).single();
+  const { data: op } = await db.from('operations').select('product_id, header_id, quantity, sale_value').eq('id', currentEditLineId).single();
   const prod = products.find(p => p.id == op?.product_id);
   const costValue = prod ? parseFloat((prod.price_with_vat * qty).toFixed(2)) : null;
 
   const update = { quantity: qty };
   if (costValue) { update.cost_value = costValue; update.amount = costValue; }
+  // спирала: запази единичната продажна цена и преизчисли sale_value за новата бройка
+  if (op?.sale_value != null && op?.quantity) {
+    update.sale_value = parseFloat(((op.sale_value / op.quantity) * qty).toFixed(2));
+  }
 
   const { error } = await db.from('operations').update(update).eq('id', currentEditLineId);
   if (error) { showToast('❌ ' + error.message, 'error'); return; }
@@ -3355,6 +3355,16 @@ async function saveEditLine() {
 
     // Update total_cost в хедъра
     await db.from('operation_headers').update({ total_cost: newTotal }).eq('id', op.header_id);
+
+    // Спирала: обнови total_revenue (Σ sale_value по 30201) и преизчисли Отчитането
+    const { data: saleLines } = await db.from('operations')
+      .select('sale_value')
+      .eq('header_id', op.header_id).eq('account_code', '30201').eq('entry_type', 'C')
+      .is('deleted_at', null);
+    const newRevenue = parseFloat(((saleLines || []).reduce((s, r) => s + (r.sale_value || 0), 0)).toFixed(2));
+    await db.from('operation_headers').update({ total_revenue: newRevenue }).eq('id', op.header_id);
+    const { data: hdrCf } = await db.from('operation_headers').select('cashflow_id').eq('id', op.header_id).single();
+    if (hdrCf?.cashflow_id) await recomputeSpiralPending(hdrCf.cashflow_id);
   }
 
   closeEditLineModal();
@@ -3372,6 +3382,16 @@ async function deleteLine(id) {
     const { data: allLines } = await db.from('operations').select('cost_value').eq('header_id', op.header_id).is('deleted_at', null);
     const newTotal = (allLines || []).reduce((s, r) => s + (r.cost_value || 0), 0);
     await db.from('operation_headers').update({ total_cost: parseFloat(newTotal.toFixed(2)) }).eq('id', op.header_id);
+
+    // Спирала: обнови total_revenue (Σ sale_value по 30201) и преизчисли Отчитането
+    const { data: saleLines } = await db.from('operations')
+      .select('sale_value')
+      .eq('header_id', op.header_id).eq('account_code', '30201').eq('entry_type', 'C')
+      .is('deleted_at', null);
+    const newRevenue = parseFloat(((saleLines || []).reduce((s, r) => s + (r.sale_value || 0), 0)).toFixed(2));
+    await db.from('operation_headers').update({ total_revenue: newRevenue }).eq('id', op.header_id);
+    const { data: hdrCf } = await db.from('operation_headers').select('cashflow_id').eq('id', op.header_id).single();
+    if (hdrCf?.cashflow_id) await recomputeSpiralPending(hdrCf.cashflow_id);
   }
   showToast('🗑 Преместено в кошчето', 'success');
   await loadRestockHistory();
