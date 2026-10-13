@@ -1657,6 +1657,10 @@ async function maybeRestoreCoffeeDraft(objId) {
   // смени активния обект и изчисти кошницата (данните на стария вече са записани)
   coffeeDraftObjId = objId;
   basket = [];
+  // нулирай избраната карта и попъпа от предишния обект
+  if (selectedProdId) document.getElementById('pc-' + selectedProdId)?.classList.remove('selected');
+  selectedProdId = null;
+  document.getElementById('qtyPopup')?.classList.remove('visible');
   _suppressCoffeeSave = true;  // празният render да не трие черновата на новия обект
   renderBasket();
   _suppressCoffeeSave = false;
