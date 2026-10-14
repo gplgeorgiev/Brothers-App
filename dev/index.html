@@ -1041,7 +1041,13 @@ input.qty-big-input {
     <span>По обект</span>
     <button onclick="exportStatsByObject()" style="padding:5px 10px; border-radius:7px; border:1px solid var(--accent); background:transparent; color:var(--accent); font-size:11px; font-weight:700; cursor:pointer; font-family:var(--font); text-transform:none; letter-spacing:0;">📥 CSV</button>
   </div>
-  <div id="objectStats" style="padding-bottom:120px;"></div>
+  <div id="objectStats"></div>
+
+  <div class="section-label" style="margin-top:24px;">Консумация по обекти</div>
+  <div id="consumptionReport"></div>
+
+  <div class="section-label" style="margin-top:24px;">Резултат по артикули — спирали</div>
+  <div id="spiralResultReport" style="padding-bottom:120px;"></div>
 </div>
 
 <!-- PAGE: КОШЧЕ -->
@@ -3751,6 +3757,134 @@ async function loadStats() {
         </div>
       </div>`;
   }).join('') || '<div class="empty"><div class="empty-icon">📊</div><p>Няма данни</p></div>';
+
+  // Справки най-отдолу (ползват същия филтър Период/Обект)
+  loadConsumptionReport(dateFrom, dateTo, objFilter);
+  loadSpiralResultReport(dateFrom, dateTo, objFilter);
+}
+
+// Помощни за справките
+function _reportProdMap() { return new Map((allProducts || []).map(p => [p.id, p])); }
+function _reportName(r, map) {
+  const p = map.get(r.product_id);
+  if (p?.name) return p.name;
+  if (r.product_name && r.product_name.includes(' · ')) return r.product_name.split(' · ').slice(1).join(' · ');
+  return r.product_name || '—';
+}
+function _reportIcon(r, map) { return map.get(r.product_id)?.icon || '📦'; }
+function _qtyFmt(q) { return Number.isInteger(q) ? q : q.toFixed(1); }
+
+// СПРАВКА 1: Консумация по обекти (изписани материали/стоки, сметка 30201)
+async function loadConsumptionReport(dateFrom, dateTo, objFilter) {
+  const el = document.getElementById('consumptionReport');
+  if (!el) return;
+  el.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  if (!dateFrom || !dateTo) { el.innerHTML = ''; return; }
+  const { data } = await fetchAllRows(() => {
+    let q = db.from('operations')
+      .select('object_name, product_id, product_name, quantity, cost_value')
+      .eq('account_code', '30201').eq('entry_type', 'C')
+      .gte('date', dateFrom).lte('date', dateTo)
+      .is('deleted_at', null);
+    if (objFilter) q = q.eq('object_name', objFilter);
+    return q.order('id', { ascending: true });
+  });
+  const rows = data || [];
+  if (!rows.length) { el.innerHTML = '<div class="empty"><p>Няма консумация за периода.</p></div>'; return; }
+  const map = _reportProdMap();
+  const byObj = {};
+  rows.forEach(r => {
+    const o = r.object_name || '—';
+    const g = byObj[o] = byObj[o] || { cost: 0, arts: {} };
+    g.cost += r.cost_value || 0;
+    const key = r.product_id != null ? 'p' + r.product_id : 'n' + _reportName(r, map);
+    const a = g.arts[key] = g.arts[key] || { name: _reportName(r, map), icon: _reportIcon(r, map), qty: 0, cost: 0 };
+    a.qty += r.quantity || 0; a.cost += r.cost_value || 0;
+  });
+  const objNames = Object.keys(byObj).sort((a, b) => byObj[b].cost - byObj[a].cost);
+  const grand = objNames.reduce((s, o) => s + byObj[o].cost, 0);
+  el.innerHTML = objNames.map((o, i) => {
+    const g = byObj[o];
+    const gid = 'cons-' + i;
+    const arts = Object.values(g.arts).sort((a, b) => b.cost - a.cost);
+    const rowsHtml = arts.map(a => `
+      <div style="display:flex; align-items:center; gap:8px; padding:6px 10px; border-top:1px solid var(--border);">
+        <div style="flex:1; min-width:0; font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${a.icon} ${a.name}</div>
+        <div style="font-family:var(--mono); font-size:12px; color:var(--text2); min-width:54px; text-align:right;">${_qtyFmt(a.qty)}</div>
+        <div style="font-family:var(--mono); font-size:13px; font-weight:700; min-width:72px; text-align:right;">${a.cost.toFixed(2)}</div>
+      </div>`).join('');
+    return `
+      <div class="card" style="padding:0; margin-bottom:8px; overflow:hidden;">
+        <div onclick="var b=document.getElementById('${gid}');var open=b.style.display==='none';b.style.display=open?'block':'none';document.getElementById('${gid}-a').textContent=open?'▾':'▸';" style="display:flex; justify-content:space-between; align-items:center; padding:10px 12px; cursor:pointer; background:var(--bg3);">
+          <div style="font-weight:800; font-size:13px;">${o}</div>
+          <div style="display:flex; align-items:center; gap:10px;">
+            <span style="font-family:var(--mono); font-weight:800; font-size:13px;">${g.cost.toFixed(2)} EUR</span>
+            <span id="${gid}-a" style="font-size:11px; color:var(--text2);">▸</span>
+          </div>
+        </div>
+        <div id="${gid}" style="display:none;">${rowsHtml}</div>
+      </div>`;
+  }).join('') +
+    `<div style="display:flex; justify-content:space-between; padding:10px 12px; font-weight:800; border-top:2px solid var(--border);"><span>Общо</span><span style="font-family:var(--mono);">${grand.toFixed(2)} EUR</span></div>`;
+}
+
+// СПРАВКА 2: Резултат по артикули — спирали (приход/себестойност/печалба)
+async function loadSpiralResultReport(dateFrom, dateTo, objFilter) {
+  const el = document.getElementById('spiralResultReport');
+  if (!el) return;
+  el.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  if (!dateFrom || !dateTo) { el.innerHTML = ''; return; }
+  const { data } = await fetchAllRows(() => {
+    let q = db.from('operations')
+      .select('object_name, product_id, product_name, quantity, cost_value, sale_value')
+      .eq('account_code', '30201').eq('entry_type', 'C')
+      .not('sale_value', 'is', null)
+      .gte('date', dateFrom).lte('date', dateTo)
+      .is('deleted_at', null);
+    if (objFilter) q = q.eq('object_name', objFilter);
+    return q.order('id', { ascending: true });
+  });
+  const rows = data || [];
+  if (!rows.length) { el.innerHTML = '<div class="empty"><p>Няма спирални продажби за периода.</p></div>'; return; }
+  const map = _reportProdMap();
+  const byArt = {};
+  rows.forEach(r => {
+    const key = r.product_id != null ? 'p' + r.product_id : 'n' + _reportName(r, map);
+    const a = byArt[key] = byArt[key] || { name: _reportName(r, map), icon: _reportIcon(r, map), qty: 0, rev: 0, cost: 0 };
+    a.qty += r.quantity || 0; a.rev += r.sale_value || 0; a.cost += r.cost_value || 0;
+  });
+  const arts = Object.values(byArt).map(a => ({ ...a, profit: a.rev - a.cost })).sort((x, y) => y.profit - x.profit);
+  const tot = arts.reduce((s, a) => ({ qty: s.qty + a.qty, rev: s.rev + a.rev, cost: s.cost + a.cost, profit: s.profit + a.profit }), { qty: 0, rev: 0, cost: 0, profit: 0 });
+  const marg = v => v.rev > 0 ? Math.round(v.profit / v.rev * 100) + '%' : '—';
+  const col = (w) => `width:${w}px; text-align:right; font-family:var(--mono);`;
+  el.innerHTML = `
+    <div class="card" style="padding:0; overflow:hidden;">
+      <div style="display:flex; gap:6px; padding:7px 10px; font-size:10px; color:var(--text3); font-weight:700; background:var(--bg3);">
+        <div style="flex:1;">Артикул</div>
+        <div style="width:38px; text-align:right;">Бр</div>
+        <div style="width:58px; text-align:right;">Приход</div>
+        <div style="width:58px; text-align:right;">Себест.</div>
+        <div style="width:58px; text-align:right;">Печалба</div>
+        <div style="width:36px; text-align:right;">Марж</div>
+      </div>` +
+    arts.map(a => `
+      <div style="display:flex; gap:6px; align-items:center; padding:7px 10px; border-top:1px solid var(--border); font-size:12px;">
+        <div style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${a.icon} ${a.name}</div>
+        <div style="${col(38)}">${_qtyFmt(a.qty)}</div>
+        <div style="${col(58)}">${a.rev.toFixed(2)}</div>
+        <div style="${col(58)} color:var(--text2);">${a.cost.toFixed(2)}</div>
+        <div style="${col(58)} font-weight:700; color:${a.profit >= 0 ? 'var(--green)' : 'var(--red)'};">${a.profit.toFixed(2)}</div>
+        <div style="${col(36)} color:var(--text2);">${marg(a)}</div>
+      </div>`).join('') +
+    `<div style="display:flex; gap:6px; align-items:center; padding:9px 10px; border-top:2px solid var(--border); font-weight:800; font-size:12px;">
+        <div style="flex:1;">Общо</div>
+        <div style="${col(38)}">${_qtyFmt(tot.qty)}</div>
+        <div style="${col(58)}">${tot.rev.toFixed(2)}</div>
+        <div style="${col(58)}">${tot.cost.toFixed(2)}</div>
+        <div style="${col(58)} color:${tot.profit >= 0 ? 'var(--green)' : 'var(--red)'};">${tot.profit.toFixed(2)}</div>
+        <div style="${col(36)}">${marg(tot)}</div>
+      </div>
+    </div>`;
 }
 
 // ── TECH DEFAULT ──
