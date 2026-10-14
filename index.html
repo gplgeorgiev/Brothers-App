@@ -1926,6 +1926,33 @@ function spiralSearchBlur() {
   bar.style.paddingBottom = '';
 }
 
+// Преизчислява сумата на отвореното Отчитане за спирала от свързаните зареждания
+async function recomputeSpiralPending(cfId) {
+  if (!cfId) return;
+  const { data: cf } = await db.from('cashflow').select('status').eq('id', cfId).single();
+  if (!cf || cf.status !== 'pending') return;  // приключените не се пипат
+  const { data: hdrs } = await db.from('operation_headers')
+    .select('total_revenue, date, technician_id, technician_name')
+    .eq('cashflow_id', cfId)
+    .eq('op_type', 'restock')
+    .is('deleted_at', null);
+  const list = hdrs || [];
+  if (!list.length) {
+    // няма свързани зареждания → премахни празното Отчитане
+    await db.from('cashflow').update({ deleted_at: new Date().toISOString() }).eq('id', cfId);
+    return;
+  }
+  // приход = Σ total_revenue на свързаните зареждания
+  const total = parseFloat(list.reduce((s, h) => s + (h.total_revenue || 0), 0).toFixed(2));
+  const latest = list.slice().sort((a, b) => (a.date < b.date ? 1 : (a.date > b.date ? -1 : 0)))[0];
+  await db.from('cashflow').update({
+    check_value: total,
+    date: latest?.date,
+    technician_id: latest?.technician_id,
+    technician_name: latest?.technician_name
+  }).eq('id', cfId);
+}
+
 async function submitSpiralRestock() {
   const btn = document.getElementById('submitBtn');
   if (btn?.disabled) return;
@@ -1967,10 +1994,11 @@ async function submitSpiralRestock() {
   const rows = [];
   items.forEach(it => {
     const cost = parseFloat(((it.slot.products?.price_with_vat || 0) * it.added).toFixed(2));
+    const saleVal = parseFloat(((it.slot.price || 0) * it.added).toFixed(2));
     rows.push({
       header_id: header.id, date, object_name: obj?.name, technician_name: tech?.name,
       product_id: it.slot.product_id, product_name: `${it.slot.slot_code} · ${it.slot.products?.name || ''}`,
-      quantity: it.added, cost_value: cost, amount: cost,
+      quantity: it.added, cost_value: cost, amount: cost, sale_value: saleVal,
       account_code: '30201', entry_type: 'C'
     });
   });
@@ -1982,13 +2010,32 @@ async function submitSpiralRestock() {
   const { error: rErr } = await db.from('operations').insert(rows);
   if (rErr) { await db.from('operation_headers').delete().eq('id', header.id); showToast('❌ ' + rErr.message, 'error'); if (btn) { btn.disabled = false; btn.innerHTML = origText; } return; }
 
-  // Отчитане: чакащо отчитане с очаквания приход (Σ добавени × продажна цена)
-  const revenue = parseFloat(items.reduce((s, it) => s + (it.slot.price || 0) * it.added, 0).toFixed(2));
-  await db.from('cashflow').insert({
-    date, object_id: parseInt(objectId), object_name: obj?.name,
-    technician_id: parseInt(techId), technician_name: tech?.name,
-    check_value: revenue, operation_id: header.id, status: 'pending'
-  });
+  // приход на зареждането (хедър): Σ sale_value = Σ продажна цена × бройка
+  const _revenue = parseFloat(items.reduce((s, it) => s + (it.slot.price || 0) * it.added, 0).toFixed(2));
+  await db.from('operation_headers').update({ total_revenue: _revenue }).eq('id', header.id);
+
+  // Отчитане: едно отворено Отчитане на машина, с натрупване
+  const { data: _openCf } = await db.from('cashflow')
+    .select('id')
+    .eq('object_id', parseInt(objectId))
+    .eq('status', 'pending')
+    .is('deleted_at', null)
+    .order('id', { ascending: false })
+    .limit(1);
+  let _cfId;
+  if (_openCf && _openCf.length) {
+    _cfId = _openCf[0].id;
+  } else {
+    const { data: _newCf } = await db.from('cashflow').insert({
+      date, object_id: parseInt(objectId), object_name: obj?.name,
+      technician_id: parseInt(techId), technician_name: tech?.name,
+      check_value: 0, status: 'pending'
+    }).select('id').single();
+    _cfId = _newCf?.id;
+  }
+  // свържи зареждането към Отчитането и преизчисли сумата от редовете
+  await db.from('operation_headers').update({ cashflow_id: _cfId }).eq('id', header.id);
+  await recomputeSpiralPending(_cfId);
 
   showToast(`✅ Записани ${items.length} спирали`, 'success');
   clearSpiralDraft(objectId);
@@ -3119,10 +3166,19 @@ function addEditLine_unused() {
 async function deleteHeader(id) {
   if (!confirm('Преместване в кошчето?')) return;
   const now = new Date().toISOString();
-  await db.from('cashflow').update({ deleted_at: now }).eq('operation_id', id);
-  await db.from('operations').update({ deleted_at: now }).eq('header_id', id);
-  const { error } = await db.from('operation_headers').update({ deleted_at: now }).eq('id', id);
-  if (error) { showToast('❌ ' + error.message, 'error'); return; }
+  const { data: _hdr } = await db.from('operation_headers').select('cashflow_id, op_type').eq('id', id).single();
+  if (_hdr && _hdr.cashflow_id && _hdr.op_type === 'restock') {
+    // спирала (натрупано Отчитане): изтрий зареждането и преизчисли Отчитането
+    await db.from('operations').update({ deleted_at: now }).eq('header_id', id);
+    const { error } = await db.from('operation_headers').update({ deleted_at: now }).eq('id', id);
+    if (error) { showToast('❌ ' + error.message, 'error'); return; }
+    await recomputeSpiralPending(_hdr.cashflow_id);
+  } else {
+    await db.from('cashflow').update({ deleted_at: now }).eq('operation_id', id);
+    await db.from('operations').update({ deleted_at: now }).eq('header_id', id);
+    const { error } = await db.from('operation_headers').update({ deleted_at: now }).eq('id', id);
+    if (error) { showToast('❌ ' + error.message, 'error'); return; }
+  }
   showToast('🗑 Преместено в кошчето', 'success');
   await loadRestockHistory();
   await loadHistory();
@@ -3191,6 +3247,33 @@ async function saveEditOp() {
     }
   }
 
+  // Спирала (натрупано Отчитане): при смяна на обект/дата/техник — премести/преизчисли
+  const { data: _eh } = await db.from('operation_headers')
+    .select('cashflow_id, op_type').eq('id', currentEditOpId).single();
+  if (_eh && _eh.cashflow_id && _eh.op_type === 'restock') {
+    const { data: _oldCfRow } = await db.from('cashflow').select('status').eq('id', _eh.cashflow_id).single();
+    if (_oldCfRow && _oldCfRow.status === 'pending') {
+      // открий отвореното Отчитане за (новия) обект
+      const { data: _opc } = await db.from('cashflow').select('id')
+        .eq('object_id', objId).eq('status', 'pending').is('deleted_at', null)
+        .order('id', { ascending: false }).limit(1);
+      let targetCf = _opc && _opc.length ? _opc[0].id : null;
+      if (!targetCf) {
+        const { data: _nc } = await db.from('cashflow').insert({
+          date, object_id: objId, object_name: obj?.name,
+          technician_id: techId, technician_name: tech?.name,
+          check_value: 0, status: 'pending'
+        }).select('id').single();
+        targetCf = _nc?.id;
+      }
+      if (targetCf && targetCf !== _eh.cashflow_id) {
+        await db.from('operation_headers').update({ cashflow_id: targetCf }).eq('id', currentEditOpId);
+        await recomputeSpiralPending(_eh.cashflow_id);
+      }
+      await recomputeSpiralPending(targetCf);
+    }
+  }
+
   closeEditOpModal();
   showToast('✅ Хедърът е обновен!', 'success');
   await loadRestockHistory();
@@ -3226,12 +3309,16 @@ async function saveEditLine() {
   const qty = parseFloat(document.getElementById('editLineQty').value) || 1;
 
   // Вземи продукта за да изчислим cost_value
-  const { data: op } = await db.from('operations').select('product_id, header_id').eq('id', currentEditLineId).single();
+  const { data: op } = await db.from('operations').select('product_id, header_id, quantity, sale_value').eq('id', currentEditLineId).single();
   const prod = products.find(p => p.id == op?.product_id);
   const costValue = prod ? parseFloat((prod.price_with_vat * qty).toFixed(2)) : null;
 
   const update = { quantity: qty };
   if (costValue) { update.cost_value = costValue; update.amount = costValue; }
+  // спирала: запази единичната продажна цена и преизчисли sale_value за новата бройка
+  if (op?.sale_value != null && op?.quantity) {
+    update.sale_value = parseFloat(((op.sale_value / op.quantity) * qty).toFixed(2));
+  }
 
   const { error } = await db.from('operations').update(update).eq('id', currentEditLineId);
   if (error) { showToast('❌ ' + error.message, 'error'); return; }
@@ -3255,6 +3342,16 @@ async function saveEditLine() {
 
     // Update total_cost в хедъра
     await db.from('operation_headers').update({ total_cost: newTotal }).eq('id', op.header_id);
+
+    // Спирала: обнови total_revenue (Σ sale_value по 30201) и преизчисли Отчитането
+    const { data: saleLines } = await db.from('operations')
+      .select('sale_value')
+      .eq('header_id', op.header_id).eq('account_code', '30201').eq('entry_type', 'C')
+      .is('deleted_at', null);
+    const newRevenue = parseFloat(((saleLines || []).reduce((s, r) => s + (r.sale_value || 0), 0)).toFixed(2));
+    await db.from('operation_headers').update({ total_revenue: newRevenue }).eq('id', op.header_id);
+    const { data: hdrCf } = await db.from('operation_headers').select('cashflow_id').eq('id', op.header_id).single();
+    if (hdrCf?.cashflow_id) await recomputeSpiralPending(hdrCf.cashflow_id);
   }
 
   closeEditLineModal();
@@ -3272,6 +3369,16 @@ async function deleteLine(id) {
     const { data: allLines } = await db.from('operations').select('cost_value').eq('header_id', op.header_id).is('deleted_at', null);
     const newTotal = (allLines || []).reduce((s, r) => s + (r.cost_value || 0), 0);
     await db.from('operation_headers').update({ total_cost: parseFloat(newTotal.toFixed(2)) }).eq('id', op.header_id);
+
+    // Спирала: обнови total_revenue (Σ sale_value по 30201) и преизчисли Отчитането
+    const { data: saleLines } = await db.from('operations')
+      .select('sale_value')
+      .eq('header_id', op.header_id).eq('account_code', '30201').eq('entry_type', 'C')
+      .is('deleted_at', null);
+    const newRevenue = parseFloat(((saleLines || []).reduce((s, r) => s + (r.sale_value || 0), 0)).toFixed(2));
+    await db.from('operation_headers').update({ total_revenue: newRevenue }).eq('id', op.header_id);
+    const { data: hdrCf } = await db.from('operation_headers').select('cashflow_id').eq('id', op.header_id).single();
+    if (hdrCf?.cashflow_id) await recomputeSpiralPending(hdrCf.cashflow_id);
   }
   showToast('🗑 Преместено в кошчето', 'success');
   await loadRestockHistory();
