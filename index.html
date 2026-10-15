@@ -3837,33 +3837,31 @@ async function loadSpiralResultReport(dateFrom, dateTo, objFilter) {
   const arts = Object.values(byArt).map(a => ({ ...a, profit: a.rev - a.cost })).sort((x, y) => y.profit - x.profit);
   const tot = arts.reduce((s, a) => ({ qty: s.qty + a.qty, rev: s.rev + a.rev, cost: s.cost + a.cost, profit: s.profit + a.profit }), { qty: 0, rev: 0, cost: 0, profit: 0 });
   const marg = v => v.cost > 0 ? Math.round(v.profit / v.cost * 100) + '%' : '—';
-  const col = (w) => `width:${w}px; text-align:right; font-family:var(--mono);`;
+  const nc = (w, val, style = '') => `<div style="width:${w}px; flex:none; text-align:right; font-family:var(--mono); ${style}">${val}</div>`;
+  const hc = (w, t) => `<div style="width:${w}px; flex:none; text-align:right;">${t}</div>`;
+  const W = { br: 30, rev: 52, cost: 52, prof: 54, marg: 40 };
   el.innerHTML = `
     <div class="card" style="padding:0; overflow:hidden;">
-      <div style="display:flex; gap:6px; padding:7px 10px; font-size:10px; color:var(--text3); font-weight:700; background:var(--bg3);">
-        <div style="flex:1;">Артикул</div>
-        <div style="width:38px; text-align:right;">Бр</div>
-        <div style="width:58px; text-align:right;">Приход</div>
-        <div style="width:58px; text-align:right;">Себест.</div>
-        <div style="width:58px; text-align:right;">Печалба</div>
-        <div style="width:36px; text-align:right;">Марж</div>
+      <div style="display:flex; gap:6px; align-items:flex-end; padding:7px 10px; font-size:10px; color:var(--text3); font-weight:700; background:var(--bg3);">
+        <div style="flex:1; min-width:0;">Артикул</div>
+        ${hc(W.br, 'Бр')}${hc(W.rev, 'Приход')}${hc(W.cost, 'Себест.')}${hc(W.prof, 'Печалба')}${hc(W.marg, 'Марж')}
       </div>` +
     arts.map(a => `
-      <div style="display:flex; gap:6px; align-items:center; padding:7px 10px; border-top:1px solid var(--border); font-size:12px;">
-        <div style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${a.icon} ${a.name}</div>
-        <div style="${col(38)}">${_qtyFmt(a.qty)}</div>
-        <div style="${col(58)}">${a.rev.toFixed(2)}</div>
-        <div style="${col(58)} color:var(--text2);">${a.cost.toFixed(2)}</div>
-        <div style="${col(58)} font-weight:700; color:${a.profit >= 0 ? 'var(--green)' : 'var(--red)'};">${a.profit.toFixed(2)}</div>
-        <div style="${col(36)} color:var(--text2);">${marg(a)}</div>
+      <div style="display:flex; gap:6px; align-items:flex-start; padding:7px 10px; border-top:1px solid var(--border); font-size:12px;">
+        <div style="flex:1; min-width:0; word-break:break-word; line-height:1.25;">${a.name}</div>
+        ${nc(W.br, _qtyFmt(a.qty))}
+        ${nc(W.rev, a.rev.toFixed(2))}
+        ${nc(W.cost, a.cost.toFixed(2), 'color:var(--text2);')}
+        ${nc(W.prof, a.profit.toFixed(2), `font-weight:700; color:${a.profit >= 0 ? 'var(--green)' : 'var(--red)'};`)}
+        ${nc(W.marg, marg(a), 'color:var(--text2);')}
       </div>`).join('') +
-    `<div style="display:flex; gap:6px; align-items:center; padding:9px 10px; border-top:2px solid var(--border); font-weight:800; font-size:12px;">
+    `<div style="display:flex; gap:6px; align-items:flex-start; padding:9px 10px; border-top:2px solid var(--border); font-weight:800; font-size:12px;">
         <div style="flex:1;">Общо</div>
-        <div style="${col(38)}">${_qtyFmt(tot.qty)}</div>
-        <div style="${col(58)}">${tot.rev.toFixed(2)}</div>
-        <div style="${col(58)}">${tot.cost.toFixed(2)}</div>
-        <div style="${col(58)} color:${tot.profit >= 0 ? 'var(--green)' : 'var(--red)'};">${tot.profit.toFixed(2)}</div>
-        <div style="${col(36)}">${marg(tot)}</div>
+        ${nc(W.br, _qtyFmt(tot.qty))}
+        ${nc(W.rev, tot.rev.toFixed(2))}
+        ${nc(W.cost, tot.cost.toFixed(2))}
+        ${nc(W.prof, tot.profit.toFixed(2), `color:${tot.profit >= 0 ? 'var(--green)' : 'var(--red)'};`)}
+        ${nc(W.marg, marg(tot))}
       </div>
     </div>`;
 }
