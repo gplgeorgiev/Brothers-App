@@ -6844,6 +6844,7 @@ function renderStatsCharts(sorted, drinksByObj, stackedByObj, objsForStats, date
     const compNames = ['М-ли', 'Други', 'Гориво', 'Наем', 'Резултат'];
     // Сортирай по приход (M-ли + Други + Гориво + Наем + Резултат, ако положителен)
     // Положителен резултат отгоре, отрицателен (загуба) отдолу
+    const incomeByName = new Map(sorted.map(([n, s]) => [n, s.income || 0]));
     const stackedEntries = Object.entries(stackedByObj).sort((a, b) => {
       const resultA = a[1]['Резултат'] || 0;
       const resultB = b[1]['Резултат'] || 0;
@@ -6853,11 +6854,13 @@ function renderStatsCharts(sorted, drinksByObj, stackedByObj, objsForStats, date
       const sumA = compNames.reduce((s, k) => s + Math.max(0, a[1][k] || 0), 0);
       const sumB = compNames.reduce((s, k) => s + Math.max(0, b[1][k] || 0), 0);
       return sumB - sumA;
-    });
+    }).filter(([n]) => (incomeByName.get(n) || 0) > 0);  // само обекти с приход
+    const excludedNoRevenue = Object.keys(stackedByObj).filter(n => (incomeByName.get(n) || 0) <= 0);
     
+    if (stackedEntries.length) {
     // Графика 1: Абсолютни суми
     const maxStackedSum = Math.max(...stackedEntries.map(([, d]) => compNames.reduce((s, k) => s + Math.max(0, d[k] || 0), 0)));
-    
+
     stackedHtml += '<div style="margin-top:24px; padding-top:16px; border-top:1px solid var(--border);"><div style="font-size:11px; font-weight:700; color:var(--text3); text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;">📊 Компоненти на прихода (EUR)</div>';
     // Legend
     stackedHtml += '<div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px; font-size:10px;">';
@@ -6928,6 +6931,10 @@ function renderStatsCharts(sorted, drinksByObj, stackedByObj, objsForStats, date
       `;
     });
     stackedHtml += '</div>';
+    }  // край if (stackedEntries.length)
+    if (excludedNoRevenue.length) {
+      stackedHtml += `<div style="font-size:11px; color:var(--text3); padding:6px 10px; background:var(--bg3); border-left:3px solid var(--text3); border-radius:4px; margin-top:10px;"><span style="font-weight:700;">Без приход (извън графиките):</span> ${excludedNoRevenue.join(', ')}</div>`;
+    }
   }
 
   // 5. Таргет vs Реален приход
