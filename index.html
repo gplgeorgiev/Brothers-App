@@ -6780,7 +6780,16 @@ function renderStatsCharts(sorted, drinksByObj, stackedByObj, objsForStats, date
       `;
     });
     stackedHtml += '</div>';
-    
+
+    // Бележка за обектите без приход — преди % графиката, в стила под donut-а
+    if (excludedNoRevenue.length) {
+      const lossText = excludedNoRevenue
+        .map(n => ({ n, v: (stackedByObj[n] && stackedByObj[n]['Резултат']) || 0 }))
+        .sort((a, b) => a.v - b.v)
+        .map(x => `${x.n} (${x.v.toFixed(0)} EUR)`).join(', ');
+      stackedHtml += `<div style="font-size:11px; color:var(--text3); padding:6px 10px; background:var(--bg3); border-left:3px solid var(--red); border-radius:4px; margin-top:10px;"><span style="color:var(--red); font-weight:700;">⚠️ Със загуба:</span> ${lossText}</div>`;
+    }
+
     // Графика 2: Проценти (100% stacked)
     stackedHtml += '<div style="margin-top:24px; padding-top:16px; border-top:1px solid var(--border);"><div style="font-size:11px; font-weight:700; color:var(--text3); text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;">📊 Компоненти (% от прихода)</div>';
     stackedHtml += '<div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px; font-size:10px;">';
@@ -6816,13 +6825,6 @@ function renderStatsCharts(sorted, drinksByObj, stackedByObj, objsForStats, date
     });
     stackedHtml += '</div>';
     }  // край if (stackedEntries.length)
-    if (excludedNoRevenue.length) {
-      const lossText = excludedNoRevenue
-        .map(n => ({ n, v: (stackedByObj[n] && stackedByObj[n]['Резултат']) || 0 }))
-        .sort((a, b) => a.v - b.v)
-        .map(x => `${x.n} (${x.v.toFixed(0)} EUR)`).join(', ');
-      stackedHtml += `<div style="font-size:11px; color:var(--text3); padding:6px 10px; background:var(--bg3); border-left:3px solid var(--red); border-radius:4px; margin-top:10px;"><span style="color:var(--red); font-weight:700;">⚠️ Със загуба:</span> ${lossText}</div>`;
-    }
   }
 
   // 5. Таргет vs Реален приход
