@@ -3850,33 +3850,24 @@ async function loadSpiralResultReport(dateFrom, dateTo, objFilter) {
   const arts = Object.values(byArt).map(a => ({ ...a, profit: a.rev - a.cost })).sort((x, y) => y.profit - x.profit);
   const tot = arts.reduce((s, a) => ({ qty: s.qty + a.qty, rev: s.rev + a.rev, cost: s.cost + a.cost, profit: s.profit + a.profit }), { qty: 0, rev: 0, cost: 0, profit: 0 });
   const marg = v => v.cost > 0 ? Math.round(v.profit / v.cost * 100) + '%' : '—';
-  const col = (w) => `width:${w}px; text-align:right; font-family:var(--mono);`;
+  const metricRow = (a, bold) => `
+    <div style="display:flex; flex-wrap:wrap; gap:3px 12px; font-size:11px; font-family:var(--mono); color:var(--text2); ${bold ? 'font-weight:700;' : ''}">
+      <span>Бр: <b style="color:var(--text);">${_qtyFmt(a.qty)}</b></span>
+      <span>Приход: <b style="color:var(--text);">${a.rev.toFixed(2)}</b></span>
+      <span>Себест.: ${a.cost.toFixed(2)}</span>
+      <span>Печалба: <b style="color:${a.profit >= 0 ? 'var(--green)' : 'var(--red)'};">${a.profit.toFixed(2)}</b></span>
+      <span>Марж: <b style="color:var(--text);">${marg(a)}</b></span>
+    </div>`;
   el.innerHTML = `
-    <div class="card" style="padding:0; overflow:hidden;">
-      <div style="display:flex; gap:6px; padding:7px 10px; font-size:10px; color:var(--text3); font-weight:700; background:var(--bg3);">
-        <div style="flex:1;">Артикул</div>
-        <div style="width:38px; text-align:right;">Бр</div>
-        <div style="width:58px; text-align:right;">Приход</div>
-        <div style="width:58px; text-align:right;">Себест.</div>
-        <div style="width:58px; text-align:right;">Печалба</div>
-        <div style="width:36px; text-align:right;">Марж</div>
-      </div>` +
+    <div class="card" style="padding:0; overflow:hidden;">` +
     arts.map(a => `
-      <div style="display:flex; gap:6px; align-items:center; padding:7px 10px; border-top:1px solid var(--border); font-size:12px;">
-        <div style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${a.icon} ${a.name}</div>
-        <div style="${col(38)}">${_qtyFmt(a.qty)}</div>
-        <div style="${col(58)}">${a.rev.toFixed(2)}</div>
-        <div style="${col(58)} color:var(--text2);">${a.cost.toFixed(2)}</div>
-        <div style="${col(58)} font-weight:700; color:${a.profit >= 0 ? 'var(--green)' : 'var(--red)'};">${a.profit.toFixed(2)}</div>
-        <div style="${col(36)} color:var(--text2);">${marg(a)}</div>
+      <div style="padding:8px 10px; border-top:1px solid var(--border);">
+        <div style="font-size:13px; font-weight:600; margin-bottom:4px; word-break:break-word;">${a.icon} ${a.name}</div>
+        ${metricRow(a, false)}
       </div>`).join('') +
-    `<div style="display:flex; gap:6px; align-items:center; padding:9px 10px; border-top:2px solid var(--border); font-weight:800; font-size:12px;">
-        <div style="flex:1;">Общо</div>
-        <div style="${col(38)}">${_qtyFmt(tot.qty)}</div>
-        <div style="${col(58)}">${tot.rev.toFixed(2)}</div>
-        <div style="${col(58)}">${tot.cost.toFixed(2)}</div>
-        <div style="${col(58)} color:${tot.profit >= 0 ? 'var(--green)' : 'var(--red)'};">${tot.profit.toFixed(2)}</div>
-        <div style="${col(36)}">${marg(tot)}</div>
+    `<div style="padding:9px 10px; border-top:2px solid var(--border);">
+        <div style="font-size:13px; font-weight:800; margin-bottom:4px;">Общо</div>
+        ${metricRow(tot, true)}
       </div>
     </div>`;
 }
