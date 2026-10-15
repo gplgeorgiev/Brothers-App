@@ -1037,7 +1037,7 @@ input.qty-big-input {
   </div>
   <div id="objectStats"></div>
 
-  <div class="section-label" style="margin-top:24px;">Консумация по обекти</div>
+  <div class="section-label" style="margin-top:24px;">Консумация общо</div>
   <div id="consumptionReport"></div>
 
   <div class="section-label" style="margin-top:24px;">Резултат по артикули — спирали</div>
@@ -3779,40 +3779,34 @@ async function loadConsumptionReport(dateFrom, dateTo, objFilter) {
   const rows = data || [];
   if (!rows.length) { el.innerHTML = '<div class="empty"><p>Няма консумация за периода.</p></div>'; return; }
   const map = _reportProdMap();
-  const byObj = {};
+  // сумарно по артикул (общо; при избран обект филтърът вече стеснява заявката)
+  const byArt = {};
   rows.forEach(r => {
-    const o = r.object_name || '—';
-    const g = byObj[o] = byObj[o] || { cost: 0, arts: {} };
-    g.cost += r.cost_value || 0;
     const key = r.product_id != null ? 'p' + r.product_id : 'n' + _reportName(r, map);
-    const a = g.arts[key] = g.arts[key] || { name: _reportName(r, map), icon: _reportIcon(r, map), qty: 0, cost: 0 };
+    const a = byArt[key] = byArt[key] || { name: _reportName(r, map), icon: _reportIcon(r, map), qty: 0, cost: 0 };
     a.qty += r.quantity || 0; a.cost += r.cost_value || 0;
   });
-  const objNames = Object.keys(byObj).sort((a, b) => byObj[b].cost - byObj[a].cost);
-  const grand = objNames.reduce((s, o) => s + byObj[o].cost, 0);
-  el.innerHTML = objNames.map((o, i) => {
-    const g = byObj[o];
-    const gid = 'cons-' + i;
-    const arts = Object.values(g.arts).sort((a, b) => b.cost - a.cost);
-    const rowsHtml = arts.map(a => `
-      <div style="display:flex; align-items:center; gap:8px; padding:6px 10px; border-top:1px solid var(--border);">
+  const arts = Object.values(byArt).sort((a, b) => b.cost - a.cost);
+  const grand = arts.reduce((s, a) => s + a.cost, 0);
+  el.innerHTML = `
+    <div class="card" style="padding:0; overflow:hidden;">
+      <div style="display:flex; gap:8px; padding:7px 10px; font-size:10px; color:var(--text3); font-weight:700; background:var(--bg3);">
+        <div style="flex:1;">Артикул</div>
+        <div style="width:60px; text-align:right;">Кол-во</div>
+        <div style="width:78px; text-align:right;">Стойност</div>
+      </div>` +
+    arts.map(a => `
+      <div style="display:flex; align-items:center; gap:8px; padding:7px 10px; border-top:1px solid var(--border);">
         <div style="flex:1; min-width:0; font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${a.icon} ${a.name}</div>
-        <div style="font-family:var(--mono); font-size:12px; color:var(--text2); min-width:54px; text-align:right;">${_qtyFmt(a.qty)}</div>
-        <div style="font-family:var(--mono); font-size:13px; font-weight:700; min-width:72px; text-align:right;">${a.cost.toFixed(2)}</div>
-      </div>`).join('');
-    return `
-      <div class="card" style="padding:0; margin-bottom:8px; overflow:hidden;">
-        <div onclick="var b=document.getElementById('${gid}');var open=b.style.display==='none';b.style.display=open?'block':'none';document.getElementById('${gid}-a').textContent=open?'▾':'▸';" style="display:flex; justify-content:space-between; align-items:center; padding:10px 12px; cursor:pointer; background:var(--bg3);">
-          <div style="font-weight:800; font-size:13px;">${o}</div>
-          <div style="display:flex; align-items:center; gap:10px;">
-            <span style="font-family:var(--mono); font-weight:800; font-size:13px;">${g.cost.toFixed(2)} EUR</span>
-            <span id="${gid}-a" style="font-size:11px; color:var(--text2);">▸</span>
-          </div>
-        </div>
-        <div id="${gid}" style="display:none;">${rowsHtml}</div>
-      </div>`;
-  }).join('') +
-    `<div style="display:flex; justify-content:space-between; padding:10px 12px; font-weight:800; border-top:2px solid var(--border);"><span>Общо</span><span style="font-family:var(--mono);">${grand.toFixed(2)} EUR</span></div>`;
+        <div style="font-family:var(--mono); font-size:12px; color:var(--text2); width:60px; text-align:right;">${_qtyFmt(a.qty)}</div>
+        <div style="font-family:var(--mono); font-size:13px; font-weight:700; width:78px; text-align:right;">${a.cost.toFixed(2)}</div>
+      </div>`).join('') +
+    `<div style="display:flex; align-items:center; gap:8px; padding:9px 10px; font-weight:800; border-top:2px solid var(--border);">
+        <div style="flex:1;">Общо</div>
+        <div style="width:60px;"></div>
+        <div style="font-family:var(--mono); width:78px; text-align:right;">${grand.toFixed(2)} EUR</div>
+      </div>
+    </div>`;
 }
 
 // СПРАВКА 2: Резултат по артикули — спирали (приход/себестойност/печалба)
@@ -3842,7 +3836,7 @@ async function loadSpiralResultReport(dateFrom, dateTo, objFilter) {
   });
   const arts = Object.values(byArt).map(a => ({ ...a, profit: a.rev - a.cost })).sort((x, y) => y.profit - x.profit);
   const tot = arts.reduce((s, a) => ({ qty: s.qty + a.qty, rev: s.rev + a.rev, cost: s.cost + a.cost, profit: s.profit + a.profit }), { qty: 0, rev: 0, cost: 0, profit: 0 });
-  const marg = v => v.rev > 0 ? Math.round(v.profit / v.rev * 100) + '%' : '—';
+  const marg = v => v.cost > 0 ? Math.round(v.profit / v.cost * 100) + '%' : '—';
   const col = (w) => `width:${w}px; text-align:right; font-family:var(--mono);`;
   el.innerHTML = `
     <div class="card" style="padding:0; overflow:hidden;">
