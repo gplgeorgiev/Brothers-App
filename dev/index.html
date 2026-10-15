@@ -3862,7 +3862,7 @@ async function loadSpiralResultReport(dateFrom, dateTo, objFilter) {
     <div class="card" style="padding:0; overflow:hidden;">` +
     arts.map(a => `
       <div style="padding:8px 10px; border-top:1px solid var(--border);">
-        <div style="font-size:13px; font-weight:600; margin-bottom:4px; word-break:break-word;">${a.icon} ${a.name}</div>
+        <div style="font-size:13px; font-weight:600; margin-bottom:4px; word-break:break-word;">${a.name}</div>
         ${metricRow(a, false)}
       </div>`).join('') +
     `<div style="padding:9px 10px; border-top:2px solid var(--border);">
