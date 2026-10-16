@@ -6844,21 +6844,13 @@ function renderStatsCharts(sorted, drinksByObj, stackedByObj, objsForStats, date
     const compNames = ['М-ли', 'Други', 'Гориво', 'Наем', 'Резултат'];
     // Сортирай по приход (M-ли + Други + Гориво + Наем + Резултат, ако положителен)
     // Положителен резултат отгоре, отрицателен (загуба) отдолу
-    const incomeByName = new Map(sorted.map(([n, s]) => [n, s.income || 0]));
-    const adminNames = new Set((objects || []).filter(o => o.type === 'admin').map(o => o.name));
-    // обект влиза в графиките само ако НЕ е админ център и има приход
-    const isRevenueObj = n => !adminNames.has(n) && (incomeByName.get(n) || 0) > 0;
+    // Обектите със загуба (резултат < 0) не влизат в графиките — само в текста отдолу
     const stackedEntries = Object.entries(stackedByObj).sort((a, b) => {
-      const resultA = a[1]['Резултат'] || 0;
-      const resultB = b[1]['Резултат'] || 0;
-      // Първо положителни (по убыв), после отрицателни (по убыв на абс)
-      if (resultA >= 0 && resultB < 0) return -1;
-      if (resultA < 0 && resultB >= 0) return 1;
       const sumA = compNames.reduce((s, k) => s + Math.max(0, a[1][k] || 0), 0);
       const sumB = compNames.reduce((s, k) => s + Math.max(0, b[1][k] || 0), 0);
       return sumB - sumA;
-    }).filter(([n]) => isRevenueObj(n));
-    const excludedNoRevenue = Object.keys(stackedByObj).filter(n => !isRevenueObj(n));
+    }).filter(([, d]) => (d['Резултат'] || 0) >= 0);
+    const excludedNoRevenue = Object.keys(stackedByObj).filter(n => ((stackedByObj[n] && stackedByObj[n]['Резултат']) || 0) < 0);
     
     if (stackedEntries.length) {
     // Графика 1: Абсолютни суми
