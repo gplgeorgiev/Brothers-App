@@ -6944,9 +6944,11 @@ function renderStatsCharts(sorted, drinksByObj, stackedByObj, objsForStats, date
     const from = new Date(dateFrom);
     const to = new Date(dateTo);
     const daysInPeriod = Math.floor((to - from) / (1000*60*60*24)) + 1;
-    
+    const objFilter = document.getElementById('statsObjFilter')?.value || '';
+
     const targetData = [];
     objsForStats.forEach(o => {
+      if (objFilter && o.name !== objFilter) return;  // спазвай филтъра по обект
       if (!o.target_weekly || o.target_weekly <= 0) return;
       const targetForPeriod = (o.target_weekly / 7) * daysInPeriod;
       const sObj = sorted.find(([n,]) => n === o.name);
