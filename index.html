@@ -2381,15 +2381,8 @@ async function submitRestock() {
   // СТЪПКА 3: Ако има брояч → създай cashflow запис
   let cashflowDrinksSold = 0;
   if (counterVal2 && obj) {
-    await createCashflowEntry(counterVal2, obj, tech, date, header.id);
-    // Вземи току-що създадения cashflow за да знаем drinks_sold
-    const { data: justCreated } = await db.from('cashflow')
-      .select('drinks_sold')
-      .eq('operation_id', header.id)
-      .is('deleted_at', null)
-      .order('id', { ascending: false })
-      .limit(1);
-    cashflowDrinksSold = justCreated?.[0]?.drinks_sold || 0;
+    // ползвай върнатата стойност директно (без повторна заявка → без race)
+    cashflowDrinksSold = (await createCashflowEntry(counterVal2, obj, tech, date, header.id)) || 0;
   }
 
   // СТЪПКА 4: АВТО ПРОДУКТИ - чаши, бъркалки (auto_add=true) по drinks_sold от cashflow
@@ -2514,6 +2507,7 @@ async function createCashflowEntry(counter, obj, tech, date, operationId) {
     operation_id: operationId, // header_id от operation_headers
     status: 'pending'
   });
+  return drinksSold;  // върни пряко, за да не се чете с повторна заявка (race)
 }
 
 async function loadCashflow() {
