@@ -322,6 +322,8 @@ input.qty-big-input {
   font-size: 9px !important;
   letter-spacing: 0.5px !important;
 }
+.stats-subtab { flex:1; padding:9px 4px; border-radius:9px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:12px; font-weight:700; cursor:pointer; font-family:var(--font); }
+.stats-subtab.active { background:var(--accent); color:#fff; border-color:var(--accent); }
 </style>
 </head>
 <body>
@@ -1013,10 +1015,8 @@ input.qty-big-input {
 
 <!-- PAGE: СТАТИСТИКА -->
 <div class="page" id="page-stats">
-  <div class="section-label">Касова наличност</div>
-  <div id="balanceSummary"><div class="loading"><div class="spinner"></div></div></div>
-
-  <div class="section-label" style="margin-top:20px">Период</div>
+  <!-- Филтър Период/Обект -->
+  <div class="section-label">Период</div>
   <div class="card" style="padding:10px 14px;">
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px;">
       <button onclick="statsResetMonth()" style="padding:8px; border-radius:8px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:14px; font-weight:700; cursor:pointer; font-family:var(--font);">📅 Текущ месец</button>
@@ -1031,23 +1031,48 @@ input.qty-big-input {
     </select>
   </div>
 
+  <!-- ДАШБОРД (винаги видим) -->
   <div class="section-label" id="statsPeriodLabel" style="margin-top:20px">Текущ месец</div>
   <div class="stats-grid" id="statsGrid"><div class="loading" style="grid-column:1/-1"><div class="spinner"></div></div></div>
+
+  <div class="section-label" style="margin-top:24px">Касова наличност</div>
+  <div id="balanceSummary"><div class="loading"><div class="spinner"></div></div></div>
+
   <div class="section-label" style="margin-top:24px">Категории</div>
   <div class="card" id="statsCategories" style="padding:12px 14px;"></div>
-  <div class="section-label" style="margin-top:24px">Графики</div>
-  <div class="card" id="statsCharts" style="padding:12px 14px;"></div>
-  <div class="section-label" style="margin-top:24px; display:flex; justify-content:space-between; align-items:center;">
-    <span>По обект</span>
-    <button onclick="exportStatsByObject()" style="padding:5px 10px; border-radius:7px; border:1px solid var(--accent); background:transparent; color:var(--accent); font-size:11px; font-weight:700; cursor:pointer; font-family:var(--font); text-transform:none; letter-spacing:0;">📥 CSV</button>
+
+  <div class="card" id="statsChartsDash" style="padding:12px 14px; margin-top:12px;"></div>
+
+  <!-- ПОД-ТАБОВЕ -->
+  <div style="display:flex; gap:6px; margin-top:22px;">
+    <button class="stats-subtab active" data-stab="charts" onclick="selectStatsSubtab('charts')">📊 Графики</button>
+    <button class="stats-subtab" data-stab="objects" onclick="selectStatsSubtab('objects')">🏢 По обекти</button>
+    <button class="stats-subtab" data-stab="articles" onclick="selectStatsSubtab('articles')">📦 По артикули</button>
   </div>
-  <div id="objectStats"></div>
 
-  <div class="section-label" style="margin-top:24px;">Консумация общо</div>
-  <div id="consumptionReport"></div>
+  <!-- Таб: Графики -->
+  <div class="stats-pane" id="stab-charts" style="margin-top:12px;">
+    <div class="card" id="statsCharts" style="padding:12px 14px;"></div>
+  </div>
 
-  <div class="section-label" style="margin-top:24px;">Резултат по артикули — спирали</div>
-  <div id="spiralResultReport" style="padding-bottom:120px;"></div>
+  <!-- Таб: По обекти -->
+  <div class="stats-pane" id="stab-objects" style="display:none; margin-top:12px;">
+    <div class="section-label" style="display:flex; justify-content:space-between; align-items:center;">
+      <span>По обект</span>
+      <button onclick="exportStatsByObject()" style="padding:5px 10px; border-radius:7px; border:1px solid var(--accent); background:transparent; color:var(--accent); font-size:11px; font-weight:700; cursor:pointer; font-family:var(--font); text-transform:none; letter-spacing:0;">📥 CSV</button>
+    </div>
+    <div id="objectStats"></div>
+  </div>
+
+  <!-- Таб: По артикули -->
+  <div class="stats-pane" id="stab-articles" style="display:none; margin-top:12px;">
+    <div class="section-label">Консумация общо</div>
+    <div id="consumptionReport"></div>
+    <div class="section-label" style="margin-top:24px;">Резултат по артикули — спирали</div>
+    <div id="spiralResultReport"></div>
+  </div>
+
+  <div style="padding-bottom:120px;"></div>
 </div>
 
 <!-- PAGE: КОШЧЕ -->
@@ -3752,9 +3777,31 @@ async function loadStats() {
       </div>`;
   }).join('') || '<div class="empty"><div class="empty-icon">📊</div><p>Няма данни</p></div>';
 
-  // Справки най-отдолу (ползват същия филтър Период/Обект)
-  loadConsumptionReport(dateFrom, dateTo, objFilter);
-  loadSpiralResultReport(dateFrom, dateTo, objFilter);
+  // Под-табове: активният се прилага; „По артикули" се зарежда мързеливо
+  applyStatsSubtab();
+}
+
+// ── ПОД-ТАБОВЕ НА СТАТИСТИКА ──
+let currentStatsSubtab = (function () { try { return localStorage.getItem('statsSubtab') || 'charts'; } catch (e) { return 'charts'; } })();
+function applyStatsSubtab() {
+  ['charts', 'objects', 'articles'].forEach(t => {
+    const pane = document.getElementById('stab-' + t);
+    if (pane) pane.style.display = (t === currentStatsSubtab) ? 'block' : 'none';
+    const btn = document.querySelector('.stats-subtab[data-stab="' + t + '"]');
+    if (btn) btn.classList.toggle('active', t === currentStatsSubtab);
+  });
+  if (currentStatsSubtab === 'articles') {
+    const f = document.getElementById('statsDateFrom')?.value;
+    const t = document.getElementById('statsDateTo')?.value;
+    const o = document.getElementById('statsObjFilter')?.value || '';
+    loadConsumptionReport(f, t, o);
+    loadSpiralResultReport(f, t, o);
+  }
+}
+function selectStatsSubtab(stab) {
+  currentStatsSubtab = stab;
+  try { localStorage.setItem('statsSubtab', stab); } catch (e) { }
+  applyStatsSubtab();
 }
 
 // Помощни за справките
@@ -6668,7 +6715,7 @@ async function renderStatsCategories(validOps, fuelByObj, byObjAll, excludedAcco
 function renderStatsCharts(sorted, drinksByObj, stackedByObj, objsForStats, dateFrom, dateTo) {
   const wrap = document.getElementById('statsCharts');
   if (!wrap) return;
-  if (!sorted.length) { wrap.innerHTML = '<div style="text-align:center; color:var(--text3); padding:20px 0;">Няма данни</div>'; return; }
+  if (!sorted.length) { wrap.innerHTML = '<div style="text-align:center; color:var(--text3); padding:20px 0;">Няма данни</div>'; const _d = document.getElementById('statsChartsDash'); if (_d) _d.innerHTML = ''; return; }
 
   // 1. Прогрес-барове за всеки обект (приходи vs разходи)
   const maxAbs = Math.max(...sorted.map(([, s]) => Math.max(s.income, s.expense)));
@@ -7049,7 +7096,10 @@ function renderStatsCharts(sorted, drinksByObj, stackedByObj, objsForStats, date
     }
   }
 
-  wrap.innerHTML = pieHtml + barsHtml + stackedHtml + targetHtml;
+  // Дашборд: donut Печалба + Брой напитки; Таб „Графики": Приходи/Разходи + Компоненти + Таргет
+  const dashEl = document.getElementById('statsChartsDash');
+  if (dashEl) dashEl.innerHTML = pieHtml;
+  wrap.innerHTML = barsHtml + stackedHtml + targetHtml;
 }
 
 
