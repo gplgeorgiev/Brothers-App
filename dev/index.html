@@ -5152,6 +5152,7 @@ function applyThemeIcons(theme) {
 
   selectors.forEach(sel => {
     document.querySelectorAll(sel).forEach(el => {
+      if (el.classList.contains('stats-subtab')) return;  // табовете пазят emoji (за да се събират)
       if (!el.hasAttribute('data-original-html')) {
         el.setAttribute('data-original-html', el.innerHTML);
       }
