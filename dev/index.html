@@ -322,7 +322,7 @@ input.qty-big-input {
   font-size: 9px !important;
   letter-spacing: 0.5px !important;
 }
-.stats-subtab { flex:1; padding:9px 4px; border-radius:9px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:12px; font-weight:700; cursor:pointer; font-family:var(--font); }
+.stats-subtab { flex:1; min-width:0; padding:9px 2px; border-radius:9px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:11px; font-weight:700; cursor:pointer; font-family:var(--font); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .stats-subtab.active { background:var(--accent); color:#fff; border-color:var(--accent); }
 </style>
 </head>
@@ -1015,44 +1015,51 @@ input.qty-big-input {
 
 <!-- PAGE: СТАТИСТИКА -->
 <div class="page" id="page-stats">
-  <!-- Касова наличност (най-отгоре) -->
-  <div class="section-label">Касова наличност</div>
-  <div id="balanceSummary"><div class="loading"><div class="spinner"></div></div></div>
-
-  <!-- Филтър Период/Обект -->
-  <div class="section-label" style="margin-top:20px">Период</div>
+  <!-- Компактен филтър (сгъваем) -->
   <div class="card" style="padding:10px 14px;">
-    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px;">
-      <button onclick="statsResetMonth()" style="padding:8px; border-radius:8px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:14px; font-weight:700; cursor:pointer; font-family:var(--font);">📅 Текущ месец</button>
-      <button onclick="statsPreviousMonth()" style="padding:8px; border-radius:8px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:14px; font-weight:700; cursor:pointer; font-family:var(--font);">📅 Минал месец</button>
+    <div style="display:flex; gap:8px;">
+      <button onclick="statsResetMonth()" style="flex:1; padding:8px; border-radius:8px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:13px; font-weight:700; cursor:pointer; font-family:var(--font);">📅 Този месец</button>
+      <button onclick="statsPreviousMonth()" style="flex:1; padding:8px; border-radius:8px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:13px; font-weight:700; cursor:pointer; font-family:var(--font);">📅 Минал</button>
+      <button onclick="toggleStatsFilter()" id="statsFilterToggle" style="flex:0 0 auto; padding:8px 12px; border-radius:8px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:13px; font-weight:700; cursor:pointer; font-family:var(--font);">По избор ▾</button>
     </div>
-    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px;">
-      <input type="date" id="statsDateFrom" onchange="loadStats(); loadBalanceSummary();" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; font-family:var(--font);">
-      <input type="date" id="statsDateTo" onchange="loadStats(); loadBalanceSummary();" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; font-family:var(--font);">
+    <div id="statsFilterAdvanced" style="display:none; margin-top:8px;">
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px;">
+        <input type="date" id="statsDateFrom" onchange="loadStats(); loadBalanceSummary();" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; font-family:var(--font);">
+        <input type="date" id="statsDateTo" onchange="loadStats(); loadBalanceSummary();" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; font-family:var(--font);">
+      </div>
+      <select id="statsObjFilter" onchange="loadStats()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; appearance:none; font-family:var(--font);">
+        <option value="">Обект</option>
+      </select>
     </div>
-    <select id="statsObjFilter" onchange="loadStats()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; appearance:none; font-family:var(--font);">
-      <option value="">Обект</option>
-    </select>
   </div>
 
-  <!-- ДАШБОРД (винаги видим) -->
-  <div class="section-label" id="statsPeriodLabel" style="margin-top:20px">Текущ месец</div>
-  <div class="stats-grid" id="statsGrid"><div class="loading" style="grid-column:1/-1"><div class="spinner"></div></div></div>
+  <!-- Период етикет -->
+  <div class="section-label" id="statsPeriodLabel" style="margin-top:12px">Текущ месец</div>
 
-  <div class="section-label" style="margin-top:24px">Категории</div>
-  <div class="card" id="statsCategories" style="padding:12px 14px;"></div>
+  <!-- Сегментни табове -->
+  <div style="display:flex; gap:5px; margin-top:10px;">
+    <button class="stats-subtab active" data-stab="dash" onclick="selectStatsSubtab('dash')">🏠 Табло</button>
+    <button class="stats-subtab" data-stab="charts" onclick="selectStatsSubtab('charts')">📊 Графики</button>
+    <button class="stats-subtab" data-stab="objects" onclick="selectStatsSubtab('objects')">🏢 Обекти</button>
+    <button class="stats-subtab" data-stab="articles" onclick="selectStatsSubtab('articles')">📦 Артикули</button>
+  </div>
 
-  <div class="card" id="statsChartsDash" style="padding:12px 14px; margin-top:12px;"></div>
+  <!-- Таб: Табло (дашборд) -->
+  <div class="stats-pane" id="stab-dash" style="margin-top:12px;">
+    <div class="section-label">Касова наличност</div>
+    <div id="balanceSummary"><div class="loading"><div class="spinner"></div></div></div>
 
-  <!-- ПОД-ТАБОВЕ -->
-  <div style="display:flex; gap:6px; margin-top:22px;">
-    <button class="stats-subtab active" data-stab="charts" onclick="selectStatsSubtab('charts')">📊 Графики</button>
-    <button class="stats-subtab" data-stab="objects" onclick="selectStatsSubtab('objects')">🏢 По обекти</button>
-    <button class="stats-subtab" data-stab="articles" onclick="selectStatsSubtab('articles')">📦 По артикули</button>
+    <div class="section-label" style="margin-top:20px">Приходи / Разходи</div>
+    <div class="stats-grid" id="statsGrid"><div class="loading" style="grid-column:1/-1"><div class="spinner"></div></div></div>
+
+    <div class="section-label" style="margin-top:24px">Категории</div>
+    <div class="card" id="statsCategories" style="padding:12px 14px;"></div>
+
+    <div class="card" id="statsChartsDash" style="padding:12px 14px; margin-top:12px;"></div>
   </div>
 
   <!-- Таб: Графики -->
-  <div class="stats-pane" id="stab-charts" style="margin-top:12px;">
+  <div class="stats-pane" id="stab-charts" style="display:none; margin-top:12px;">
     <div class="card" id="statsCharts" style="padding:12px 14px;"></div>
   </div>
 
@@ -3782,10 +3789,10 @@ async function loadStats() {
   applyStatsSubtab();
 }
 
-// ── ПОД-ТАБОВЕ НА СТАТИСТИКА ──
-let currentStatsSubtab = (function () { try { return localStorage.getItem('statsSubtab') || 'charts'; } catch (e) { return 'charts'; } })();
+// ── СЕГМЕНТНИ ТАБОВЕ НА СТАТИСТИКА ──
+let currentStatsSubtab = 'dash';  // при влизане винаги Табло
 function applyStatsSubtab() {
-  ['charts', 'objects', 'articles'].forEach(t => {
+  ['dash', 'charts', 'objects', 'articles'].forEach(t => {
     const pane = document.getElementById('stab-' + t);
     if (pane) pane.style.display = (t === currentStatsSubtab) ? 'block' : 'none';
     const btn = document.querySelector('.stats-subtab[data-stab="' + t + '"]');
@@ -3801,8 +3808,15 @@ function applyStatsSubtab() {
 }
 function selectStatsSubtab(stab) {
   currentStatsSubtab = stab;
-  try { localStorage.setItem('statsSubtab', stab); } catch (e) { }
   applyStatsSubtab();
+}
+function toggleStatsFilter() {
+  const adv = document.getElementById('statsFilterAdvanced');
+  const btn = document.getElementById('statsFilterToggle');
+  if (!adv) return;
+  const open = adv.style.display === 'none';
+  adv.style.display = open ? 'block' : 'none';
+  if (btn) btn.textContent = open ? 'По избор ▴' : 'По избор ▾';
 }
 
 // Помощни за справките
@@ -3981,7 +3995,7 @@ function switchTab(tab) {
   if(tab==='service') loadService();
   if(tab==='settings') { loadUnknownRoutes(); loadTrashRetention(); loadThemeSetting(); }
   if(tab==='trash') loadTrash();
-  if(tab==='stats') { loadStats(); loadBalanceSummary(); }
+  if(tab==='stats') { currentStatsSubtab = 'dash'; loadStats(); loadBalanceSummary(); }
   if(tab==='events') loadEvents();
 }
 
