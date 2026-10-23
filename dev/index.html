@@ -1015,12 +1015,15 @@ input.qty-big-input {
 
 <!-- PAGE: СТАТИСТИКА -->
 <div class="page" id="page-stats">
+  <!-- Период етикет (над филтъра) -->
+  <div class="section-label" id="statsPeriodLabel">Текущ месец</div>
+
   <!-- Компактен филтър (сгъваем) -->
   <div class="card" style="padding:10px 14px;">
     <div style="display:flex; gap:8px;">
-      <button onclick="statsResetMonth()" style="flex:1; padding:8px; border-radius:8px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:13px; font-weight:700; cursor:pointer; font-family:var(--font);">📅 Този месец</button>
-      <button onclick="statsPreviousMonth()" style="flex:1; padding:8px; border-radius:8px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:13px; font-weight:700; cursor:pointer; font-family:var(--font);">📅 Минал</button>
-      <button onclick="toggleStatsFilter()" id="statsFilterToggle" style="flex:0 0 auto; padding:8px 12px; border-radius:8px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:13px; font-weight:700; cursor:pointer; font-family:var(--font);">По избор ▾</button>
+      <button onclick="statsResetMonth()" style="flex:1; padding:8px 4px; border-radius:8px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:13px; font-weight:700; cursor:pointer; font-family:var(--font); white-space:nowrap;">📅 Текущ</button>
+      <button onclick="statsPreviousMonth()" style="flex:1; padding:8px 4px; border-radius:8px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:13px; font-weight:700; cursor:pointer; font-family:var(--font); white-space:nowrap;">📅 Минал</button>
+      <button onclick="toggleStatsFilter()" id="statsFilterToggle" style="flex:0 0 auto; padding:8px 12px; border-radius:8px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:13px; font-weight:700; cursor:pointer; font-family:var(--font); white-space:nowrap;">По избор ▾</button>
     </div>
     <div id="statsFilterAdvanced" style="display:none; margin-top:8px;">
       <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px;">
@@ -1033,15 +1036,12 @@ input.qty-big-input {
     </div>
   </div>
 
-  <!-- Период етикет -->
-  <div class="section-label" id="statsPeriodLabel" style="margin-top:12px">Текущ месец</div>
-
   <!-- Сегментни табове -->
-  <div style="display:flex; gap:5px; margin-top:10px;">
-    <button class="stats-subtab active" data-stab="dash" onclick="selectStatsSubtab('dash')">🏠 Табло</button>
-    <button class="stats-subtab" data-stab="charts" onclick="selectStatsSubtab('charts')">📊 Графики</button>
-    <button class="stats-subtab" data-stab="objects" onclick="selectStatsSubtab('objects')">🏢 Обекти</button>
-    <button class="stats-subtab" data-stab="articles" onclick="selectStatsSubtab('articles')">📦 Артикули</button>
+  <div style="display:flex; gap:5px; margin-top:12px;">
+    <button class="stats-subtab active" data-stab="dash" onclick="selectStatsSubtab('dash')">🏠&#8202;Табло</button>
+    <button class="stats-subtab" data-stab="charts" onclick="selectStatsSubtab('charts')">📊&#8202;Графики</button>
+    <button class="stats-subtab" data-stab="objects" onclick="selectStatsSubtab('objects')">🏢&#8202;Обекти</button>
+    <button class="stats-subtab" data-stab="articles" onclick="selectStatsSubtab('articles')">📦&#8202;Артикули</button>
   </div>
 
   <!-- Таб: Табло (дашборд) -->
