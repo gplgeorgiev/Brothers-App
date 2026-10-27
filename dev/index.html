@@ -3831,11 +3831,24 @@ function _reportIcon(r, map) { return map.get(r.product_id)?.icon || '📦'; }
 function _qtyFmt(q) { return Number.isInteger(q) ? q : q.toFixed(1); }
 
 // СПРАВКА 1: Консумация по обекти (изписани материали/стоки, сметка 30201)
+// Помощни за сортиране на справките
+let _consRows = [], _consSort = { key: 'cost', dir: 'desc' };
+let _spiralRows = [], _spiralSort = { key: 'profit', dir: 'desc' };
+function _reportSortArr(arr, key, dir) {
+  return arr.slice().sort((a, b) => {
+    let r;
+    if (key === 'name') r = String(a.name).localeCompare(String(b.name), 'bg');
+    else r = (a[key] || 0) - (b[key] || 0);
+    return dir === 'asc' ? r : -r;
+  });
+}
+function _sortArrow(active, dir) { return active ? (dir === 'asc' ? ' ▲' : ' ▼') : ''; }
+
 async function loadConsumptionReport(dateFrom, dateTo, objFilter) {
   const el = document.getElementById('consumptionReport');
   if (!el) return;
   el.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
-  if (!dateFrom || !dateTo) { el.innerHTML = ''; return; }
+  if (!dateFrom || !dateTo) { el.innerHTML = ''; _consRows = []; return; }
   const { data } = await fetchAllRows(() => {
     let q = db.from('operations')
       .select('object_name, product_id, product_name, quantity, cost_value')
@@ -3846,23 +3859,35 @@ async function loadConsumptionReport(dateFrom, dateTo, objFilter) {
     return q.order('id', { ascending: true });
   });
   const rows = data || [];
-  if (!rows.length) { el.innerHTML = '<div class="empty"><p>Няма консумация за периода.</p></div>'; return; }
   const map = _reportProdMap();
-  // сумарно по артикул (общо; при избран обект филтърът вече стеснява заявката)
   const byArt = {};
   rows.forEach(r => {
     const key = r.product_id != null ? 'p' + r.product_id : 'n' + _reportName(r, map);
     const a = byArt[key] = byArt[key] || { name: _reportName(r, map), icon: _reportIcon(r, map), qty: 0, cost: 0 };
     a.qty += r.quantity || 0; a.cost += r.cost_value || 0;
   });
-  const arts = Object.values(byArt).sort((a, b) => b.cost - a.cost);
-  const grand = arts.reduce((s, a) => s + a.cost, 0);
+  _consRows = Object.values(byArt);
+  renderConsumption();
+}
+function sortConsumption(key) {
+  if (_consSort.key === key) _consSort.dir = _consSort.dir === 'asc' ? 'desc' : 'asc';
+  else _consSort = { key, dir: key === 'name' ? 'asc' : 'desc' };
+  renderConsumption();
+}
+function renderConsumption() {
+  const el = document.getElementById('consumptionReport');
+  if (!el) return;
+  if (!_consRows.length) { el.innerHTML = '<div class="empty"><p>Няма консумация за периода.</p></div>'; return; }
+  const arts = _reportSortArr(_consRows, _consSort.key, _consSort.dir);
+  const grand = _consRows.reduce((s, a) => s + a.cost, 0);
+  const S = _consSort;
+  const h = (key, label, w) => `<div onclick="sortConsumption('${key}')" style="${w ? 'width:' + w + 'px; text-align:right;' : 'flex:1;'} cursor:pointer;">${label}${_sortArrow(S.key === key, S.dir)}</div>`;
   el.innerHTML = `
     <div class="card" style="padding:0; overflow:hidden;">
-      <div style="display:flex; gap:8px; padding:7px 10px; font-size:10px; color:var(--text3); font-weight:700; background:var(--bg3);">
-        <div style="flex:1;">Артикул</div>
-        <div style="width:60px; text-align:right;">Кол-во</div>
-        <div style="width:78px; text-align:right;">Стойност</div>
+      <div style="display:flex; gap:8px; padding:7px 10px; font-size:10px; color:var(--text3); font-weight:700; background:var(--bg3); user-select:none;">
+        ${h('name', 'Артикул')}
+        ${h('qty', 'Кол-во', 60)}
+        ${h('cost', 'Стойност', 78)}
       </div>` +
     arts.map(a => `
       <div style="display:flex; align-items:center; gap:8px; padding:7px 10px; border-top:1px solid var(--border);">
@@ -3883,7 +3908,7 @@ async function loadSpiralResultReport(dateFrom, dateTo, objFilter) {
   const el = document.getElementById('spiralResultReport');
   if (!el) return;
   el.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
-  if (!dateFrom || !dateTo) { el.innerHTML = ''; return; }
+  if (!dateFrom || !dateTo) { el.innerHTML = ''; _spiralRows = []; return; }
   const { data } = await fetchAllRows(() => {
     let q = db.from('operations')
       .select('object_name, product_id, product_name, quantity, cost_value, sale_value')
@@ -3895,7 +3920,6 @@ async function loadSpiralResultReport(dateFrom, dateTo, objFilter) {
     return q.order('id', { ascending: true });
   });
   const rows = data || [];
-  if (!rows.length) { el.innerHTML = '<div class="empty"><p>Няма спирални продажби за периода.</p></div>'; return; }
   const map = _reportProdMap();
   const byArt = {};
   rows.forEach(r => {
@@ -3903,17 +3927,33 @@ async function loadSpiralResultReport(dateFrom, dateTo, objFilter) {
     const a = byArt[key] = byArt[key] || { name: _reportName(r, map), icon: _reportIcon(r, map), qty: 0, rev: 0, cost: 0 };
     a.qty += r.quantity || 0; a.rev += r.sale_value || 0; a.cost += r.cost_value || 0;
   });
-  const arts = Object.values(byArt).map(a => ({ ...a, profit: a.rev - a.cost })).sort((x, y) => y.profit - x.profit);
-  const tot = arts.reduce((s, a) => ({ qty: s.qty + a.qty, rev: s.rev + a.rev, cost: s.cost + a.cost, profit: s.profit + a.profit }), { qty: 0, rev: 0, cost: 0, profit: 0 });
+  _spiralRows = Object.values(byArt).map(a => {
+    const profit = a.rev - a.cost;
+    return { ...a, profit, margVal: a.cost > 0 ? profit / a.cost : 0 };
+  });
+  renderSpiralResult();
+}
+function sortSpiral(key) {
+  if (_spiralSort.key === key) _spiralSort.dir = _spiralSort.dir === 'asc' ? 'desc' : 'asc';
+  else _spiralSort = { key, dir: key === 'name' ? 'asc' : 'desc' };
+  renderSpiralResult();
+}
+function renderSpiralResult() {
+  const el = document.getElementById('spiralResultReport');
+  if (!el) return;
+  if (!_spiralRows.length) { el.innerHTML = '<div class="empty"><p>Няма спирални продажби за периода.</p></div>'; return; }
+  const arts = _reportSortArr(_spiralRows, _spiralSort.key, _spiralSort.dir);
+  const tot = _spiralRows.reduce((s, a) => ({ qty: s.qty + a.qty, rev: s.rev + a.rev, cost: s.cost + a.cost, profit: s.profit + a.profit }), { qty: 0, rev: 0, cost: 0, profit: 0 });
   const marg = v => v.cost > 0 ? Math.round(v.profit / v.cost * 100) + '%' : '—';
   const nc = (w, val, style = '') => `<div style="width:${w}px; flex:none; text-align:right; font-family:var(--mono); ${style}">${val}</div>`;
-  const hc = (w, t) => `<div style="width:${w}px; flex:none; text-align:right;">${t}</div>`;
+  const S = _spiralSort;
+  const hc = (w, key, label) => `<div onclick="sortSpiral('${key}')" style="width:${w}px; flex:none; text-align:right; cursor:pointer;">${label}${_sortArrow(S.key === key, S.dir)}</div>`;
   const W = { br: 30, rev: 52, cost: 52, prof: 54, marg: 40 };
   el.innerHTML = `
     <div class="card" style="padding:0; overflow:hidden;">
-      <div style="display:flex; gap:6px; align-items:flex-end; padding:7px 10px; font-size:10px; color:var(--text3); font-weight:700; background:var(--bg3);">
-        <div style="flex:1; min-width:0;">Артикул</div>
-        ${hc(W.br, 'Бр')}${hc(W.rev, 'Приход')}${hc(W.cost, 'Себест.')}${hc(W.prof, 'Печалба')}${hc(W.marg, 'Марж')}
+      <div style="display:flex; gap:6px; align-items:flex-end; padding:7px 10px; font-size:10px; color:var(--text3); font-weight:700; background:var(--bg3); user-select:none;">
+        <div onclick="sortSpiral('name')" style="flex:1; min-width:0; cursor:pointer;">Артикул${_sortArrow(S.key === 'name', S.dir)}</div>
+        ${hc(W.br, 'qty', 'Бр')}${hc(W.rev, 'rev', 'Приход')}${hc(W.cost, 'cost', 'Себест.')}${hc(W.prof, 'profit', 'Печалба')}${hc(W.marg, 'margVal', 'Марж')}
       </div>` +
     arts.map(a => `
       <div style="display:flex; gap:6px; align-items:flex-start; padding:7px 10px; border-top:1px solid var(--border); font-size:12px;">
