@@ -3881,7 +3881,7 @@ function renderConsumption() {
   const arts = _reportSortArr(_consRows, _consSort.key, _consSort.dir);
   const grand = _consRows.reduce((s, a) => s + a.cost, 0);
   const S = _consSort;
-  const h = (key, label, w) => `<div onclick="sortConsumption('${key}')" style="${w ? 'width:' + w + 'px; text-align:right;' : 'flex:1;'} cursor:pointer;">${label}${_sortArrow(S.key === key, S.dir)}</div>`;
+  const h = (key, label, w) => `<div onclick="sortConsumption('${key}')" style="${w ? 'width:' + w + 'px; text-align:right;' : 'flex:1;'} cursor:pointer; white-space:nowrap;">${label}${_sortArrow(S.key === key, S.dir)}</div>`;
   el.innerHTML = `
     <div class="card" style="padding:0; overflow:hidden;">
       <div style="display:flex; gap:8px; padding:7px 10px; font-size:10px; color:var(--text3); font-weight:700; background:var(--bg3); user-select:none;">
@@ -3947,12 +3947,12 @@ function renderSpiralResult() {
   const marg = v => v.cost > 0 ? Math.round(v.profit / v.cost * 100) + '%' : '—';
   const nc = (w, val, style = '') => `<div style="width:${w}px; flex:none; text-align:right; font-family:var(--mono); ${style}">${val}</div>`;
   const S = _spiralSort;
-  const hc = (w, key, label) => `<div onclick="sortSpiral('${key}')" style="width:${w}px; flex:none; text-align:right; cursor:pointer;">${label}${_sortArrow(S.key === key, S.dir)}</div>`;
-  const W = { br: 30, rev: 52, cost: 52, prof: 54, marg: 40 };
+  const hc = (w, key, label) => `<div onclick="sortSpiral('${key}')" style="width:${w}px; flex:none; text-align:right; cursor:pointer; white-space:nowrap;">${label}${_sortArrow(S.key === key, S.dir)}</div>`;
+  const W = { br: 28, rev: 50, cost: 54, prof: 54, marg: 46 };
   el.innerHTML = `
     <div class="card" style="padding:0; overflow:hidden;">
       <div style="display:flex; gap:6px; align-items:flex-end; padding:7px 10px; font-size:10px; color:var(--text3); font-weight:700; background:var(--bg3); user-select:none;">
-        <div onclick="sortSpiral('name')" style="flex:1; min-width:0; cursor:pointer;">Артикул${_sortArrow(S.key === 'name', S.dir)}</div>
+        <div onclick="sortSpiral('name')" style="flex:1; min-width:0; cursor:pointer; white-space:nowrap;">Артикул${_sortArrow(S.key === 'name', S.dir)}</div>
         ${hc(W.br, 'qty', 'Бр')}${hc(W.rev, 'rev', 'Приход')}${hc(W.cost, 'cost', 'Себест.')}${hc(W.prof, 'profit', 'Печалба')}${hc(W.marg, 'margVal', 'Марж')}
       </div>` +
     arts.map(a => `
