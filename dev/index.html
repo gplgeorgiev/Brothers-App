@@ -6575,7 +6575,7 @@ async function computeUpcomingEvents() {
     if (days == null) return;
     const cat = _remCat(r.category);
     const who = r.vehicles?.name || r.objects?.name || '';
-    events.push({ icon: cat.icon, title: r.title, who, date: _reminderNextDate(r), days });
+    events.push({ id: r.id, icon: cat.icon, title: r.title, who, date: _reminderNextDate(r), days });
   });
   events.sort((a, b) => a.days - b.days);
   return events;
@@ -6597,13 +6597,14 @@ async function loadEvents() {
     else { txt = `след ${e.days} дни`; }
     const dstr = new Date(e.date).toLocaleDateString('bg-BG', { day: 'numeric', month: 'short', year: 'numeric' });
     return `
-      <div style="display:flex; align-items:center; gap:10px; padding:12px 10px; border-bottom:1px solid var(--border);">
+      <div style="display:flex; align-items:center; gap:8px; padding:12px 10px; border-bottom:1px solid var(--border);">
         <div style="font-size:22px;">${e.icon}</div>
         <div style="flex:1; min-width:0;">
           <div style="font-size:14px; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${e.title}${e.who ? ' · ' + e.who : ''}</div>
           <div style="font-size:12px; color:var(--text2);">${dstr}</div>
         </div>
         <div style="font-size:12px; font-weight:800; color:${color}; white-space:nowrap;">${txt}</div>
+        <button onclick="markReminderDone(${e.id})" title="Готово" style="padding:5px 9px; border-radius:7px; border:1px solid var(--green); background:transparent; color:var(--green); font-size:13px; font-weight:700; cursor:pointer; flex-shrink:0;">✓</button>
       </div>`;
   }).join('');
 }
@@ -6851,7 +6852,8 @@ async function markReminderDone(id) {
   const { error } = await db.from('reminders').update(patch).eq('id', id);
   if (error) { showToast('❌ ' + error.message, 'error'); return; }
   showToast('✅ Отбелязано като изпълнено', 'success');
-  loadReminders();
+  if (document.getElementById('remindersList')) loadReminders();
+  if (document.getElementById('eventsList')) loadEvents();
   if (typeof checkEventsAlert === 'function') checkEventsAlert();
 }
 
