@@ -379,6 +379,7 @@ input.qty-big-input {
       <button class="menu-item" data-tab="vehicles" onclick="selectMenu('vehicles')">🚗 Превозни средства</button>
       <button class="menu-item" data-tab="routes" onclick="selectMenu('routes')">🗺 Маршрути</button>
       <button class="menu-item" data-tab="products" onclick="selectMenu('products')">📦 Продукти</button>
+      <button class="menu-item" data-tab="reminders" onclick="selectMenu('reminders')">🔔 Напомняния</button>
     </div>
     <button class="menu-item" data-tab="settings" onclick="selectMenu('settings')">⚙️ Настройки</button>
     <button class="menu-item" onclick="doLogout()" style="color:var(--red);">🚪 Изход</button>
@@ -1153,6 +1154,79 @@ input.qty-big-input {
       <button onclick="openImportProductsModal()" style="padding:10px; border-radius:8px; border:1px solid var(--accent); background:transparent; color:var(--accent); font-size:13px; font-weight:700; cursor:pointer; font-family:var(--font);">📥 Импорт</button>
     </div>
     <div id="productsList"></div>
+  </div>
+</div>
+
+<div class="page" id="page-reminders">
+  <div class="card" style="margin-bottom:10px;">
+    <button onclick="openReminderModal()" style="width:100%; padding:11px; border-radius:8px; border:none; background:var(--accent); color:#fff; font-size:14px; font-weight:700; cursor:pointer; font-family:var(--font);">+ Добави напомняне</button>
+  </div>
+  <div class="card" style="padding:10px 14px; margin-bottom:10px;">
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+      <select id="remFilterCategory" onchange="loadReminders()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; outline:none; appearance:none; font-family:var(--font);">
+        <option value="">Всички категории</option>
+      </select>
+      <select id="remFilterStatus" onchange="loadReminders()" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; outline:none; appearance:none; font-family:var(--font);">
+        <option value="active">Активни</option>
+        <option value="all">Всички</option>
+      </select>
+    </div>
+  </div>
+  <div id="remindersList" style="padding-bottom:120px;"><div class="loading"><div class="spinner"></div></div></div>
+</div>
+
+<!-- Modal: напомняне -->
+<div id="reminderModal" class="modal-overlay" style="display:none;">
+  <div class="modal" style="max-height:90vh; overflow-y:auto;">
+    <div class="modal-title" id="reminderModalTitle">Ново напомняне</div>
+    <div class="field">
+      <label>ЗАГЛАВИЕ</label>
+      <input type="text" id="remTitle" placeholder="напр. ГО — Renault">
+    </div>
+    <div class="field">
+      <label>КАТЕГОРИЯ</label>
+      <select id="remCategory" style="width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:8px; background:var(--bg3); color:var(--text); font-size:14px;"></select>
+    </div>
+    <div class="field">
+      <label>ПОВТОРЕНИЕ</label>
+      <select id="remRecurrence" onchange="onReminderRecurrenceChange()" style="width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:8px; background:var(--bg3); color:var(--text); font-size:14px;"></select>
+    </div>
+    <div class="field" id="remDateField">
+      <label>ДАТА</label>
+      <input type="date" id="remDueDate">
+    </div>
+    <div class="field" id="remDayField" style="display:none;">
+      <label>ДЕН ОТ МЕСЕЦА (1–31)</label>
+      <input type="number" id="remDayOfMonth" inputmode="numeric" min="1" max="31" placeholder="напр. 5">
+    </div>
+    <div class="field">
+      <label>ПРЕДИЗВЕСТИЕ (дни преди, през запетая)</label>
+      <input type="text" id="remLeadDays" inputmode="numeric" placeholder="напр. 1 или 7,1">
+    </div>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+      <div class="field">
+        <label>ОБЕКТ (по избор)</label>
+        <select id="remObjectId" style="width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:8px; background:var(--bg3); color:var(--text); font-size:14px;"><option value="">—</option></select>
+      </div>
+      <div class="field">
+        <label>АВТОМОБИЛ (по избор)</label>
+        <select id="remVehicleId" style="width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:8px; background:var(--bg3); color:var(--text); font-size:14px;"><option value="">—</option></select>
+      </div>
+    </div>
+    <div class="field">
+      <label>БЕЛЕЖКА</label>
+      <input type="text" id="remNote" placeholder="по избор">
+    </div>
+    <div class="field">
+      <div style="display:flex; align-items:center; gap:10px;">
+        <input type="checkbox" id="remActive" class="custom-checkbox" checked style="flex-shrink:0;">
+        <span onclick="document.getElementById('remActive').click()" style="cursor:pointer; user-select:none;">Активно</span>
+      </div>
+    </div>
+    <div class="modal-btns">
+      <button class="cancel" onclick="closeReminderModal()">Откажи</button>
+      <button onclick="saveReminder()">✓ Запиши</button>
+    </div>
   </div>
 </div>
 
@@ -3995,7 +4069,8 @@ const tabTitles = {
   'technicians': { icon: '👤', name: 'Техници' },
   'vehicles': { icon: '🚗', name: 'Превозни средства' },
   'routes': { icon: '🗺', name: 'Маршрути' },
-  'products': { icon: '📦', name: 'Продукти' }
+  'products': { icon: '📦', name: 'Продукти' },
+  'reminders': { icon: '🔔', name: 'Напомняния' }
 };
 
 function updateHeaderTitle(tab) {
@@ -4026,6 +4101,7 @@ function switchTab(tab) {
   if (tab === 'vehicles') loadVehiclesList();
   if (tab === 'routes') loadRoutesList();
   if (tab === 'products') loadProductsList();
+  if (tab === 'reminders') loadReminders();
   document.getElementById(`nav-${tab}`)?.classList.add('active');
   const tabMap = ['restock','cashflow','history','finance','service','stats','settings'];
   document.querySelectorAll('.tab')[tabMap.indexOf(tab)]?.classList.add('active');
@@ -6567,6 +6643,205 @@ async function checkEventsAlert() {
     if (badge) { badge.textContent = urgent.length || ''; badge.style.display = urgent.length ? 'inline-flex' : 'none'; }
     if (dot) dot.style.display = urgent.length ? 'block' : 'none';
   } catch (e) { /* няма колоните още — тихо */ }
+}
+
+// ===== НАПОМНЯНИЯ =====
+const REMINDER_CATEGORIES = [
+  { code: 'insurance', label: 'ГО', icon: '🛡' },
+  { code: 'casco', label: 'Каско', icon: '🚗' },
+  { code: 'vignette', label: 'Винетка', icon: '🏷' },
+  { code: 'tax', label: 'Данък', icon: '🧾' },
+  { code: 'inspection', label: 'Тех. преглед', icon: '🔧' },
+  { code: 'rent', label: 'Наем', icon: '🏠' },
+  { code: 'service', label: 'Сервиз', icon: '🛠' },
+  { code: 'other', label: 'Друго', icon: '📌' }
+];
+const REMINDER_RECURRENCE = [
+  { code: 'once', label: 'Еднократно' },
+  { code: 'monthly', label: 'Месечно' },
+  { code: 'quarterly', label: '3-месечно' },
+  { code: 'yearly', label: 'Годишно' }
+];
+let editingReminderId = null;
+function _remCat(code) { return REMINDER_CATEGORIES.find(c => c.code === code) || REMINDER_CATEGORIES[REMINDER_CATEGORIES.length - 1]; }
+function _remRecLabel(code) { return (REMINDER_RECURRENCE.find(x => x.code === code) || {}).label || ''; }
+
+// Следваща дата на напомнянето (според повторението)
+function _reminderNextDate(r) {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  if (r.recurrence === 'monthly') {
+    if (!r.day_of_month) return null;
+    const clamp = (y, m) => new Date(y, m, Math.min(r.day_of_month, new Date(y, m + 1, 0).getDate()));
+    let d = clamp(today.getFullYear(), today.getMonth());
+    if (d < today) { const m = today.getMonth(); d = clamp(m === 11 ? today.getFullYear() + 1 : today.getFullYear(), (m + 1) % 12); }
+    return d;
+  }
+  if (!r.due_date) return null;
+  const base = new Date(r.due_date); base.setHours(0, 0, 0, 0);
+  if (r.recurrence === 'once') return base;
+  const step = r.recurrence === 'quarterly' ? 3 : 12;
+  let d = new Date(base);
+  while (d < today) d.setMonth(d.getMonth() + step);
+  return d;
+}
+function _reminderDaysLeft(r) {
+  const d = _reminderNextDate(r);
+  if (!d) return null;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  return Math.round((d - today) / 86400000);
+}
+function _reminderColor(days) {
+  if (days == null) return 'var(--text2)';
+  if (days < 0 || days <= 3) return 'var(--red)';
+  if (days <= 7) return 'var(--amber)';
+  return 'var(--text2)';
+}
+function _reminderStatusText(days) {
+  if (days == null) return '—';
+  if (days < 0) return 'просрочено с ' + Math.abs(days) + ' дни';
+  if (days === 0) return 'днес';
+  return 'след ' + days + ' дни';
+}
+
+async function loadReminders() {
+  const fc = document.getElementById('remFilterCategory');
+  if (fc && fc.options.length <= 1) {
+    REMINDER_CATEGORIES.forEach(c => { const o = document.createElement('option'); o.value = c.code; o.textContent = c.icon + ' ' + c.label; fc.appendChild(o); });
+  }
+  const list = document.getElementById('remindersList');
+  if (!list) return;
+  list.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  const catFilter = document.getElementById('remFilterCategory')?.value || '';
+  const statusFilter = document.getElementById('remFilterStatus')?.value || 'active';
+  let q = db.from('reminders').select('*, vehicles(name), objects(name)').is('deleted_at', null);
+  if (catFilter) q = q.eq('category', catFilter);
+  if (statusFilter === 'active') q = q.eq('active', true);
+  const { data, error } = await q;
+  if (error) { list.innerHTML = `<div class="empty"><div class="empty-icon">❌</div><p>${error.message}</p></div>`; return; }
+  if (!data || !data.length) { list.innerHTML = '<div class="empty"><div class="empty-icon">🔔</div><p>Няма напомняния. Добави първото горе.</p></div>'; return; }
+  const withDays = data.map(r => ({ r, days: _reminderDaysLeft(r) }));
+  withDays.sort((a, b) => (a.days == null) ? 1 : (b.days == null ? -1 : a.days - b.days));
+  list.innerHTML = withDays.map(({ r, days }) => {
+    const cat = _remCat(r.category);
+    const d = _reminderNextDate(r);
+    const dstr = d ? d.toLocaleDateString('bg-BG', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+    const ent = r.vehicles?.name ? '🚗 ' + r.vehicles.name : (r.objects?.name ? '📍 ' + r.objects.name : '');
+    const inactive = !r.active;
+    return `
+      <div style="display:flex; align-items:center; gap:10px; padding:10px; border-bottom:1px solid var(--border); ${inactive ? 'opacity:0.5;' : ''}">
+        <div style="font-size:20px;">${cat.icon}</div>
+        <div style="flex:1; min-width:0;">
+          <div style="font-size:14px; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${r.title}</div>
+          <div style="font-size:11px; color:var(--text2);">${cat.label}${ent ? ' · ' + ent : ''} · ${dstr} · ${_remRecLabel(r.recurrence)}</div>
+          <div style="font-size:11px; font-weight:700; color:${_reminderColor(days)};">${inactive ? 'неактивно' : _reminderStatusText(days)}</div>
+        </div>
+        <button onclick="editReminder(${r.id})" style="padding:5px 9px; border-radius:7px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:11px; cursor:pointer;">✏️</button>
+        <button onclick="deleteReminder(${r.id})" style="padding:5px 9px; border-radius:7px; border:1px solid var(--red); background:transparent; color:var(--red); font-size:11px; cursor:pointer;">🗑</button>
+      </div>`;
+  }).join('');
+}
+
+async function _populateReminderModalSelects() {
+  const catSel = document.getElementById('remCategory');
+  if (catSel) catSel.innerHTML = REMINDER_CATEGORIES.map(c => `<option value="${c.code}">${c.icon} ${c.label}</option>`).join('');
+  const recSel = document.getElementById('remRecurrence');
+  if (recSel) recSel.innerHTML = REMINDER_RECURRENCE.map(c => `<option value="${c.code}">${c.label}</option>`).join('');
+  const objSel = document.getElementById('remObjectId');
+  if (objSel) objSel.innerHTML = '<option value="">—</option>' + (objects || []).map(o => `<option value="${o.id}">${o.name}</option>`).join('');
+  const vehSel = document.getElementById('remVehicleId');
+  if (vehSel) {
+    const { data: vehs } = await db.from('vehicles').select('id,name').is('deleted_at', null).order('name');
+    vehSel.innerHTML = '<option value="">—</option>' + (vehs || []).map(v => `<option value="${v.id}">${v.name}</option>`).join('');
+  }
+}
+
+function onReminderRecurrenceChange() {
+  const rec = document.getElementById('remRecurrence').value;
+  const monthly = rec === 'monthly';
+  document.getElementById('remDateField').style.display = monthly ? 'none' : 'block';
+  document.getElementById('remDayField').style.display = monthly ? 'block' : 'none';
+}
+
+async function openReminderModal() {
+  editingReminderId = null;
+  document.getElementById('reminderModalTitle').textContent = 'Ново напомняне';
+  await _populateReminderModalSelects();
+  document.getElementById('remTitle').value = '';
+  document.getElementById('remCategory').value = 'insurance';
+  document.getElementById('remRecurrence').value = 'yearly';
+  document.getElementById('remDueDate').value = '';
+  document.getElementById('remDayOfMonth').value = '';
+  document.getElementById('remLeadDays').value = '1';
+  document.getElementById('remObjectId').value = '';
+  document.getElementById('remVehicleId').value = '';
+  document.getElementById('remNote').value = '';
+  document.getElementById('remActive').checked = true;
+  onReminderRecurrenceChange();
+  document.getElementById('reminderModal').style.display = 'flex';
+}
+function closeReminderModal() { document.getElementById('reminderModal').style.display = 'none'; }
+
+async function editReminder(id) {
+  const { data: r } = await db.from('reminders').select('*').eq('id', id).single();
+  if (!r) return;
+  editingReminderId = id;
+  document.getElementById('reminderModalTitle').textContent = 'Редакция на напомняне';
+  await _populateReminderModalSelects();
+  document.getElementById('remTitle').value = r.title || '';
+  document.getElementById('remCategory').value = r.category || 'other';
+  document.getElementById('remRecurrence').value = r.recurrence || 'once';
+  document.getElementById('remDueDate').value = r.due_date || '';
+  document.getElementById('remDayOfMonth').value = r.day_of_month || '';
+  document.getElementById('remLeadDays').value = (r.lead_days || [1]).join(',');
+  document.getElementById('remObjectId').value = r.object_id || '';
+  document.getElementById('remVehicleId').value = r.vehicle_id || '';
+  document.getElementById('remNote').value = r.note || '';
+  document.getElementById('remActive').checked = r.active !== false;
+  onReminderRecurrenceChange();
+  document.getElementById('reminderModal').style.display = 'flex';
+}
+
+async function saveReminder() {
+  const title = document.getElementById('remTitle').value.trim();
+  const category = document.getElementById('remCategory').value;
+  const recurrence = document.getElementById('remRecurrence').value;
+  const dueDate = document.getElementById('remDueDate').value || null;
+  const dayOfMonth = parseInt(document.getElementById('remDayOfMonth').value) || null;
+  const leadDays = (document.getElementById('remLeadDays').value || '').split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n) && n >= 0);
+  const objectId = parseInt(document.getElementById('remObjectId').value) || null;
+  const vehicleId = parseInt(document.getElementById('remVehicleId').value) || null;
+  const note = document.getElementById('remNote').value.trim() || null;
+  const active = document.getElementById('remActive').checked;
+  if (!title) { showToast('Въведи заглавие!', 'error'); return; }
+  if (recurrence === 'monthly') {
+    if (!dayOfMonth || dayOfMonth < 1 || dayOfMonth > 31) { showToast('Въведи ден от месеца (1–31)!', 'error'); return; }
+  } else if (!dueDate) { showToast('Избери дата!', 'error'); return; }
+  const payload = {
+    title, category, recurrence,
+    due_date: recurrence === 'monthly' ? null : dueDate,
+    day_of_month: recurrence === 'monthly' ? dayOfMonth : null,
+    lead_days: leadDays.length ? leadDays : [1],
+    object_id: objectId, vehicle_id: vehicleId, note, active,
+    tenant_id: currentTechnician?.tenant_id || null
+  };
+  let result;
+  if (editingReminderId) result = await db.from('reminders').update(payload).eq('id', editingReminderId);
+  else result = await db.from('reminders').insert(payload);
+  if (result.error) { showToast('❌ ' + result.error.message, 'error'); return; }
+  showToast('✅ Запазено', 'success');
+  closeReminderModal();
+  loadReminders();
+  if (typeof checkEventsAlert === 'function') checkEventsAlert();
+}
+
+async function deleteReminder(id) {
+  const ok = await showConfirm('Изтрий напомнянето?');
+  if (!ok) return;
+  const { error } = await db.from('reminders').update({ deleted_at: new Date().toISOString() }).eq('id', id);
+  if (error) { showToast('❌ ' + error.message, 'error'); return; }
+  showToast('🗑 Изтрито', 'success');
+  loadReminders();
+  if (typeof checkEventsAlert === 'function') checkEventsAlert();
 }
 
 function openVehicleModal() {
