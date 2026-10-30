@@ -6640,22 +6640,38 @@ let editingReminderId = null;
 function _remCat(code) { return REMINDER_CATEGORIES.find(c => c.code === code) || REMINDER_CATEGORIES[REMINDER_CATEGORIES.length - 1]; }
 function _remRecLabel(code) { return (REMINDER_RECURRENCE.find(x => x.code === code) || {}).label || ''; }
 
-// Следваща дата на напомнянето (според повторението)
+// Дата (само ден) от 'YYYY-MM-DD' или ISO timestamp — локална полунощ, без timezone изместване
+function _dateOnly(s) {
+  if (!s) return null;
+  if (s instanceof Date) { const d = new Date(s); d.setHours(0, 0, 0, 0); return d; }
+  const p = String(s).slice(0, 10).split('-');
+  return new Date(+p[0], (+p[1]) - 1, +p[2]);
+}
+function _toISODate(d) {
+  const off = d.getTimezoneOffset();
+  return new Date(d.getTime() - off * 60000).toISOString().slice(0, 10);
+}
+
+// Текущата "отворена" дата на напомнянето — първото възникване след last_done_date
+// (или след създаването при месечни). НЕ се превърта автоматично → минала дата = просрочено.
 function _reminderNextDate(r) {
-  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const done = r.last_done_date ? _dateOnly(r.last_done_date) : null;
   if (r.recurrence === 'monthly') {
     if (!r.day_of_month) return null;
     const clamp = (y, m) => new Date(y, m, Math.min(r.day_of_month, new Date(y, m + 1, 0).getDate()));
-    let d = clamp(today.getFullYear(), today.getMonth());
-    if (d < today) { const m = today.getMonth(); d = clamp(m === 11 ? today.getFullYear() + 1 : today.getFullYear(), (m + 1) % 12); }
+    const anchor = done || (r.created_at ? _dateOnly(r.created_at) : (() => { const t = new Date(); t.setHours(0, 0, 0, 0); return t; })());
+    let y = anchor.getFullYear(), m = anchor.getMonth();
+    let d = clamp(y, m);
+    // при last_done → строго след него; при създаване → на/след датата на създаване
+    while (done ? d <= anchor : d < anchor) { m++; if (m > 11) { m = 0; y++; } d = clamp(y, m); }
     return d;
   }
   if (!r.due_date) return null;
-  const base = new Date(r.due_date); base.setHours(0, 0, 0, 0);
-  if (r.recurrence === 'once') return base;
+  const base = _dateOnly(r.due_date);
+  if (r.recurrence === 'once') return done ? null : base;
   const step = r.recurrence === 'quarterly' ? 3 : 12;
   let d = new Date(base);
-  while (d < today) d.setMonth(d.getMonth() + step);
+  if (done) { while (d <= done) d.setMonth(d.getMonth() + step); }
   return d;
 }
 function _reminderDaysLeft(r) {
@@ -6701,14 +6717,17 @@ async function loadReminders() {
     const dstr = d ? d.toLocaleDateString('bg-BG', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
     const ent = r.vehicles?.name ? '🚗 ' + r.vehicles.name : (r.objects?.name ? '📍 ' + r.objects.name : '');
     const inactive = !r.active;
+    const statusTxt = inactive ? (r.last_done_date ? 'изпълнено' : 'неактивно') : _reminderStatusText(days);
+    const doneBtn = (!inactive && d) ? `<button onclick="markReminderDone(${r.id})" title="Готово" style="padding:5px 9px; border-radius:7px; border:1px solid var(--green); background:transparent; color:var(--green); font-size:11px; font-weight:700; cursor:pointer;">✓</button>` : '';
     return `
-      <div style="display:flex; align-items:center; gap:10px; padding:10px; border-bottom:1px solid var(--border); ${inactive ? 'opacity:0.5;' : ''}">
+      <div style="display:flex; align-items:center; gap:8px; padding:10px; border-bottom:1px solid var(--border); ${inactive ? 'opacity:0.5;' : ''}">
         <div style="font-size:20px;">${cat.icon}</div>
         <div style="flex:1; min-width:0;">
           <div style="font-size:14px; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${r.title}</div>
           <div style="font-size:11px; color:var(--text2);">${cat.label}${ent ? ' · ' + ent : ''} · ${dstr} · ${_remRecLabel(r.recurrence)}</div>
-          <div style="font-size:11px; font-weight:700; color:${_reminderColor(days)};">${inactive ? 'неактивно' : _reminderStatusText(days)}</div>
+          <div style="font-size:11px; font-weight:700; color:${inactive ? 'var(--text2)' : _reminderColor(days)};">${statusTxt}</div>
         </div>
+        ${doneBtn}
         <button onclick="editReminder(${r.id})" style="padding:5px 9px; border-radius:7px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:11px; cursor:pointer;">✏️</button>
         <button onclick="deleteReminder(${r.id})" style="padding:5px 9px; border-radius:7px; border:1px solid var(--red); background:transparent; color:var(--red); font-size:11px; cursor:pointer;">🗑</button>
       </div>`;
@@ -6814,6 +6833,24 @@ async function deleteReminder(id) {
   const { error } = await db.from('reminders').update({ deleted_at: new Date().toISOString() }).eq('id', id);
   if (error) { showToast('❌ ' + error.message, 'error'); return; }
   showToast('🗑 Изтрито', 'success');
+  loadReminders();
+  if (typeof checkEventsAlert === 'function') checkEventsAlert();
+}
+
+// Маркирай като изпълнено: при повтарящи се → придвижва към следващия период;
+// при еднократни → деактивира (изпълнено).
+async function markReminderDone(id) {
+  const { data: r } = await db.from('reminders').select('*').eq('id', id).single();
+  if (!r) return;
+  const open = _reminderNextDate(r);
+  const once = r.recurrence === 'once';
+  const ok = await showConfirm(once ? 'Маркирай като изпълнено?' : 'Маркирай текущия период като изпълнен?');
+  if (!ok) return;
+  const patch = { last_done_date: open ? _toISODate(open) : (r.due_date || _toISODate(new Date())) };
+  if (once) patch.active = false;
+  const { error } = await db.from('reminders').update(patch).eq('id', id);
+  if (error) { showToast('❌ ' + error.message, 'error'); return; }
+  showToast('✅ Отбелязано като изпълнено', 'success');
   loadReminders();
   if (typeof checkEventsAlert === 'function') checkEventsAlert();
 }
