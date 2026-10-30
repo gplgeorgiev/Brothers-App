@@ -1232,7 +1232,7 @@ input.qty-big-input {
 
 <div class="page" id="page-events">
   <div class="section-label">Предстоящи събития</div>
-  <div style="font-size:12px; color:var(--text2); margin-bottom:10px;">Изтичане на застраховки/прегледи за автомобилите и наеми за обектите (следващите 30 дни и просрочени).</div>
+  <div style="font-size:12px; color:var(--text2); margin-bottom:10px;">Напомняния с настъпващ срок (следващите 30 дни и просрочени).</div>
   <div id="eventsList" style="padding-bottom:120px;"><div class="loading"><div class="spinner"></div></div></div>
 </div>
 
@@ -6564,45 +6564,18 @@ async function loadVehiclesList() {
   `).join('');
 }
 
-// ── ПРЕДСТОЯЩИ СЪБИТИЯ (срокове автомобили + наеми обекти) ──
-function _eventDaysLeft(dateStr) {
-  const today = new Date(); today.setHours(0, 0, 0, 0);
-  const d = new Date(dateStr); d.setHours(0, 0, 0, 0);
-  return Math.round((d - today) / 86400000);
-}
-
-function _nextRentDate(day) {
-  const today = new Date(); today.setHours(0, 0, 0, 0);
-  const clamp = (yy, mm) => new Date(yy, mm, Math.min(day, new Date(yy, mm + 1, 0).getDate()));
-  let d = clamp(today.getFullYear(), today.getMonth());
-  if (d < today) {
-    const m = today.getMonth();
-    d = clamp(m === 11 ? today.getFullYear() + 1 : today.getFullYear(), (m + 1) % 12);
-  }
-  const off = d.getTimezoneOffset();
-  return new Date(d.getTime() - off * 60000).toISOString().slice(0, 10);
-}
-
+// ── ПРЕДСТОЯЩИ СЪБИТИЯ (от таблицата reminders) ──
 async function computeUpcomingEvents() {
   const events = [];
-  const { data: vehicles } = await db.from('vehicles').select('*').is('deleted_at', null);
-  const vdefs = [
-    { f: 'insurance_until', label: 'Гражданска отговорност', icon: '🛡' },
-    { f: 'inspection_until', label: 'Технически преглед', icon: '🔧' },
-    { f: 'casco_until', label: 'Каско', icon: '🚗' },
-    { f: 'vignette_until', label: 'Винетка', icon: '🏷' }
-  ];
-  (vehicles || []).forEach(v => {
-    vdefs.forEach(def => {
-      if (v[def.f]) events.push({ icon: def.icon, title: def.label, who: v.name, date: v[def.f], days: _eventDaysLeft(v[def.f]) });
-    });
-  });
-  const { data: objs } = await db.from('objects').select('*').is('deleted_at', null);
-  (objs || []).forEach(o => {
-    if (o.rent_day) {
-      const nd = _nextRentDate(o.rent_day);
-      events.push({ icon: '🏠', title: 'Наем', who: o.name, date: nd, days: _eventDaysLeft(nd) });
-    }
+  const { data } = await db.from('reminders')
+    .select('*, vehicles(name), objects(name)')
+    .is('deleted_at', null).eq('active', true);
+  (data || []).forEach(r => {
+    const days = _reminderDaysLeft(r);
+    if (days == null) return;
+    const cat = _remCat(r.category);
+    const who = r.vehicles?.name || r.objects?.name || '';
+    events.push({ icon: cat.icon, title: r.title, who, date: _reminderNextDate(r), days });
   });
   events.sort((a, b) => a.days - b.days);
   return events;
@@ -6627,7 +6600,7 @@ async function loadEvents() {
       <div style="display:flex; align-items:center; gap:10px; padding:12px 10px; border-bottom:1px solid var(--border);">
         <div style="font-size:22px;">${e.icon}</div>
         <div style="flex:1; min-width:0;">
-          <div style="font-size:14px; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${e.title} · ${e.who}</div>
+          <div style="font-size:14px; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${e.title}${e.who ? ' · ' + e.who : ''}</div>
           <div style="font-size:12px; color:var(--text2);">${dstr}</div>
         </div>
         <div style="font-size:12px; font-weight:800; color:${color}; white-space:nowrap;">${txt}</div>
