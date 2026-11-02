@@ -2790,11 +2790,11 @@ async function saveEditCf() {
         .is('deleted_at', null);
       const newTotal = (allCreditRows || []).reduce((s, r) => s + (r.amount || 0), 0);
 
-      // Обнови 60101 ред
+      // Обнови обобщения разходен ред (кафе 60101 / спирала 60104)
       await db.from('operations')
         .update({ amount: parseFloat(newTotal.toFixed(2)), cost_value: parseFloat(newTotal.toFixed(2)) })
         .eq('header_id', cf.operation_id)
-        .eq('account_code', '60101');
+        .in('account_code', ['60101', '60104']);
 
       // Обнови total_cost в хедъра
       await db.from('operation_headers')
@@ -3367,11 +3367,11 @@ async function saveEditLine() {
       .is('deleted_at', null);
     const newTotal = parseFloat(((creditLines || []).reduce((s, r) => s + (r.amount || 0), 0)).toFixed(2));
 
-    // Update 60101 реда (общия разход)
+    // Update обобщения разходен ред (кафе 60101 / спирала 60104)
     await db.from('operations')
       .update({ amount: newTotal, cost_value: newTotal })
       .eq('header_id', op.header_id)
-      .eq('account_code', '60101');
+      .in('account_code', ['60101', '60104']);
 
     // Update total_cost в хедъра
     await db.from('operation_headers').update({ total_cost: newTotal }).eq('id', op.header_id);
@@ -3399,9 +3399,20 @@ async function deleteLine(id) {
   const { error } = await db.from('operations').update({ deleted_at: new Date().toISOString() }).eq('id', id);
   if (error) { showToast('❌ ' + error.message, 'error'); return; }
   if (op?.header_id) {
-    const { data: allLines } = await db.from('operations').select('cost_value').eq('header_id', op.header_id).is('deleted_at', null);
-    const newTotal = (allLines || []).reduce((s, r) => s + (r.cost_value || 0), 0);
-    await db.from('operation_headers').update({ total_cost: parseFloat(newTotal.toFixed(2)) }).eq('id', op.header_id);
+    // Сума само от 30201 редовете (изписани материали), не от обобщения ред
+    const { data: creditLines } = await db.from('operations')
+      .select('amount')
+      .eq('header_id', op.header_id)
+      .eq('account_code', '30201')
+      .eq('entry_type', 'C')
+      .is('deleted_at', null);
+    const newTotal = parseFloat(((creditLines || []).reduce((s, r) => s + (r.amount || 0), 0)).toFixed(2));
+    // Обнови обобщения разходен ред (кафе 60101 / спирала 60104)
+    await db.from('operations')
+      .update({ amount: newTotal, cost_value: newTotal })
+      .eq('header_id', op.header_id)
+      .in('account_code', ['60101', '60104']);
+    await db.from('operation_headers').update({ total_cost: newTotal }).eq('id', op.header_id);
 
     // Спирала: обнови total_revenue (Σ sale_value по 30201) и преизчисли Отчитането
     const { data: saleLines } = await db.from('operations')
