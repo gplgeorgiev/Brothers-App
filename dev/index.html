@@ -60,69 +60,6 @@ input.qty-big-input {
     --green: #5a7a3d; --amber: #b85c2c; --red: #a83c2c;
     --text: #3a2818; --text2: #6b5237; --text3: #9b8266;
   }
-
-  /* ====== MODERN — чист минимализъм, светъл (fintech/SaaS) ====== */
-  [data-theme="modern"] {
-    --bg:#f7f8fa; --bg2:#ffffff; --bg3:#eef1f6;
-    --border:#e7eaf0; --accent:#4f46e5; --accent2:#6366f1;
-    --green:#10b981; --amber:#f59e0b; --red:#ef4444;
-    --text:#0f172a; --text2:#64748b; --text3:#9aa6b8;
-    --radius:18px;
-    --shadow:0 1px 2px rgba(15,23,42,.05), 0 2px 6px rgba(15,23,42,.05);
-    --shadow-lg:0 8px 26px rgba(79,70,229,.18);
-  }
-  /* ====== VIBRANT — изразително и цветно (топъл корал/оранж) ====== */
-  [data-theme="vibrant"] {
-    --bg:#fbf7f4; --bg2:#ffffff; --bg3:#f6ece4;
-    --border:#f0ddce; --accent:#f0493f; --accent2:#ff8a3d;
-    --green:#10b981; --amber:#f59e0b; --red:#e11d48;
-    --text:#241812; --text2:#7a5a46; --text3:#b49a86;
-    --radius:20px;
-    --shadow:0 2px 6px rgba(240,73,63,.07), 0 6px 20px rgba(240,73,63,.08);
-    --shadow-lg:0 10px 30px rgba(240,73,63,.22);
-  }
-
-  /* ---- Споделени модерни пречиствания (само за modern + vibrant) ---- */
-  /* Карти: мека елевация вместо плоска рамка */
-  [data-theme="modern"] .card, [data-theme="vibrant"] .card,
-  [data-theme="modern"] .summary-card, [data-theme="vibrant"] .summary-card {
-    border-color:transparent; box-shadow:var(--shadow);
-  }
-  [data-theme="modern"] .summary-card, [data-theme="vibrant"] .summary-card { background:var(--bg2); }
-  /* Header & долна навигация: без твърда рамка, лека сянка */
-  [data-theme="modern"] .header, [data-theme="vibrant"] .header {
-    border-bottom-color:transparent; box-shadow:0 1px 0 var(--border);
-  }
-  [data-theme="modern"] .bottom-nav, [data-theme="vibrant"] .bottom-nav {
-    border-top-color:transparent; box-shadow:0 -2px 18px rgba(15,23,42,.07);
-  }
-  /* Табове → pill */
-  [data-theme="modern"] .tab, [data-theme="vibrant"] .tab {
-    border-radius:999px; border-color:transparent; background:var(--bg3);
-  }
-  [data-theme="modern"] .tab.active, [data-theme="vibrant"] .tab.active {
-    background:var(--accent); border-color:transparent; color:#fff; box-shadow:var(--shadow);
-  }
-  /* Полета за въвеждане: безрамкови, фокус-пръстен в акцента */
-  [data-theme="modern"] .field input, [data-theme="modern"] .field select, [data-theme="modern"] .field textarea,
-  [data-theme="vibrant"] .field input, [data-theme="vibrant"] .field select, [data-theme="vibrant"] .field textarea {
-    border-color:transparent;
-  }
-  [data-theme="modern"] .field input:focus, [data-theme="modern"] .field select:focus, [data-theme="modern"] .field textarea:focus {
-    border-color:var(--accent); box-shadow:0 0 0 3px rgba(79,70,229,.14);
-  }
-  [data-theme="vibrant"] .field input:focus, [data-theme="vibrant"] .field select:focus, [data-theme="vibrant"] .field textarea:focus {
-    border-color:var(--accent); box-shadow:0 0 0 3px rgba(240,73,63,.14);
-  }
-  /* Избрана продуктова карта — неутрален фон вместо фиксирано синьо */
-  [data-theme="modern"] .prod-card.selected, [data-theme="vibrant"] .prod-card.selected { background:var(--bg3); }
-  /* Submit: Modern — плосък solid; Vibrant — запазва смелия градиент, по-силна сянка */
-  [data-theme="modern"] .submit-btn { background:var(--accent); box-shadow:var(--shadow-lg); }
-  [data-theme="vibrant"] .submit-btn { box-shadow:var(--shadow-lg); }
-  [data-theme="modern"] .qty-add-btn { box-shadow:var(--shadow); }
-  /* Vibrant акцентни заглавия на секции */
-  [data-theme="vibrant"] .section-label { color:var(--accent); }
-
   * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
   body { font-family:var(--font); background:var(--bg); color:var(--text); min-height:100vh; max-width:480px; margin:0 auto; padding-bottom:90px; }
 
@@ -1321,8 +1258,6 @@ input.qty-big-input {
       <label>ИЗБЕРИ ТЕМА</label>
       <select id="themeSelect" onchange="changeTheme(this.value)" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:10px 12px; color:var(--text); font-size:14px; width:100%; outline:none; appearance:none; font-family:var(--font);">
         <option value="standard">🎨 Стандарт</option>
-        <option value="modern">✨ Modern</option>
-        <option value="vibrant">🌈 Vibrant</option>
         <option value="coffee-dark">☕ Coffee Dark</option>
         <option value="coffee-light">🥛 Coffee Light</option>
       </select>
