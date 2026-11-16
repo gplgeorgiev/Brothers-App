@@ -322,8 +322,78 @@ input.qty-big-input {
   font-size: 9px !important;
   letter-spacing: 0.5px !important;
 }
-.stats-subtab { flex:1; min-width:0; padding:9px 2px; border-radius:9px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:11px; font-weight:700; cursor:pointer; font-family:var(--font); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.stats-subtab.active { background:var(--accent); color:#fff; border-color:var(--accent); }
+/* ====== СТАТИСТИКА / ТАБЛО — модерна визия ====== */
+:root { --elev:0 1px 2px rgba(16,24,40,.04), 0 4px 16px rgba(16,24,40,.06); --dash-border:transparent; }
+[data-theme="coffee-dark"] { --elev:none; --dash-border:var(--border); }
+
+/* Период (заглавие на страницата) + филтър-чипове + сегментен контрол */
+#statsPeriodLabel { font-size:20px; font-weight:800; letter-spacing:-0.4px; text-transform:none; color:var(--text); margin:8px 2px 12px; }
+.stats-chips { display:flex; gap:8px; }
+.stats-chip { flex:1; padding:10px 6px; border-radius:999px; border:1px solid var(--dash-border); background:var(--bg2); box-shadow:var(--elev); color:var(--text2); font-size:13px; font-weight:700; cursor:pointer; font-family:var(--font); white-space:nowrap; transition:transform 0.12s; }
+.stats-chip:active { transform:scale(0.96); }
+.stats-subtabs { display:flex; gap:2px; margin-top:12px; padding:3px; background:var(--bg3); border-radius:14px; }
+.stats-subtab { flex:1; min-width:0; padding:9px 2px; border-radius:11px; border:none; background:transparent; color:var(--text2); font-size:11px; font-weight:700; cursor:pointer; font-family:var(--font); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; transition:background 0.15s, color 0.15s; }
+.stats-subtab.active { background:var(--bg2); color:var(--text); box-shadow:0 1px 3px rgba(16,24,40,.14); }
+[data-theme="coffee-dark"] .stats-subtab.active { background:var(--accent); color:var(--bg); box-shadow:none; }
+
+/* Табло: повърхности с мека елевация, по-едри заглавия */
+#stab-dash .section-label { font-size:15px; font-weight:800; letter-spacing:-0.2px; text-transform:none; color:var(--text); margin:22px 2px 10px; }
+#stab-dash > .section-label:first-child { margin-top:4px; }
+#stab-dash .card { border-radius:20px; border-color:var(--dash-border); box-shadow:var(--elev); padding:18px; margin-bottom:12px; }
+.dash-num { font-family:var(--font); font-variant-numeric:tabular-nums; }
+.dash-num small { font-weight:700; color:var(--text3); letter-spacing:0; margin-left:3px; }
+.dash-neg { color:var(--red) !important; }
+
+/* Герой: резултат за периода */
+.dash-hero-label { font-size:13px; font-weight:600; color:var(--text2); }
+.dash-hero-value { font-size:40px; line-height:1.1; font-weight:800; letter-spacing:-1.2px; margin-top:4px; color:var(--green); }
+.dash-hero-value small { font-size:15px; }
+.dash-meter { display:flex; gap:3px; height:8px; margin:16px 0 14px; }
+.dash-meter > div { border-radius:999px; min-width:6px; }
+.dash-split { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.dash-kv-label { display:flex; align-items:center; gap:6px; font-size:12px; font-weight:600; color:var(--text2); }
+.dash-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+.dash-kv-value { font-size:20px; font-weight:800; letter-spacing:-0.4px; margin-top:2px; color:var(--text); }
+.dash-kv-value small { font-size:11px; }
+.dash-hero-meta { display:flex; justify-content:space-between; margin-top:14px; padding-top:12px; border-top:1px solid var(--border); font-size:12px; color:var(--text2); }
+.dash-hero-meta b { color:var(--text); font-weight:800; }
+
+/* Каса: редове по техник / банка */
+.dash-sub { display:flex; justify-content:space-between; align-items:center; margin:18px 0 4px; font-size:12px; font-weight:700; color:var(--text3); }
+.dash-ghost-btn { padding:5px 10px; border-radius:999px; border:none; background:var(--bg3); color:var(--text2); font-size:11px; font-weight:700; cursor:pointer; font-family:var(--font); }
+.dash-row { display:flex; align-items:center; gap:10px; padding:10px 0; cursor:pointer; }
+.dash-avatar { width:30px; height:30px; border-radius:50%; background:var(--bg3); color:var(--text2); font-size:12px; font-weight:800; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.dash-row-name { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:14px; font-weight:600; color:var(--text); }
+.dash-row-val { font-size:14px; font-weight:800; color:var(--text); white-space:nowrap; }
+.dash-row-val small { font-size:10px; }
+.dash-chev { display:flex; color:var(--text3); transition:transform 0.2s; flex-shrink:0; }
+.dash-chev.open { transform:rotate(180deg); }
+.dash-details { background:var(--bg3); border-radius:12px; padding:10px 12px; margin:0 0 8px; }
+.dash-details span { font-family:var(--font) !important; font-variant-numeric:tabular-nums; }
+
+/* Категории */
+.dash-cat + .dash-cat { margin-top:18px; padding-top:18px; border-top:1px solid var(--border); }
+.dash-cat-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+.dash-cat-title { display:flex; align-items:center; gap:6px; font-size:14px; font-weight:800; color:var(--text); }
+.dash-cat-total { font-size:16px; font-weight:800; letter-spacing:-0.3px; color:var(--text); }
+.dash-cat-total small { font-size:10px; }
+.dash-stack { display:flex; gap:2px; height:8px; margin-bottom:8px; }
+.dash-stack > div { border-radius:999px; min-width:3px; }
+.dash-cat-row { display:flex; align-items:center; gap:8px; padding:6px 0; font-size:13px; }
+.dash-cat-name { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text2); }
+.dash-cat-code { font-family:var(--mono); font-size:10px; color:var(--text3); margin-right:5px; }
+.dash-cat-val { font-weight:700; color:var(--text); }
+.dash-cat-pct { font-size:11px; color:var(--text3); min-width:34px; text-align:right; }
+
+/* Donut карти */
+.dash-card-title { font-size:14px; font-weight:800; color:var(--text); margin-bottom:12px; }
+.dash-donut { display:flex; gap:16px; align-items:center; }
+.dash-legend { flex:1; min-width:0; }
+.dash-legend-row { display:flex; align-items:center; gap:8px; font-size:12px; padding:3px 0; }
+.dash-legend-name { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text2); }
+.dash-legend-val { font-weight:700; color:var(--text); }
+.loss-note { font-size:12px; line-height:1.4; color:var(--text2); padding:10px 12px; background:rgba(220,38,38,0.08); border-radius:12px; margin-top:12px; }
+.loss-note b { color:var(--red); font-weight:700; }
 </style>
 </head>
 <body>
@@ -1020,13 +1090,13 @@ input.qty-big-input {
   <div class="section-label" id="statsPeriodLabel">Текущ месец</div>
 
   <!-- Компактен филтър (сгъваем) -->
-  <div class="card" style="padding:10px 14px;">
-    <div style="display:flex; gap:8px;">
-      <button onclick="statsResetMonth()" style="flex:1; padding:8px 4px; border-radius:8px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:13px; font-weight:700; cursor:pointer; font-family:var(--font); white-space:nowrap;">📅 Текущ</button>
-      <button onclick="statsPreviousMonth()" style="flex:1; padding:8px 4px; border-radius:8px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:13px; font-weight:700; cursor:pointer; font-family:var(--font); white-space:nowrap;">📅 Минал</button>
-      <button onclick="toggleStatsFilter()" id="statsFilterToggle" style="flex:0 0 auto; padding:8px 12px; border-radius:8px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:13px; font-weight:700; cursor:pointer; font-family:var(--font); white-space:nowrap;">По избор ▾</button>
+  <div>
+    <div class="stats-chips">
+      <button class="stats-chip" onclick="statsResetMonth()">Текущ</button>
+      <button class="stats-chip" onclick="statsPreviousMonth()">Минал</button>
+      <button class="stats-chip" onclick="toggleStatsFilter()" id="statsFilterToggle">По избор ▾</button>
     </div>
-    <div id="statsFilterAdvanced" style="display:none; margin-top:8px;">
+    <div id="statsFilterAdvanced" class="card" style="display:none; margin:10px 0 0; padding:12px; border-radius:16px; border-color:var(--dash-border); box-shadow:var(--elev);">
       <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px;">
         <input type="date" id="statsDateFrom" onchange="loadStats(); loadBalanceSummary();" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; font-family:var(--font);">
         <input type="date" id="statsDateTo" onchange="loadStats(); loadBalanceSummary();" style="background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:13px; width:100%; outline:none; font-family:var(--font);">
@@ -1038,7 +1108,7 @@ input.qty-big-input {
   </div>
 
   <!-- Сегментни табове -->
-  <div style="display:flex; gap:5px; margin-top:12px;">
+  <div class="stats-subtabs">
     <button class="stats-subtab active" data-stab="dash" onclick="selectStatsSubtab('dash')">🏠&#8202;Табло</button>
     <button class="stats-subtab" data-stab="charts" onclick="selectStatsSubtab('charts')">📊&#8202;Графики</button>
     <button class="stats-subtab" data-stab="objects" onclick="selectStatsSubtab('objects')">🏢&#8202;Обекти</button>
@@ -1050,13 +1120,13 @@ input.qty-big-input {
     <div class="section-label">Касова наличност</div>
     <div id="balanceSummary"><div class="loading"><div class="spinner"></div></div></div>
 
-    <div class="section-label" style="margin-top:20px">Приходи / Разходи</div>
-    <div class="stats-grid" id="statsGrid"><div class="loading" style="grid-column:1/-1"><div class="spinner"></div></div></div>
+    <div class="section-label">Приходи / Разходи</div>
+    <div id="statsGrid"><div class="loading"><div class="spinner"></div></div></div>
 
-    <div class="section-label" style="margin-top:24px">Категории</div>
-    <div class="card" id="statsCategories" style="padding:12px 14px;"></div>
+    <div class="section-label">Категории</div>
+    <div class="card" id="statsCategories"></div>
 
-    <div class="card" id="statsChartsDash" style="padding:12px 14px; margin-top:12px;"></div>
+    <div id="statsChartsDash"></div>
   </div>
 
   <!-- Таб: Графики -->
@@ -3528,6 +3598,9 @@ async function deleteOp(id) {
 }
 
 // ── STATS ──
+// Цяло число с разделител за хилядите (за едрите стойности в Таблото)
+function fmtInt(n) { return (Math.round(n) || 0).toLocaleString('bg-BG'); }
+
 function toggleStatDetails(safeId) {
   console.log('Toggle stat for:', safeId);
   const el = document.getElementById(`stat-details-${safeId}`);
@@ -3747,11 +3820,30 @@ async function loadStats() {
   const profit = totalIncome - totalExpense;
   const objCount = Object.keys(byObj).filter(k => byObj[k].income > 0 || byObj[k].expense > 0).length;
 
+  // Герой карта: резултат + съотношение приход/разход
+  const _flowSum = Math.max(totalIncome, 0) + Math.max(totalExpense, 0);
+  const _meter = _flowSum > 0 ? `
+      <div class="dash-meter">
+        <div style="flex:${Math.max(totalIncome, 0)} 1 0; background:var(--green);"></div>
+        <div style="flex:${Math.max(totalExpense, 0)} 1 0; background:var(--red);"></div>
+      </div>` : '<div style="height:16px;"></div>';
   grid.innerHTML = `
-    <div class="stat-card"><div class="stat-label">Приход</div><div class="stat-value green">${totalIncome.toFixed(0)} EUR</div></div>
-    <div class="stat-card"><div class="stat-label">Разход</div><div class="stat-value" style="color:var(--red)">${totalExpense.toFixed(0)} EUR</div></div>
-    <div class="stat-card"><div class="stat-label">Печалба</div><div class="stat-value ${profit >= 0 ? 'green' : ''}" style="${profit < 0 ? 'color:var(--red)' : ''}">${profit.toFixed(0)} EUR</div></div>
-    <div class="stat-card"><div class="stat-label">Обекти</div><div class="stat-value">${objCount}</div></div>`;
+    <div class="card">
+      <div class="dash-hero-label">${profit >= 0 ? 'Печалба' : 'Загуба'} за периода</div>
+      <div class="dash-hero-value dash-num ${profit < 0 ? 'dash-neg' : ''}">${fmtInt(profit)}<small>EUR</small></div>
+      ${_meter}
+      <div class="dash-split">
+        <div>
+          <div class="dash-kv-label"><span class="dash-dot" style="background:var(--green);"></span>Приход</div>
+          <div class="dash-kv-value dash-num">${fmtInt(totalIncome)}<small>EUR</small></div>
+        </div>
+        <div>
+          <div class="dash-kv-label"><span class="dash-dot" style="background:var(--red);"></span>Разход</div>
+          <div class="dash-kv-value dash-num">${fmtInt(totalExpense)}<small>EUR</small></div>
+        </div>
+      </div>
+      <div class="dash-hero-meta"><span>Активни обекти</span><b>${objCount}</b></div>
+    </div>`;
 
   // DEBUG
   console.log('byObj final state:', JSON.parse(JSON.stringify(byObj)));
@@ -4813,19 +4905,20 @@ async function loadBalanceSummary() {
   bankMoves.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
   const bankPeriodSum = bankMoves.reduce((s, m) => s + m.amount, 0);
 
+  const _chev = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>';
   el.innerHTML = `
-    <div class="stats-grid" style="margin-bottom:12px;">
-      <div class="stat-card">
-        <div class="stat-label">💵 Каса общо</div>
-        <div class="stat-value ${totalCash >= 0 ? 'green' : ''}" style="${totalCash < 0 ? 'color:var(--red)' : ''}">${totalCash.toFixed(0)} EUR</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">🏦 Банка общо</div>
-        <div class="stat-value ${totalBank >= 0 ? 'green' : ''}" style="${totalBank < 0 ? 'color:var(--red)' : ''}">${totalBank.toFixed(0)} EUR</div>
-      </div>
-    </div>
     <div class="card">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;"><div style="font-size:11px; font-weight:700; letter-spacing:1px; color:var(--text3); text-transform:uppercase;">По техник (каса)</div><button onclick="exportCashByTechnician()" style="padding:4px 8px; border-radius:6px; border:1px solid var(--accent); background:transparent; color:var(--accent); font-size:10px; font-weight:700; cursor:pointer; font-family:var(--font); text-transform:none;">📥 CSV</button></div>
+      <div class="dash-split">
+        <div>
+          <div class="dash-kv-label">💵 Каса</div>
+          <div class="dash-kv-value dash-num ${totalCash < 0 ? 'dash-neg' : ''}">${fmtInt(totalCash)}<small>EUR</small></div>
+        </div>
+        <div>
+          <div class="dash-kv-label">🏦 Банка</div>
+          <div class="dash-kv-value dash-num ${totalBank < 0 ? 'dash-neg' : ''}">${fmtInt(totalBank)}<small>EUR</small></div>
+        </div>
+      </div>
+      <div class="dash-sub"><span>По техник (каса)</span><button class="dash-ghost-btn" onclick="exportCashByTechnician()">CSV</button></div>
       ${Object.entries(byTech).map(([name, bal]) => {
         const safeId = btoa(unescape(encodeURIComponent(name))).replace(/[^a-zA-Z0-9]/g, '_').substring(0, 30);
         const moves = (movesByTech[name] || []).sort((a, b) => (a.date || '').localeCompare(b.date || ''));
@@ -4833,26 +4926,27 @@ async function loadBalanceSummary() {
         const startBal = startBalByTech[name] || 0;
         return `
         <div id="techCard-${safeId}">
-          <div class="info-row" style="cursor:pointer;" onclick="toggleTechDetails('${safeId}')">
-            <span class="key">👤 ${name} <span id="techArrow-${safeId}" style="font-size:10px; color:var(--text2);">▼</span></span>
-            <span class="val" style="color:${bal >= 0 ? 'var(--green)' : 'var(--red)'}">${bal.toFixed(2)} EUR</span>
+          <div class="dash-row" onclick="toggleTechDetails('${safeId}')">
+            <span class="dash-avatar">${(name || '?').trim().charAt(0).toUpperCase()}</span>
+            <span class="dash-row-name">${name}</span>
+            <span class="dash-row-val dash-num ${bal < 0 ? 'dash-neg' : ''}">${bal.toFixed(2)}<small>EUR</small></span>
+            <span id="techArrow-${safeId}" class="dash-chev">${_chev}</span>
           </div>
-          <div id="techDetails-${safeId}" style="display:none; padding:8px 0; border-top:1px dashed var(--border); margin-top:6px;">
+          <div id="techDetails-${safeId}" class="dash-details" style="display:none;">
             <div style="font-size:11px; font-weight:700; color:var(--text2); margin-bottom:6px; display:flex; justify-content:space-between;"><span>🏁 Начално салдо:</span><span style="font-family:var(--mono); color:${startBal >= 0 ? 'var(--green)' : 'var(--red)'};">${startBal.toFixed(2)}</span></div>
             ${moves.length ? `<div style="font-size:11px; font-weight:700; color:var(--text2); margin-bottom:6px; display:flex; justify-content:space-between;"><span>📊 Оборот за периода:</span><span style="font-family:var(--mono); color:${periodSum >= 0 ? 'var(--green)' : 'var(--red)'};">${periodSum >= 0 ? '+' : ''}${periodSum.toFixed(2)}</span></div>${moves.map(renderMove).join('')}` : '<div style="font-size:11px; color:var(--text3); font-style:italic;">Няма движения в периода</div>'}
           </div>
         </div>`;
       }).join('') || '<div style="color:var(--text3); font-size:13px;">Няма данни</div>'}
-      <div style="margin-top:12px; display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-        <div style="font-size:11px; font-weight:700; letter-spacing:1px; color:var(--text3); text-transform:uppercase;">Банка</div>
-        <button onclick="exportBankMovements()" style="padding:4px 8px; border-radius:6px; border:1px solid var(--accent); background:transparent; color:var(--accent); font-size:10px; font-weight:700; cursor:pointer; font-family:var(--font); text-transform:none;">📥 CSV</button>
-      </div>
+      <div class="dash-sub"><span>Банка</span><button class="dash-ghost-btn" onclick="exportBankMovements()">CSV</button></div>
       <div id="bankCard">
-        <div class="info-row" style="cursor:pointer;" onclick="toggleBankDetails()">
-          <span class="key">🏦 Общ баланс <span id="bankArrow" style="font-size:10px; color:var(--text2);">▼</span></span>
-          <span class="val" style="color:${totalBank >= 0 ? 'var(--green)' : 'var(--red)'}">${totalBank.toFixed(2)} EUR</span>
+        <div class="dash-row" onclick="toggleBankDetails()">
+          <span class="dash-avatar">🏦</span>
+          <span class="dash-row-name">Общ баланс</span>
+          <span class="dash-row-val dash-num ${totalBank < 0 ? 'dash-neg' : ''}">${totalBank.toFixed(2)}<small>EUR</small></span>
+          <span id="bankArrow" class="dash-chev">${_chev}</span>
         </div>
-        <div id="bankDetails" style="display:none; padding:8px 0; border-top:1px dashed var(--border); margin-top:6px;">
+        <div id="bankDetails" class="dash-details" style="display:none;">
           <div style="font-size:11px; font-weight:700; color:var(--text2); margin-bottom:6px; display:flex; justify-content:space-between;"><span>🏁 Начално салдо:</span><span style="font-family:var(--mono); color:${bankStartBal >= 0 ? 'var(--green)' : 'var(--red)'};">${bankStartBal.toFixed(2)}</span></div>
           ${bankMoves.length ? `<div style="font-size:11px; font-weight:700; color:var(--text2); margin-bottom:6px; display:flex; justify-content:space-between;"><span>📊 Оборот за периода:</span><span style="font-family:var(--mono); color:${bankPeriodSum >= 0 ? 'var(--green)' : 'var(--red)'};">${bankPeriodSum >= 0 ? '+' : ''}${bankPeriodSum.toFixed(2)}</span></div>${bankMoves.map(renderMove).join('')}` : '<div style="font-size:11px; color:var(--text3); font-style:italic;">Няма движения в периода</div>'}
         </div>
@@ -4866,7 +4960,7 @@ function toggleBankDetails() {
   if (!el) return;
   const visible = el.style.display !== 'none';
   el.style.display = visible ? 'none' : 'block';
-  if (arrow) arrow.textContent = visible ? '▼' : '▲';
+  if (arrow) arrow.classList.toggle('open', !visible);
 }
 
 function toggleTechDetails(safeId) {
@@ -4875,7 +4969,7 @@ function toggleTechDetails(safeId) {
   if (!el) return;
   const visible = el.style.display !== 'none';
   el.style.display = visible ? 'none' : 'block';
-  if (arrow) arrow.textContent = visible ? '▼' : '▲';
+  if (arrow) arrow.classList.toggle('open', !visible);
 }
 
 // ── SERVICE ──
@@ -7029,29 +7123,27 @@ async function renderStatsCategories(validOps, fuelByObj, byObjAll, excludedAcco
   const renderSection = (arr, total, title, titleColor) => {
     if (!arr.length) return '';
     let segments = '';
-    let cumPct = 0;
     const items = arr.map(([code, value], i) => {
       const percent = total > 0 ? (value / total * 100) : 0;
       const color = colors[i % colors.length];
       const name = code === '_fuel' ? 'Гориво начислено' : code === '_rent' ? 'Наем начислен' : (accNames.get(code) || code);
       const codeDisplay = code.startsWith('_') ? '' : code;
-      segments += `<div style="position:absolute; left:${cumPct}%; top:0; bottom:0; width:${percent}%; background:${color};"></div>`;
-      cumPct += percent;
+      segments += `<div style="flex:${value} 1 0; background:${color};"></div>`;
       return { code: codeDisplay, name, value, percent, color };
     });
     return `
-      <div style="margin-bottom:18px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-          <div style="font-size:12px; font-weight:800; color:${titleColor}; text-transform:uppercase; letter-spacing:0.5px;">${title}</div>
-          <div style="font-family:var(--mono); font-size:14px; font-weight:800; color:${titleColor};">${total.toFixed(2)} EUR</div>
+      <div class="dash-cat">
+        <div class="dash-cat-head">
+          <div class="dash-cat-title">${title}</div>
+          <div class="dash-cat-total dash-num">${total.toFixed(2)}<small>EUR</small></div>
         </div>
-        <div style="position:relative; height:14px; background:var(--bg3); border-radius:3px; overflow:hidden; margin-bottom:8px;">${segments}</div>
+        <div class="dash-stack">${segments}</div>
         ${items.map(it => `
-          <div style="display:flex; align-items:center; gap:6px; font-size:11px; padding:3px 0;">
-            <div style="width:8px; height:8px; border-radius:2px; background:${it.color}; flex-shrink:0;"></div>
-            <span style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text2);">${it.code ? '<span style="font-family:var(--mono); color:var(--text3); margin-right:4px;">' + it.code + '</span>' : ''}${it.name}</span>
-            <span style="font-family:var(--mono); font-weight:700; color:var(--text);">${it.value.toFixed(2)}</span>
-            <span style="font-family:var(--mono); font-size:10px; color:var(--text3); min-width:34px; text-align:right;">${it.percent.toFixed(0)}%</span>
+          <div class="dash-cat-row">
+            <span class="dash-dot" style="background:${it.color};"></span>
+            <span class="dash-cat-name">${it.code ? '<span class="dash-cat-code">' + it.code + '</span>' : ''}${it.name}</span>
+            <span class="dash-cat-val dash-num">${it.value.toFixed(2)}</span>
+            <span class="dash-cat-pct dash-num">${it.percent.toFixed(0)}%</span>
           </div>
         `).join('')}
       </div>
@@ -7081,32 +7173,40 @@ function renderStatsCharts(sorted, drinksByObj, stackedByObj, objsForStats, date
   // Helper за рисуване на donut
   function drawDonut(data, totalLabel, totalValue, totalUnit) {
     if (!data.length || totalValue <= 0) return '';
-    const cx = 80, cy = 80, r = 60, strokeWidth = 22;
+    const cx = 80, cy = 80, r = 64, strokeWidth = 16;
+    const gap = data.length > 1 ? 0.04 : 0;  // малка пролука между сегментите (rad)
     let cumAngle = -Math.PI / 2;
     const slices = data.map((d, i) => {
       const angle = (d.value / totalValue) * 2 * Math.PI;
-      const x1 = cx + r * Math.cos(cumAngle);
-      const y1 = cy + r * Math.sin(cumAngle);
-      const x2 = cx + r * Math.cos(cumAngle + angle);
-      const y2 = cy + r * Math.sin(cumAngle + angle);
-      const largeArc = angle > Math.PI ? 1 : 0;
+      const pad = angle > gap * 2 ? gap / 2 : 0;
+      const a1 = cumAngle + pad, a2 = cumAngle + angle - pad;
+      const x1 = cx + r * Math.cos(a1);
+      const y1 = cy + r * Math.sin(a1);
+      const x2 = cx + r * Math.cos(a2);
+      const y2 = cy + r * Math.sin(a2);
+      const largeArc = (a2 - a1) > Math.PI ? 1 : 0;
       const path = `M ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2}`;
       cumAngle += angle;
       return { ...d, percent: (d.value / totalValue * 100).toFixed(1), path, color: colors[i % colors.length] };
     });
+    // един сегмент = пълен кръг (дъга от точка до същата точка не се рисува)
+    const ring = slices.length === 1
+      ? `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${slices[0].color}" stroke-width="${strokeWidth}"/>`
+      : slices.map(s => `<path d="${s.path}" fill="none" stroke="${s.color}" stroke-width="${strokeWidth}"/>`).join('');
     return `
-      <div style="display:flex; gap:16px; align-items:center; margin-bottom:16px;">
-        <svg width="160" height="160" viewBox="0 0 160 160" style="flex-shrink:0;">
-          ${slices.map(s => `<path d="${s.path}" fill="none" stroke="${s.color}" stroke-width="${strokeWidth}"/>`).join('')}
-          <text x="80" y="78" text-anchor="middle" font-size="10" font-weight="700" fill="var(--text2)">${totalLabel}</text>
-          <text x="80" y="92" text-anchor="middle" font-size="14" font-weight="800" fill="var(--text)" font-family="var(--mono)">${totalValue.toFixed(0)}${totalUnit ? ' ' + totalUnit : ''}</text>
+      <div class="dash-donut">
+        <svg width="148" height="148" viewBox="0 0 160 160" style="flex-shrink:0;">
+          ${ring}
+          <text x="80" y="72" text-anchor="middle" font-size="10" font-weight="700" letter-spacing="0.8" fill="var(--text3)">${totalLabel}</text>
+          <text x="80" y="96" text-anchor="middle" font-size="21" font-weight="800" fill="var(--text)" style="font-variant-numeric:tabular-nums;">${fmtInt(totalValue)}</text>
+          ${totalUnit ? `<text x="80" y="111" text-anchor="middle" font-size="10" font-weight="700" fill="var(--text3)">${totalUnit}</text>` : ''}
         </svg>
-        <div style="flex:1; min-width:0;">
+        <div class="dash-legend">
           ${slices.map(s => `
-            <div style="display:flex; align-items:center; gap:6px; font-size:11px; margin-bottom:4px;">
-              <div style="width:10px; height:10px; border-radius:2px; background:${s.color}; flex-shrink:0;"></div>
-              <div style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text2);">${s.name}</div>
-              <div style="font-family:var(--mono); font-weight:700; color:var(--text);">${Math.round(s.value)}</div>
+            <div class="dash-legend-row">
+              <span class="dash-dot" style="background:${s.color};"></span>
+              <span class="dash-legend-name">${s.name}</span>
+              <span class="dash-legend-val dash-num">${fmtInt(s.value)}</span>
             </div>
           `).join('')}
         </div>
@@ -7121,12 +7221,13 @@ function renderStatsCharts(sorted, drinksByObj, stackedByObj, objsForStats, date
   const totalProfit = profitByObj.reduce((sum, d) => sum + d.value, 0);
   let pieHtml = '';
   if (totalProfit > 0) {
-    pieHtml += '<div style="font-size:11px; font-weight:700; color:var(--text3); text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;">💰 Печалба по обекти</div>';
+    pieHtml += '<div class="card"><div class="dash-card-title">Печалба</div>';
     pieHtml += drawDonut(profitByObj, 'ПЕЧАЛБА', totalProfit, 'EUR');
     if (lossByObj.length > 0) {
       const lossText = lossByObj.map(d => `${d.name} (${d.value.toFixed(0)} EUR)`).join(', ');
-      pieHtml += `<div style="font-size:11px; color:var(--text3); padding:6px 10px; background:var(--bg3); border-left:3px solid var(--red); border-radius:4px; margin-bottom:12px;"><span style="color:var(--red); font-weight:700;">⚠️ Със загуба:</span> ${lossText}</div>`;
+      pieHtml += `<div class="loss-note"><b>⚠️ Със загуба:</b> ${lossText}</div>`;
     }
+    pieHtml += '</div>';
   }
   
   // 2B. Donut: БРОЙ НАПИТКИ ПО ОБЕКТИ (от drinksByObj подадено отдолу)
@@ -7137,10 +7238,12 @@ function renderStatsCharts(sorted, drinksByObj, stackedByObj, objsForStats, date
       .sort((a, b) => b.value - a.value);
     const totalDrinks = drinksArr.reduce((sum, d) => sum + d.value, 0);
     if (totalDrinks > 0) {
-      pieHtml += '<div style="font-size:11px; font-weight:700; color:var(--text3); text-transform:uppercase; letter-spacing:1px; margin-bottom:8px; margin-top:8px;">☕ Брой напитки по обекти</div>';
+      pieHtml += '<div class="card"><div class="dash-card-title">Брой напитки</div>';
       pieHtml += drawDonut(drinksArr, 'НАПИТКИ', totalDrinks, '');
+      pieHtml += '</div>';
     }
   }
+  if (pieHtml) pieHtml = '<div class="section-label">По обекти</div>' + pieHtml;
 
   // 3. Bar chart - приходи (синьо) + печалба (зелено) | разходи (жълто) + загуба (червено)
   // Логика:
@@ -7294,7 +7397,7 @@ function renderStatsCharts(sorted, drinksByObj, stackedByObj, objsForStats, date
         .map(n => ({ n, v: (stackedByObj[n] && stackedByObj[n]['Резултат']) || 0 }))
         .sort((a, b) => a.v - b.v)
         .map(x => `${x.n} (${x.v.toFixed(0)} EUR)`).join(', ');
-      stackedHtml += `<div style="font-size:11px; color:var(--text3); padding:6px 10px; background:var(--bg3); border-left:3px solid var(--red); border-radius:4px; margin-top:10px;"><span style="color:var(--red); font-weight:700;">⚠️ Със загуба:</span> ${lossText}</div>`;
+      stackedHtml += `<div class="loss-note"><b>⚠️ Със загуба:</b> ${lossText}</div>`;
     }
 
     // Графика 2: Проценти (100% stacked)
