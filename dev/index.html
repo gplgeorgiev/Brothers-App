@@ -752,6 +752,11 @@ input.qty-big-input {
         <img id="invoiceOcrImg" style="max-width:100%; max-height:180px; object-fit:contain;">
       </div>
       <div id="invoiceOcrStatus" class="ocr-status"></div>
+      <!-- DEV диагностика: суровият текст от OCR (за настройка на правилата) -->
+      <details id="invoiceOcrRawWrap" style="display:none; margin-top:8px;">
+        <summary style="font-size:12px; font-weight:700; color:var(--text2); cursor:pointer;">Разчетен текст (OCR)</summary>
+        <textarea id="invoiceOcrRaw" readonly style="width:100%; height:200px; margin-top:6px; background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px; color:var(--text); font-family:var(--mono); font-size:11px;"></textarea>
+      </details>
     </div>
   </div>
 
@@ -5073,6 +5078,14 @@ async function processInvoiceOCR(input) {
       console.log('Parsed:', JSON.stringify(data.parsed));
       console.log('Raw text:', data.raw_text);
       console.log('========================');
+      const rawWrap = document.getElementById('invoiceOcrRawWrap');
+      if (rawWrap) {
+        const p0 = data.parsed || {};
+        document.getElementById('invoiceOcrRaw').value =
+          `parsed: doc=${p0.document_ref || 'NULL'} | contractor=${p0.contractor || 'NULL'} | amount=${p0.amount || 'NULL'} | date=${p0.date || 'NULL'}\n\n` +
+          (data.raw_text || '(няма raw_text в отговора)');
+        rawWrap.style.display = 'block';
+      }
       // Покажи parsed на екрана за тест
       const dbgEl = document.getElementById('invoiceOcrStatus');
       if (dbgEl) {
