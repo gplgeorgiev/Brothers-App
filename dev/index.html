@@ -404,9 +404,9 @@ input.qty-big-input {
       </div>
       <button class="gps-btn" onclick="getGPS()">📍</button>
     </div>
-    <div class="gps-status" id="gpsStatus"></div>
-    <div id="objectInfo"></div>
   </div>
+  <div class="gps-status" id="gpsStatus"></div>
+  <div id="objectInfo"></div>
 
   <!-- COFFEE секции (само за кафе машини) -->
   <div id="coffeeRestockSections">
@@ -423,10 +423,10 @@ input.qty-big-input {
         <input class="qty-big-input" id="popupQtyInput" type="text" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*" value="1" oninput="updateBasketFromInput(this.value.replace(',', '.'))" oncontextmenu="event.preventDefault();" onfocus="this.select()">
         <div class="qty-big-btn" onclick="changePopupQty(1)">＋</div>
       </div>
-      
+
     </div>
-    <div class="added-lines" id="addedLines"></div>
   </div>
+  <div class="added-lines" id="addedLines"></div>
 
   <!-- РЕЗЮМЕ -->
   <div id="summarySection" style="display:none;"></div>
@@ -704,8 +704,8 @@ input.qty-big-input {
       </div>
       <button class="gps-btn" onclick="getGPSFinance()">📍</button>
     </div>
-    <div class="gps-status" id="finGpsStatus"></div>
   </div>
+  <div class="gps-status" id="finGpsStatus"></div>
 
   <!-- 2. ТИП (по подразбиране Разход) -->
   <div class="section-label">Тип</div>
@@ -729,8 +729,8 @@ input.qty-big-input {
       </div>
       <button class="qty-add-btn" onclick="addFinLine()">✓ Добави</button>
     </div>
-    <div class="added-lines" id="finLines"></div>
   </div>
+  <div class="added-lines" id="finLines"></div>
 
   <div id="finSummary"></div>
 
