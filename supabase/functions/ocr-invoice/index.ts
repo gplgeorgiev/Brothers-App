@@ -143,6 +143,10 @@ function parseInvoice(text: string) {
   if (!result.amount) {
     result.amount = largestAmountAfter(text, /за\s*плащане/i);
   }
+  // "Обща стойност (EUR):" — същата подредба по колони (стойност / ДДС / обща)
+  if (!result.amount) {
+    result.amount = largestAmountAfter(text, /обща\s*стойност/i);
+  }
 
   // Fallback: ако не намерим, взимай ПОСЛЕДНОТО € число (обикновено е общата сума)
   if (!result.amount) {
@@ -167,7 +171,8 @@ function parseInvoice(text: string) {
 
   // 5. Контрагент
   //    "кофи брадърс / coffee brothers" — това сме ние (Получател), никога не е контрагент
-  const skipKeywords = /(пос\s*терминал|оригинал|копие|адрес|клиент|данни|каса|транзак|получател|купувач|идент|здас|еик|ддс|метанстанция|метастанция|колонка|шофьор|продавач|титуляр|банка|bic|iban|място|клон|НАП|номер|телефон|email|свежест|стара|общ|улица|ул\.|гр\.|с\.|плащане|словом|пълномощно|подпис|печат|съставил|дата|мярка|колич|цена|стойност|всичко|общо|основание|данъкът|обстоятелствата|сума|бр\b|кг\b|кофи\s*брад|coffee\s*brothers)/i;
+  //    Банките (ОББ АД, ДСК ЕАД...) са до IBAN-а на издателя, не са контрагент
+  const skipKeywords = /(пос\s*терминал|оригинал|копие|адрес|клиент|данни|каса|транзак|получател|купувач|идент|здас|еик|ддс|метанстанция|метастанция|колонка|шофьор|продавач|титуляр|банка|bic|iban|място|клон|НАП|номер|телефон|email|свежест|стара|общ|улица|ул\.|гр\.|с\.|плащане|словом|пълномощно|подпис|печат|съставил|дата|мярка|колич|цена|стойност|всичко|общо|основание|данъкът|обстоятелствата|сума|бр\b|кг\b|кофи\s*брад|coffee\s*brothers|обб|дск|уникредит|булбанк|пощенска|първа\s*инвестиционна|fibank|райфайзен|прокредит|цкб|кооперативна|инвестбанк|токуда|тексим|bacb|българо[\s-]*американска)/i;
   const corpForms = /(?<![а-яА-Я])(ЕООД|ЕГОД|ЕОД|ООО|ООД|ЕАД|АД|ЕТ|EOOD|OOD|LTD)(?![а-яА-Я])/;
 
   // ПРИОРИТЕТ 1: Намери текст след "издател:" - стандартна фактура
@@ -175,14 +180,18 @@ function parseInvoice(text: string) {
   if (issuerIdx >= 0) {
     const textAfter = text.substring(issuerIdx);
     const linesAfter = textAfter.split('\n').map(l => l.trim()).filter(Boolean);
+    let foundAt = Infinity;  // на колко реда след етикета е намереното име
     for (let i = 0; i < Math.min(linesAfter.length, 30); i++) {
-      const line = linesAfter[i];
+      // "Издател: Фирма ООД" на един ред — без самия етикет
+      const line = i === 0 ? linesAfter[0].replace(/^издател[:\s]*/i, '') : linesAfter[i];
       if (skipKeywords.test(line)) continue;
       if (line.startsWith('BG') || /^\d+$/.test(line)) continue;  // ЕИК
       if (!corpForms.test(line)) continue;
       // Намерихме ред с правна форма
+      foundAt = i;
       // Ако е къс (< 20 символа), вероятно е продължение на предишен ред
-      if (line.length < 20 && i > 0) {
+      // (но не и на самия етикет "Издател" на ред 0)
+      if (line.length < 20 && i > 1) {
         const prev = linesAfter[i-1];
         if (!skipKeywords.test(prev) && prev.length < 60 && !prev.startsWith('BG') && !/^\d+$/.test(prev)) {
           result.contractor = (prev + ' ' + line).replace(/["'']/g, '').trim().substring(0, 100);
@@ -191,6 +200,17 @@ function parseInvoice(text: string) {
       }
       result.contractor = line.replace(/["'']/g, '').trim().substring(0, 100);
       break;
+    }
+
+    // Vision понякога слага името ПРЕДИ етикета (колоните се четат поотделно):
+    // "Автогранд ООД / ИЗДАТЕЛ". Ако на 1–2 реда преди етикета има фирма и е
+    // по-близо от намерената след него — тя е издателят. Не минаваме през "Получател".
+    const labelLine = lines.findIndex(l => /издател/i.test(l));
+    for (let k = 1; k <= 2 && labelLine - k >= 0 && k < foundAt; k++) {
+      const line = lines[labelLine - k];
+      if (/получател|купувач/i.test(line)) break;
+      if (skipKeywords.test(line) || line.startsWith('BG') || /^\d+$/.test(line)) continue;
+      if (corpForms.test(line)) { result.contractor = line.replace(/["'']/g, '').trim().substring(0, 100); break; }
     }
   }
 
@@ -239,13 +259,13 @@ function parseInvoice(text: string) {
 }
 
 // Най-голямата сума (в евро, ако има маркирани с €/EUR/евро) в блока след етикета.
-// Блокът спира до "Словом" / IBAN / "Дата на данъчно събитие" или до 250 знака.
+// Блокът спира до "Словом" / IBAN / "Дата на данъчно събитие" / BGN или до 250 знака.
 // Дати (17.11.2026) и суми в лева се пропускат.
 function largestAmountAfter(text: string, label: RegExp): number | null {
   const m = label.exec(text);
   if (!m) return null;
   let win = text.slice(m.index, m.index + 250);
-  const stop = win.search(/словом|iban|дата\s*на\s*данъчно/i);
+  const stop = win.search(/словом|iban|дата\s*на\s*данъчно|\bbgn\b/i);
   if (stop > 0) win = win.slice(0, stop);
   const eur: number[] = [], plain: number[] = [];
   const re = /(?<![\d.,])((?:\d{1,3}(?:[  ]\d{3})+|\d+)[.,]\d{2})(?!\d|[.,]\d)\s*(€|eur|евро|лв|bgn)?/gi;
