@@ -4360,6 +4360,7 @@ async function saveFinance() {
   document.getElementById('finDocRef').value = '';
   document.getElementById('finContractor').value = '';
   document.getElementById('finComment').value = '';
+  clearInvoiceOcr();
   const finDateEl = document.getElementById('finDateInput');
   if (finDateEl) finDateEl.value = getLocalDateString();
   loadTxHistory();
@@ -4945,9 +4946,26 @@ async function saveNewCustomer() {
   ['ncName','ncPhone','ncEmail','ncAddress'].forEach(id => document.getElementById(id).value = '');
 }
 
+// Изчисти прегледа на сканирания документ (снимка, статус, разчетен текст) и избрания файл
+function clearInvoiceOcr() {
+  const preview = document.getElementById('invoiceOcrPreview');
+  if (preview) preview.style.display = 'none';
+  const img = document.getElementById('invoiceOcrImg');
+  if (img) img.removeAttribute('src');
+  const status = document.getElementById('invoiceOcrStatus');
+  if (status) { status.className = 'ocr-status'; status.textContent = ''; }
+  const rawWrap = document.getElementById('invoiceOcrRawWrap');
+  if (rawWrap) { rawWrap.style.display = 'none'; rawWrap.open = false; }
+  const raw = document.getElementById('invoiceOcrRaw');
+  if (raw) raw.value = '';
+  ['invoiceCameraInput', 'invoiceGalleryInput'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+}
+
 async function processInvoiceOCR(input) {
   const file = input.files[0];
   if (!file) return;
+  // Изчисти избора веднага (и при грешка), за да може същата снимка да се избере отново
+  input.value = '';
 
   const reader = new FileReader();
   reader.onload = async (e) => {
@@ -5045,8 +5063,6 @@ async function processInvoiceOCR(input) {
       status.className = 'ocr-status error';
       status.textContent = '❌ Грешка: ' + err.message;
     }
-
-    input.value = '';
   };
   reader.readAsDataURL(file);
 }
